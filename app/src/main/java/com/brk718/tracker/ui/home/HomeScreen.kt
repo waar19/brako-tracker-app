@@ -124,14 +124,15 @@ fun ShipmentCard(
                     else -> MaterialTheme.colorScheme.tertiary
                 }
                 
-                if (item.shipment.status == "LOGIN_REQUIRED") {
+                if (item.shipment.status == "LOGIN_REQUIRED" || 
+                    (item.shipment.trackingNumber.startsWith("111-") && item.shipment.status == "No disponible")) {
                     Button(
                         onClick = onAmazonAuthClick,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text("Conectar Amazon")
+                        Text(if (item.shipment.status == "No disponible") "Reconectar Amazon" else "Conectar Amazon")
                     }
                 } else {
                     AssistChip(

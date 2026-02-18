@@ -58,22 +58,26 @@ fun AmazonAuthScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
+            var isLoading by remember { mutableStateOf(true) }
+
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     WebView(context).apply {
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
-                        settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                        // settings.userAgentString = ... // Dejamos el default del sistema para evitar errores de JS
                         
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 super.onPageStarted(view, url, favicon)
+                                isLoading = true
                                 checkLogin(url)
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
+                                isLoading = false
                                 checkLogin(url)
                             }
                             
@@ -85,10 +89,11 @@ fun AmazonAuthScreen(
                             private fun checkLogin(url: String?) {
                                 if (url == null) return
                                 // Detectar redirección a distintas variantes de "Mi Cuenta" o "Mis Pedidos"
-                                if (url.contains("your-account") || 
-                                    url.contains("order-history") ||
-                                    url.contains("css/order-history") ||
-                                    url.contains("/gp/aw/ya")) {
+                                val lowerUrl = url.lowercase()
+                                if (lowerUrl.contains("your-account") || 
+                                    lowerUrl.contains("order-history") ||
+                                    lowerUrl.contains("css/order-history") ||
+                                    lowerUrl.contains("/gp/aw/ya")) {
                                     
                                     // Guardamos las cookies de la URL actual
                                     viewModel.saveCookies(url)
@@ -101,6 +106,12 @@ fun AmazonAuthScreen(
                     }
                 }
             )
+            
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
         }
     }
 }

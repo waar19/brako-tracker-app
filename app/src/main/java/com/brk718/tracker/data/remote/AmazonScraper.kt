@@ -28,27 +28,54 @@ class AmazonScraper @Inject constructor() {
             // Lógica de scraping (aproximada, Amazon cambia esto a menudo)
             // Buscamos contenedores comunes de estado
             
+            // Verificar si nos redirigió al login
+            val title = doc.title()
+            if (title.contains("Sign-In", ignoreCase = true) || 
+                doc.select("form[name='signIn']").isNotEmpty()) {
+                throw Exception("Sign-In required")
+            }
+
+            // Lógica de scraping (multi-selector para robustez)
             // 1. Estado principal
-            var status = doc.select("div.shipment-top-status").text()
-            if (status.isEmpty()) status = doc.select("h2.a-color-state").text()
-            if (status.isEmpty()) status = "No disponible"
+            var status = doc.select("div.shipment-top-status").text() // Mobile new
+            if (status.isEmpty()) status = doc.select("h2.a-color-state").text() // Mobile generic
+            if (status.isEmpty()) status = doc.select("div.js-shipment-info-container h2").text() // Desktop generic
+            if (status.isEmpty()) status = doc.select("div.pt-delivery-card-primary-status").text() // Another mobile variant
+            
+            // Fallback: buscar cualquier texto grande en la cabecera
+            if (status.isEmpty()) status = doc.select("h1.a-spacing-small").text()
 
             // 2. Fecha de entrega
-            val arrivalDate = doc.select("span.arrival-date-text").text().takeIf { it.isNotEmpty() }
-            
-            // 3. Ubicación (para el mapa) - Buscamos en el timeline o texto de tracking
-            // A menudo está en div.tracking-event-location o similar
-            val location = doc.select("span.tracking-event-location").last()?.text()
+            var arrivalDate = doc.select("span.arrival-date-text").text()
+            if (arrivalDate.isEmpty()) arrivalDate = doc.select("span.promise-date").text()
 
-            // 4. Progreso (barra)
-            // A veces es un width: X%
-            // O una clase step-active
+            // 3. Ubicación (para el mapa)
+            // Buscamos en el timeline el evento más reciente
+            var location: String? = null
+            val locationElement = doc.select("span.tracking-event-location").first() // Mobile list
+            if (locationElement != null) {
+                location = locationElement.text()
+            } else {
+                // Desktop list often has layout: Date | Time | Location | Description
+                // We try to find a row with location text
+                val rows = doc.select("div.a-row.tracking-event-row")
+                if (rows.isNotEmpty()) {
+                    val firstRow = rows.first()
+                    // This is tricky without specific structure, usually column 3?
+                    // Let's rely on mobile view mostly as we use mobile UA
+                }
+            }
+            
+            if (status.isEmpty()) {
+                // Loguear para debug
+                println("AmazonScraper: No status found. Title: $title")
+            }
             
             return ScrapedInfo(
-                status = status,
-                arrivalDate = arrivalDate,
+                status = status.takeIf { it.isNotEmpty() } ?: "No disponible",
+                arrivalDate = arrivalDate.takeIf { it.isNotEmpty() } ?: null,
                 location = location,
-                progress = null // Implementar lógica de barra si es posible
+                progress = null
             )
         } catch (e: Exception) {
             e.printStackTrace()
