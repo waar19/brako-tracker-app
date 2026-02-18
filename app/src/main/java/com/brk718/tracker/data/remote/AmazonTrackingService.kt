@@ -15,9 +15,13 @@ import javax.inject.Singleton
  * como TBA, AMZPSR, etc.
  */
 @Singleton
-class AmazonTrackingService @Inject constructor(
-    private val okHttpClient: OkHttpClient
-) {
+class AmazonTrackingService @Inject constructor() {
+
+    // Cliente HTTP propio (sin interceptores de AfterShip)
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
 
     companion object {
         private const val TAG = "AmazonTracking"
@@ -59,7 +63,7 @@ class AmazonTrackingService @Inject constructor(
                 .header("Accept", "application/json")
                 .build()
 
-            val response = okHttpClient.newCall(request).execute()
+            val response = httpClient.newCall(request).execute()
             val body = response.body?.string() ?: return@withContext AmazonTrackingResult(
                 status = null, expectedDelivery = null, events = emptyList(), error = "Sin respuesta"
             )
