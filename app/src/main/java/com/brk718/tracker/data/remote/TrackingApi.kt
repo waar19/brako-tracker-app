@@ -6,6 +6,10 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 
 interface TrackingApi {
+    // Detectar el courier correcto por número de tracking
+    @POST("couriers/detect")
+    suspend fun detectCouriers(@Body body: DetectCourierRequest): DetectCourierResponse
+
     // Crear un tracking en AfterShip (requerido antes de poder consultarlo)
     @POST("trackings")
     suspend fun createTracking(@Body body: CreateTrackingRequest): AfterShipResponse
@@ -17,6 +21,30 @@ interface TrackingApi {
         @Path("tracking_number") trackingNumber: String
     ): AfterShipResponse
 }
+
+// Request para detectar el courier
+data class DetectCourierRequest(
+    val tracking: DetectCourierBody
+)
+
+data class DetectCourierBody(
+    val tracking_number: String
+)
+
+// Response de detección de courier
+data class DetectCourierResponse(
+    val meta: AfterShipMeta,
+    val data: DetectCourierData?
+)
+
+data class DetectCourierData(
+    val couriers: List<DetectedCourier>?
+)
+
+data class DetectedCourier(
+    val slug: String,
+    val name: String
+)
 
 // Request body para crear un tracking
 data class CreateTrackingRequest(

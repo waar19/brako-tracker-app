@@ -9,6 +9,16 @@ import javax.inject.Inject
  */
 class MockTrackingApi @Inject constructor() : TrackingApi {
 
+    override suspend fun detectCouriers(body: DetectCourierRequest): DetectCourierResponse {
+        delay(500)
+        return DetectCourierResponse(
+            meta = AfterShipMeta(code = 200, message = "OK"),
+            data = DetectCourierData(
+                couriers = listOf(DetectedCourier(slug = "mock-courier", name = "Mock Courier"))
+            )
+        )
+    }
+
     override suspend fun createTracking(body: CreateTrackingRequest): AfterShipResponse {
         delay(500)
         return AfterShipResponse(

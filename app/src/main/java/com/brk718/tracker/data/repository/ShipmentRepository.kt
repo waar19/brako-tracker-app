@@ -6,6 +6,8 @@ import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.local.TrackingEventEntity
 import com.brk718.tracker.data.remote.CreateTrackingBody
 import com.brk718.tracker.data.remote.CreateTrackingRequest
+import com.brk718.tracker.data.remote.DetectCourierBody
+import com.brk718.tracker.data.remote.DetectCourierRequest
 import com.brk718.tracker.data.remote.TrackingApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -38,32 +40,51 @@ class ShipmentRepository @Inject constructor(
         dao.insertShipment(shipment)
 
         withContext(Dispatchers.IO) {
+            // Paso 1: Detectar el courier correcto automáticamente
+            var detectedSlug = carrier.ifBlank { null }
             try {
-                // Paso 1: Registrar el tracking en AfterShip
-                // Si el slug está vacío, AfterShip intentará detectar el carrier automáticamente
-                val createBody = if (carrier.isBlank()) {
-                    CreateTrackingBody(
-                        tracking_number = trackingNumber,
-                        title = title.ifBlank { null }
+                val detectResponse = api.detectCouriers(
+                    DetectCourierRequest(
+                        tracking = DetectCourierBody(tracking_number = trackingNumber)
                     )
+                )
+                val couriers = detectResponse.data?.couriers
+                if (!couriers.isNullOrEmpty()) {
+                    detectedSlug = couriers.first().slug
+                    android.util.Log.d("AfterShip", "Courier detectado: ${couriers.first().name} (slug: $detectedSlug)")
+                    // Actualizar el carrier en la base de datos local
+                    dao.insertShipment(shipment.copy(carrier = detectedSlug, status = "Courier: ${couriers.first().name}"))
                 } else {
-                    CreateTrackingBody(
-                        tracking_number = trackingNumber,
-                        slug = carrier,
-                        title = title.ifBlank { null }
-                    )
+                    android.util.Log.w("AfterShip", "No se detectó courier para $trackingNumber")
+                    dao.insertShipment(shipment.copy(status = "Courier no reconocido"))
                 }
-                val createResponse = api.createTracking(CreateTrackingRequest(tracking = createBody))
-                android.util.Log.d("AfterShip", "POST response: code=${createResponse.meta.code} msg=${createResponse.meta.message}")
             } catch (e: Exception) {
-                android.util.Log.e("AfterShip", "POST error: ${e.message}")
-                e.printStackTrace()
+                android.util.Log.e("AfterShip", "Error detectando courier: ${e.message}")
             }
-            // Paso 2: Consultar el estado actual
-            try {
-                refreshShipment(id)
-            } catch (e: Exception) {
-                e.printStackTrace()
+
+            // Paso 2: Crear el tracking en AfterShip
+            if (detectedSlug != null) {
+                try {
+                    api.createTracking(
+                        CreateTrackingRequest(
+                            tracking = CreateTrackingBody(
+                                tracking_number = trackingNumber,
+                                slug = detectedSlug,
+                                title = title.ifBlank { null }
+                            )
+                        )
+                    )
+                    android.util.Log.d("AfterShip", "Tracking creado con slug: $detectedSlug")
+                } catch (e: Exception) {
+                    android.util.Log.e("AfterShip", "Error creando tracking: ${e.message}")
+                }
+
+                // Paso 3: Consultar el estado
+                try {
+                    refreshShipment(id)
+                } catch (e: Exception) {
+                    android.util.Log.e("AfterShip", "Error consultando estado: ${e.message}")
+                }
             }
         }
     }
