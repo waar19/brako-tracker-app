@@ -28,11 +28,19 @@ object EmailParser {
         addMatches(results, text, "DHL", Regex("""\bJD\d{18}\b"""))
 
         // 3. Amazon tracking URLs (extraer el trackingId real del enlace "Rastrear")
-        // Busca: trackingId, packageId, shipmentId, etc.
-        val amazonTrackRegex = Regex("""(?:trackingId|tracking_number|packageId|shipmentId)[=:/]([A-Z0-9]{8,20})""", RegexOption.IGNORE_CASE)
+        // Busca: trackingId, packageId, shipmentId. 
+        // IMPORTANTE: El valor (ID) debe ser MAYÚSCULAS/NÚMEROS para evitar IDs internos "raros" tipo "Pxg5tF3tT"
+        
+        // Explicación regex:
+        // (?i) -> case-insensitive para las claves (trackingId, packageId...)
+        // (?-i) -> case-SENSITIVE para el valor (debe ser [A-Z0-9])
+        val amazonTrackRegex = Regex("""(?i)(?:trackingId|tracking_number|packageId|shipmentId)[=:/](?-i)([A-Z0-9-]{8,25})""")
+        
         amazonTrackRegex.findAll(text).forEach { match ->
             val id = match.groupValues[1]
-            if (results.none { it.trackingNumber == id }) {
+            // Validar que no sea un Order ID (111-...) a menos que venga explícitamente como trackingId
+            // (A veces Amazon usa el Order ID como trackingId en URLs, lo permitimos si cumple el formato)
+             if (results.none { it.trackingNumber == id }) {
                 results.add(ParsedShipment(id, "Amazon", null))
             }
         }
