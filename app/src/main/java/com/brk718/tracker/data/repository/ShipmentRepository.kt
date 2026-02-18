@@ -14,6 +14,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -234,10 +238,15 @@ class ShipmentRepository @Inject constructor(
             // Guardar eventos
             if (result.events.isNotEmpty()) {
                 val events = result.events.mapIndexed { index, event ->
+                    // Intentar parsear la fecha real
+                    val realTimestamp = parseAmazonDate(event.timestamp)
+                    // Fallback: Si falla, usar tiempo actual menos un offset para mantener orden relativo
+                    val finalTimestamp = realTimestamp ?: (System.currentTimeMillis() - (index * 3600000L))
+                    
                     TrackingEventEntity(
                         id = 0L,
                         shipmentId = id,
-                        timestamp = System.currentTimeMillis() - (index * 3600000L),
+                        timestamp = finalTimestamp,
                         description = event.description,
                         location = event.location,
                         status = "",
@@ -261,6 +270,75 @@ class ShipmentRepository @Inject constructor(
 
     suspend fun deleteShipment(id: String) {
         dao.deleteShipment(id)
+    }
+
+    private fun parseAmazonDate(dateStr: String): Long? {
+        if (dateStr.isBlank()) return null
+        
+        // 1. Intentar ISO 8601 (formato API)
+        try {
+            if (dateStr.contains("T") && dateStr.endsWith("Z")) {
+                // Ej: "2023-10-27T10:00:00Z" (tomando hasta segundos para evitar problemas con milisegundos variables)
+                val cleanDate = if (dateStr.length > 19) dateStr.substring(0, 19) else dateStr.replace("Z", "")
+                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                isoFormat.timeZone = TimeZone.getTimeZone("UTC")
+                return isoFormat.parse(cleanDate)?.time
+            }
+        } catch (e: Exception) {
+            // Ignorar y seguir
+        }
+
+        val now = Calendar.getInstance()
+        val currentYear = now.get(Calendar.YEAR)
+        
+        // Formatos scrapeados (sin año)
+        // Probamos Español e Inglés
+        val formats = listOf(
+            // Español (con y sin coma, con y sin hora)
+            Pair("EEEE dd 'de' MMMM HH:mm", Locale("es", "ES")),
+            Pair("EEEE, dd 'de' MMMM HH:mm", Locale("es", "ES")),
+            Pair("dd 'de' MMMM HH:mm", Locale("es", "ES")),
+            Pair("EEEE dd 'de' MMMM", Locale("es", "ES")),
+            Pair("EEEE, dd 'de' MMMM", Locale("es", "ES")),
+            Pair("dd 'de' MMMM", Locale("es", "ES")),
+            
+            // Inglés
+            Pair("EEEE, MMMM d h:mm a", Locale.US),
+            Pair("MMMM d, h:mm a", Locale.US),
+            Pair("EEEE, MMMM d", Locale.US),
+            Pair("MMMM d", Locale.US),
+            
+            // Variaciones simples
+            Pair("dd/MM/yyyy HH:mm", Locale.getDefault()),
+            Pair("dd/MM/yyyy", Locale.getDefault())
+        )
+        
+        for ((pattern, locale) in formats) {
+            try {
+                val format = SimpleDateFormat(pattern, locale)
+                format.isLenient = false 
+                // Fix para meses en español si el sistema no tiene Locale data completo (raro en Android pero posible)
+                
+                val date = format.parse(dateStr) ?: continue
+                
+                val calendar = Calendar.getInstance()
+                calendar.time = date
+                
+                // Si el año es 1970 (default cuando no hay año), inferirlo
+                if (calendar.get(Calendar.YEAR) == 1970) {
+                    calendar.set(Calendar.YEAR, currentYear)
+                    // Si la fecha resultante es futura (> 24h), asumimos que fue el año pasado
+                    if (calendar.timeInMillis > now.timeInMillis + 86400000L) {
+                        calendar.add(Calendar.YEAR, -1)
+                    }
+                }
+                return calendar.timeInMillis
+            } catch (e: Exception) {
+                // Probar siguiente formato
+            }
+        }
+        
+        return null
     }
 }
 
