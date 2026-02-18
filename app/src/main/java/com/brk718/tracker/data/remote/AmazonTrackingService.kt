@@ -82,23 +82,51 @@ class AmazonTrackingService @Inject constructor(
                 
                 // Mapear info scrapeada a resultado
                 val events = mutableListOf<AmazonTrackingEvent>()
-                if (info.location != null || info.status.isNotEmpty()) {
-                    var lat: Double? = null
-                    var lon: Double? = null
+                
+                // Si tenemos eventos scrapeados, usarlos
+                if (info.events.isNotEmpty()) {
+                    var latestLocationGeocoded = false
                     
-                    if (!info.location.isNullOrBlank()) {
-                        val coords = geocodingService.getCoordinates(info.location)
-                        lat = coords?.lat
-                        lon = coords?.lon
+                    for (scrapedEvent in info.events) {
+                        var lat: Double? = null
+                        var lon: Double? = null
+                        
+                        // Geocodificar solo el evento más reciente que tenga ubicación (para el mapa)
+                        if (!latestLocationGeocoded && !scrapedEvent.location.isNullOrBlank()) {
+                            val coords = geocodingService.getCoordinates(scrapedEvent.location)
+                            lat = coords?.lat
+                            lon = coords?.lon
+                            latestLocationGeocoded = true
+                        }
+                        
+                        events.add(AmazonTrackingEvent(
+                            timestamp = scrapedEvent.date ?: "", // Usar fecha parseada
+                            description = scrapedEvent.message,
+                            location = scrapedEvent.location ?: "",
+                            latitude = lat,
+                            longitude = lon
+                        ))
                     }
-                    
-                    events.add(AmazonTrackingEvent(
-                        timestamp = System.currentTimeMillis().toString(), // No tenemos hora exacta
-                        description = info.status,
-                        location = info.location ?: "",
-                        latitude = lat,
-                        longitude = lon
-                    ))
+                } else {
+                    // Fallback: Si no hay eventos (layout desconocido), crear uno sintético con el status global
+                    if (info.location != null || info.status.isNotEmpty()) {
+                        var lat: Double? = null
+                        var lon: Double? = null
+                        
+                        if (!info.location.isNullOrBlank()) {
+                            val coords = geocodingService.getCoordinates(info.location)
+                            lat = coords?.lat
+                            lon = coords?.lon
+                        }
+                        
+                        events.add(AmazonTrackingEvent(
+                            timestamp = info.arrivalDate ?: System.currentTimeMillis().toString(),
+                            description = info.status,
+                            location = info.location ?: "",
+                            latitude = lat,
+                            longitude = lon
+                        ))
+                    }
                 }
                 
                 return@withContext AmazonTrackingResult(

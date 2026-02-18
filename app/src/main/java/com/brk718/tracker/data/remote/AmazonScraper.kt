@@ -7,11 +7,18 @@ import javax.inject.Singleton
 @Singleton
 class AmazonScraper @Inject constructor() {
 
+    data class ScrapedEvent(
+        val date: String?,
+        val message: String,
+        val location: String?
+    )
+
     data class ScrapedInfo(
         val status: String,
         val arrivalDate: String?,
-        val location: String?, // For map
-        val progress: Int? // 0-100
+        val location: String?, // For map (latest location)
+        val progress: Int?, // 0-100
+        val events: List<ScrapedEvent> = emptyList()
     )
 
     fun scrapeOrder(orderId: String, cookies: String): ScrapedInfo {
@@ -100,23 +107,52 @@ class AmazonScraper @Inject constructor() {
             if (arrivalDate.isEmpty()) arrivalDate = doc.select("span.promise-date").text()
             if (arrivalDate.isEmpty()) arrivalDate = doc.select("div.promise-message").text()
 
-            // 3. Ubicación (para el mapa)
-            // Buscamos en el timeline el evento más reciente
+            // 3. Ubicación (para el mapa) e Historial completo
             var location: String? = null
+            val events = mutableListOf<ScrapedEvent>()
+
+            // Selectores para eventos (Mobile & Desktop fallbacks)
+            // Mobile suele usar: .tracking-event-row o .transport-event-row
+            val eventRows = doc.select("div.tracking-event-row, div.transport-event-row, div.a-row.tracking-event-row")
             
-            // Mobile list usually has .tracking-event-location or .transport-event-location
-            val locationElement = doc.select("span.tracking-event-location").first() 
-                ?: doc.select("div.transport-event-location").first()
-                
-            if (locationElement != null) {
-                location = locationElement.text()
+            if (eventRows.isNotEmpty()) {
+                for (row in eventRows) {
+                    val date = row.select("span.tracking-event-date-header, h2.transport-event-date-header").text()
+                    val time = row.select("div.tracking-event-time, span.transport-event-time").text()
+                    val message = row.select("div.tracking-event-message, div.transport-event-message").text()
+                    val loc = row.select("span.tracking-event-location, div.transport-event-location").text()
+                    
+                    if (message.isNotBlank()) {
+                         // Combinar fecha y hora
+                        val fullDate = if (time.isNotBlank()) "$date $time".trim() else date
+                        events.add(ScrapedEvent(fullDate, message, loc.takeIf { it.isNotBlank() }))
+                    }
+                }
+            } else {
+                 // Fallback para estructura antigua de escritorio (Table based?)
+                 // Raramente necesario con Mobile UA, pero por si acaso
+            }
+
+            // Usar la ubicación del primer evento (más reciente) si existe
+            if (events.isNotEmpty()) {
+                location = events.first().location
             }
             
+            // Si no encontramos eventos pero hay un "latest event" en el header
+            if (events.isEmpty() && location == null) {
+                 val headerLoc = doc.select("span.tracking-event-location").first() 
+                    ?: doc.select("div.transport-event-location").first()
+                 if (headerLoc != null) {
+                     location = headerLoc.text()
+                 }
+            }
+
             return ScrapedInfo(
                 status = status.takeIf { it.isNotEmpty() } ?: "No disponible",
                 arrivalDate = arrivalDate.takeIf { it.isNotEmpty() } ?: null,
                 location = location,
-                progress = null
+                progress = null,
+                events = events
             )
         } catch (e: Exception) {
             e.printStackTrace()
