@@ -16,41 +16,63 @@ class AmazonScraper @Inject constructor() {
 
     fun scrapeOrder(orderId: String, cookies: String): ScrapedInfo {
         try {
-            // URL de seguimiento "moderna" (la que usa el usuario)
-            val url = "https://www.amazon.com/gp/your-account/ship-track?orderId=$orderId"
+            // ESTRATEGIA DE DOS PASOS:
+            // 1. Ir a detalles del pedido para encontrar el enlace REAL de rastreo (con shipmentId)
+            val url = "https://www.amazon.com/gp/your-account/order-details?orderID=$orderId"
             
-            val doc = Jsoup.connect(url)
+            // Usamos Mobile UA para coincidir con el WebView de Auth y obtener DOM más simple
+            val userAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
+            var doc = Jsoup.connect(url)
                 .header("Cookie", cookies)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("User-Agent", userAgent)
                 .timeout(10000)
                 .get()
 
             // Verificar si nos redirigió al login
-            val title = doc.title()
+            var title = doc.title()
             if (title.contains("Sign-In", ignoreCase = true) || 
                 doc.select("form[name='signIn']").isNotEmpty()) {
                 throw Exception("Sign-In required")
             }
 
-            // Lógica de scraping (multi-selector para robustez)
+            // 2. Buscar el enlace de "Rastrear paquete"
+            val trackingLink = doc.select("a:contains(Track package)").firstOrNull()?.attr("abs:href") 
+                ?: doc.select("a[href*='ship-track']").firstOrNull()?.attr("abs:href")
+            
+            if (!trackingLink.isNullOrBlank()) {
+                // Si encontramos el enlace, lo seguimos
+                try {
+                    doc = Jsoup.connect(trackingLink)
+                        .header("Cookie", cookies)
+                        .header("User-Agent", userAgent)
+                        .timeout(10000)
+                        .get()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    // Si falla, nos quedamos con la página de detalles
+                }
+            }
+
+            // Lógica de scraping (Mobile First)
             // 1. Estado principal
-            var status = doc.select("div.shipment-top-status").text()
-            if (status.isEmpty()) status = doc.select("h3.a-spacing-small").text() // User provided selector
-            if (status.isEmpty()) status = doc.select("h2.a-color-state").text()
+            var status = doc.select("div.shipment-top-status").text() // A veces presente en mobile view web
+            if (status.isEmpty()) status = doc.select("h3.a-spacing-small").text()
+            if (status.isEmpty()) status = doc.select("h2.a-color-state").text() // Típico header de estado
             if (status.isEmpty()) status = doc.select("div.js-shipment-info-container h2").text()
             if (status.isEmpty()) status = doc.select("div.pt-delivery-card-primary-status").text()
-            if (status.isEmpty()) status = doc.select("h1.a-spacing-small").text()
             
-            // Generic Fallbacks for Desktop/Mobile
-            if (status.isEmpty()) status = doc.select("div.shipment-status").text()
-            if (status.isEmpty()) status = doc.select("span.shipment-status-label").text()
-            if (status.isEmpty()) status = doc.select("h1").firstOrNull()?.text() ?: ""
+            // Mobile Specific
+            if (status.isEmpty()) status = doc.select("div.transport-message").text()
+            if (status.isEmpty()) status = doc.select("h5.transport-status-header").text()
             
-            // Refinamiento: Si el estado es genérico
-            if (status.equals("Detalles del pedido", ignoreCase = true) || 
+            // Refinamiento: Si el estado es genérico o vacío
+            if (status.isEmpty() || 
+                status.equals("Detalles del pedido", ignoreCase = true) || 
                 status.equals("Resumen del pedido", ignoreCase = true) ||
                 status.contains("Order Details", ignoreCase = true)) {
                 
+                // Intentar buscar mensajes de evento específicos
                 val eventMessage = doc.select("div.tracking-event-message").firstOrNull()?.text()
                 if (!eventMessage.isNullOrBlank()) {
                     status = eventMessage
@@ -73,37 +95,21 @@ class AmazonScraper @Inject constructor() {
                 }
             }
             
-            // DEBUG: Si no encontramos estado después de probar todo, devolvemos el título
-            if (status.isEmpty()) {
-                val title = doc.title()
-                status = "Debug: $title"
-            }
-            // FIN DEBUG
-
             // 2. Fecha de entrega
             var arrivalDate = doc.select("span.arrival-date-text").text()
             if (arrivalDate.isEmpty()) arrivalDate = doc.select("span.promise-date").text()
+            if (arrivalDate.isEmpty()) arrivalDate = doc.select("div.promise-message").text()
 
             // 3. Ubicación (para el mapa)
             // Buscamos en el timeline el evento más reciente
             var location: String? = null
-            val locationElement = doc.select("span.tracking-event-location").first() // Mobile list
+            
+            // Mobile list usually has .tracking-event-location or .transport-event-location
+            val locationElement = doc.select("span.tracking-event-location").first() 
+                ?: doc.select("div.transport-event-location").first()
+                
             if (locationElement != null) {
                 location = locationElement.text()
-            } else {
-                // Desktop list often has layout: Date | Time | Location | Description
-                // We try to find a row with location text
-                val rows = doc.select("div.a-row.tracking-event-row")
-                if (rows.isNotEmpty()) {
-                    val firstRow = rows.first()
-                    // This is tricky without specific structure, usually column 3?
-                    // Let's rely on mobile view mostly as we use mobile UA
-                }
-            }
-            
-            if (status.isEmpty()) {
-                // Loguear para debug
-                println("AmazonScraper: No status found. Title: $title")
             }
             
             return ScrapedInfo(
