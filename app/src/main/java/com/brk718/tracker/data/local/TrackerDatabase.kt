@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [ShipmentEntity::class, TrackingEventEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class TrackerDatabase : RoomDatabase() {

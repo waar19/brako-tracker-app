@@ -2,6 +2,7 @@ package com.brk718.tracker.data.local
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
 
@@ -25,6 +26,10 @@ data class ShipmentEntity(
             childColumns = ["shipmentId"],
             onDelete = ForeignKey.CASCADE
         )
+    ],
+    indices = [
+        Index(value = ["shipmentId"]),
+        Index(value = ["shipmentId", "description", "timestamp"], unique = true)
     ]
 )
 data class TrackingEventEntity(

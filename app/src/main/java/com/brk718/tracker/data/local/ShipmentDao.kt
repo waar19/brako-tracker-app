@@ -20,7 +20,7 @@ interface ShipmentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertShipment(shipment: ShipmentEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertEvents(events: List<TrackingEventEntity>)
 
     @Query("DELETE FROM tracking_events WHERE shipmentId = :shipmentId")

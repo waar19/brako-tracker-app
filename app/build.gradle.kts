@@ -30,6 +30,7 @@ android {
             localProperties.load(localPropertiesFile.inputStream())
         }
         buildConfigField("String", "AFTERSHIP_API_KEY", "\"${localProperties["AFTERSHIP_API_KEY"] ?: ""}\"")
+        buildConfigField("String", "GMAIL_CLIENT_ID", "\"${localProperties["GMAIL_CLIENT_ID"] ?: ""}\"")
     }
 
     buildTypes {
@@ -51,6 +52,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/DEPENDENCIES"
+        }
     }
 }
 
@@ -90,6 +97,10 @@ dependencies {
 
     // Play Services Auth (Gmail)
     implementation(libs.play.services.auth)
+    implementation(libs.google.api.client.android)
+    implementation(libs.google.api.services.gmail) {
+        exclude(group = "org.apache.httpcomponents")
+    }
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -25,13 +26,21 @@ import com.brk718.tracker.data.local.ShipmentWithEvents
 fun HomeScreen(
     onAddClick: () -> Unit,
     onShipmentClick: (String) -> Unit,
+    onGmailClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val shipments by viewModel.shipments.collectAsState()
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(title = { Text("Mis Envíos") })
+            CenterAlignedTopAppBar(
+                title = { Text("Mis Envíos") },
+                actions = {
+                    IconButton(onClick = onGmailClick) {
+                        Icon(Icons.Default.Email, contentDescription = "Importar de Gmail")
+                    }
+                }
+            )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddClick) {
@@ -58,7 +67,8 @@ fun HomeScreen(
                     ShipmentCard(
                         item = item,
                         onClick = { onShipmentClick(item.shipment.id) },
-                        onArchive = { viewModel.archiveShipment(item.shipment.id) }
+                        onArchive = { viewModel.archiveShipment(item.shipment.id) },
+                        onDelete = { viewModel.deleteShipment(item.shipment.id) }
                     )
                 }
             }
@@ -70,7 +80,8 @@ fun HomeScreen(
 fun ShipmentCard(
     item: ShipmentWithEvents,
     onClick: () -> Unit,
-    onArchive: () -> Unit
+    onArchive: () -> Unit,
+    onDelete: () -> Unit
 ) {
     ElevatedCard(
         onClick = onClick,
@@ -79,20 +90,13 @@ fun ShipmentCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = item.shipment.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                IconButton(onClick = onArchive) {
-                    Icon(Icons.Default.Archive, contentDescription = "Archivar", tint = MaterialTheme.colorScheme.secondary)
-                }
-            }
+            Text(
+                text = item.shipment.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "${item.shipment.carrier} • ${item.shipment.trackingNumber}",
@@ -101,21 +105,42 @@ fun ShipmentCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
             
-            // Estado con color semántico básico
-            val statusColor = when (item.shipment.status.lowercase()) {
-                "entregado" -> MaterialTheme.colorScheme.primary
-                "error", "incidencia" -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.tertiary
+            // Estado + acciones
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Estado con color semántico
+                val status = item.shipment.status.lowercase()
+                val statusColor = when {
+                    status == "entregado" -> MaterialTheme.colorScheme.primary
+                    status.contains("error") || status.contains("incidencia") -> MaterialTheme.colorScheme.error
+                    status.contains("manual") || status.contains("no soportado") -> MaterialTheme.colorScheme.outline
+                    status.contains("registrando") -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.tertiary
+                }
+                
+                AssistChip(
+                    onClick = {},
+                    label = { Text(item.shipment.status) },
+                    colors = AssistChipDefaults.assistChipColors(
+                        labelColor = statusColor
+                    ),
+                    border = BorderStroke(1.dp, statusColor)
+                )
+                
+                Row {
+                    IconButton(onClick = onArchive) {
+                        Icon(Icons.Default.Archive, contentDescription = "Archivar",
+                            tint = MaterialTheme.colorScheme.secondary)
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Eliminar",
+                            tint = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
-            
-            AssistChip(
-                onClick = {},
-                label = { Text(item.shipment.status) },
-                colors = AssistChipDefaults.assistChipColors(
-                    labelColor = statusColor
-                ),
-                border = BorderStroke(1.dp, statusColor)
-            )
         }
     }
 }

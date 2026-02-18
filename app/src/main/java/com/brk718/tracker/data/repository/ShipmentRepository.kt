@@ -4,6 +4,7 @@ import com.brk718.tracker.data.local.ShipmentDao
 import com.brk718.tracker.data.local.ShipmentEntity
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.local.TrackingEventEntity
+import com.brk718.tracker.data.remote.AmazonTrackingService
 import com.brk718.tracker.data.remote.CreateTrackingBody
 import com.brk718.tracker.data.remote.CreateTrackingRequest
 import com.brk718.tracker.data.remote.DetectCourierBody
@@ -20,8 +21,50 @@ import javax.inject.Singleton
 @Singleton
 class ShipmentRepository @Inject constructor(
     private val dao: ShipmentDao,
-    private val api: TrackingApi
+    private val api: TrackingApi,
+    private val amazonService: AmazonTrackingService
 ) {
+    companion object {
+        // Mapeo conocido: nombre del carrier → slug de AfterShip
+        // AfterShip se encarga del scraping (incluyendo CAPTCHAs)
+        private val CARRIER_SLUG_MAP = mapOf(
+            // Carriers colombianos
+            "coordinadora" to "coordinadora",
+            "servientrega" to "servientrega",
+            "inter rapidísimo" to "inter-rapidisimo",
+            "inter rapidisimo" to "inter-rapidisimo",
+            "interrapidisimo" to "inter-rapidisimo",
+            "deprisa" to "deprisa",
+            "envía / colvanes" to "envia-co",
+            "envía" to "envia-co",
+            "envia" to "envia-co",
+            "colvanes" to "envia-co",
+            "tcc" to "tcc-co",
+            "clicoh" to "logysto",
+            "logysto" to "logysto",
+            "saferbo" to "saferbo",
+            "472" to "472-co",
+            // PASAREX = Amazon last-mile Colombia → se trackea vía Amazon
+            "pasarex" to "amazon",
+            "amazon / pasarex" to "amazon",
+            // Internacionales
+            "fedex" to "fedex",
+            "ups" to "ups",
+            "usps" to "usps",
+            "dhl" to "dhl",
+            "dhl express" to "dhl",
+            "amazon" to "amazon",
+            "amazon logistics" to "amazon",
+        )
+
+        /**
+         * Resuelve el slug de AfterShip a partir del nombre del carrier
+         */
+        fun resolveSlug(carrier: String): String? {
+            val normalized = carrier.lowercase().trim()
+            return CARRIER_SLUG_MAP[normalized]
+        }
+    }
 
     val activeShipments: Flow<List<ShipmentWithEvents>> = dao.getAllActiveShipments()
 
@@ -32,7 +75,7 @@ class ShipmentRepository @Inject constructor(
         val shipment = ShipmentEntity(
             id = id,
             trackingNumber = trackingNumber,
-            carrier = carrier,
+            carrier = carrier.ifBlank { "manual" },
             title = title.ifBlank { trackingNumber },
             status = "Registrando...",
             lastUpdate = System.currentTimeMillis()
@@ -40,51 +83,68 @@ class ShipmentRepository @Inject constructor(
         dao.insertShipment(shipment)
 
         withContext(Dispatchers.IO) {
-            // Paso 1: Detectar el courier correcto automáticamente
-            var detectedSlug = carrier.ifBlank { null }
-            try {
-                val detectResponse = api.detectCouriers(
-                    DetectCourierRequest(
-                        tracking = DetectCourierBody(tracking_number = trackingNumber)
+            // Paso 1: Determinar el slug del carrier
+            var slug: String? = resolveSlug(carrier) // Intentar mapeo directo primero
+
+            // Si no hay mapeo directo, intentar auto-detect de AfterShip
+            if (slug == null) {
+                try {
+                    val detectResponse = api.detectCouriers(
+                        DetectCourierRequest(
+                            tracking = DetectCourierBody(tracking_number = trackingNumber)
+                        )
                     )
-                )
-                val couriers = detectResponse.data?.couriers
-                if (!couriers.isNullOrEmpty()) {
-                    detectedSlug = couriers.first().slug
-                    android.util.Log.d("AfterShip", "Courier detectado: ${couriers.first().name} (slug: $detectedSlug)")
-                    // Actualizar el carrier en la base de datos local
-                    dao.insertShipment(shipment.copy(carrier = detectedSlug, status = "Courier: ${couriers.first().name}"))
-                } else {
-                    android.util.Log.w("AfterShip", "No se detectó courier para $trackingNumber")
-                    dao.insertShipment(shipment.copy(status = "Courier no reconocido"))
+                    val couriers = detectResponse.data?.couriers
+                    if (!couriers.isNullOrEmpty()) {
+                        slug = couriers.first().slug
+                        android.util.Log.d("AfterShip", "Auto-detectado: ${couriers.first().name} ($slug)")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("AfterShip", "Auto-detect falló: ${e.message}")
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("AfterShip", "Error detectando courier: ${e.message}")
+            } else {
+                android.util.Log.d("AfterShip", "Slug mapeado: $carrier → $slug")
             }
 
-            // Paso 2: Crear el tracking en AfterShip
-            if (detectedSlug != null) {
+            // Paso 2: Si tenemos slug, crear tracking en AfterShip
+            var afterShipOk = false
+            if (slug != null && slug != "amazon") {
                 try {
                     api.createTracking(
                         CreateTrackingRequest(
                             tracking = CreateTrackingBody(
                                 tracking_number = trackingNumber,
-                                slug = detectedSlug,
+                                slug = slug,
                                 title = title.ifBlank { null }
                             )
                         )
                     )
-                    android.util.Log.d("AfterShip", "Tracking creado con slug: $detectedSlug")
+                    afterShipOk = true
+                    dao.insertShipment(shipment.copy(carrier = slug))
+                    android.util.Log.d("AfterShip", "Tracking creado: $slug/$trackingNumber")
                 } catch (e: Exception) {
-                    android.util.Log.e("AfterShip", "Error creando tracking: ${e.message}")
+                    android.util.Log.w("AfterShip", "Create tracking falló: ${e.message}")
                 }
+            }
 
-                // Paso 3: Consultar el estado
+            // Paso 3: Consultar estado según el método que funcionó
+            if (afterShipOk) {
                 try {
                     refreshShipment(id)
                 } catch (e: Exception) {
-                    android.util.Log.e("AfterShip", "Error consultando estado: ${e.message}")
+                    dao.insertShipment(shipment.copy(
+                        carrier = slug ?: carrier,
+                        status = "Registrado (sin datos aún)"
+                    ))
                 }
+            } else if (slug == "amazon" || amazonService.isAmazonTracking(trackingNumber)) {
+                android.util.Log.d("Tracking", "Usando Amazon tracking para $trackingNumber")
+                refreshShipmentAmazon(id)
+            } else {
+                dao.insertShipment(shipment.copy(
+                    carrier = carrier.ifBlank { "manual" },
+                    status = "Seguimiento manual"
+                ))
             }
         }
     }
@@ -93,11 +153,16 @@ class ShipmentRepository @Inject constructor(
         val shipmentWithEvents = dao.getShipmentById(id).first() ?: return@withContext
         val shipment = shipmentWithEvents.shipment
 
+        // Si es un tracking de Amazon, usar el servicio de Amazon directamente
+        if (amazonService.isAmazonTracking(shipment.trackingNumber)) {
+            refreshShipmentAmazon(id)
+            return@withContext
+        }
+
         try {
             val response = api.getTrackingInfo(shipment.carrier, shipment.trackingNumber)
             val tracking = response.data?.tracking ?: return@withContext
 
-            // Mapear el tag de AfterShip a un estado legible en español
             val statusText = when (tracking.tag) {
                 "Delivered"     -> "Entregado"
                 "InTransit"     -> "En Tránsito"
@@ -108,13 +173,11 @@ class ShipmentRepository @Inject constructor(
                 else            -> tracking.subtag_message ?: tracking.tag
             }
 
-            // Actualizar estado del envío
             dao.insertShipment(shipment.copy(
                 status = statusText,
                 lastUpdate = System.currentTimeMillis()
             ))
 
-            // Mapear checkpoints a eventos locales
             val events = tracking.checkpoints.mapIndexed { index, checkpoint ->
                 TrackingEventEntity(
                     id = 0L,
@@ -133,6 +196,53 @@ class ShipmentRepository @Inject constructor(
         }
     }
 
+    private suspend fun refreshShipmentAmazon(id: String) = withContext(Dispatchers.IO) {
+        val shipmentWithEvents = dao.getShipmentById(id).first() ?: return@withContext
+        val shipment = shipmentWithEvents.shipment
+
+        try {
+            val result = amazonService.getTracking(shipment.trackingNumber)
+
+            if (result.error != null) {
+                android.util.Log.w("AmazonTracking", "Error: ${result.error}")
+                dao.insertShipment(shipment.copy(
+                    carrier = "Amazon",
+                    status = "Seguimiento manual",
+                    lastUpdate = System.currentTimeMillis()
+                ))
+                return@withContext
+            }
+
+            // Actualizar estado
+            val status = result.status ?: "En seguimiento"
+            dao.insertShipment(shipment.copy(
+                carrier = "Amazon",
+                status = status,
+                lastUpdate = System.currentTimeMillis()
+            ))
+
+            // Guardar eventos
+            if (result.events.isNotEmpty()) {
+                val events = result.events.mapIndexed { index, event ->
+                    TrackingEventEntity(
+                        id = 0L,
+                        shipmentId = id,
+                        timestamp = System.currentTimeMillis() - (index * 3600000L),
+                        description = event.description,
+                        location = event.location,
+                        status = ""
+                    )
+                }
+                dao.clearEventsForShipment(id)
+                dao.insertEvents(events)
+            }
+
+            android.util.Log.d("AmazonTracking", "Estado: $status, Eventos: ${result.events.size}")
+        } catch (e: Exception) {
+            android.util.Log.e("AmazonTracking", "Error: ${e.message}")
+        }
+    }
+
     suspend fun archiveShipment(id: String) {
         dao.archiveShipment(id)
     }
@@ -141,3 +251,4 @@ class ShipmentRepository @Inject constructor(
         dao.deleteShipment(id)
     }
 }
+
