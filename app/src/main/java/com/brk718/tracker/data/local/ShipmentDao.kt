@@ -1,0 +1,34 @@
+package com.brk718.tracker.data.local
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Transaction
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface ShipmentDao {
+    @Transaction
+    @Query("SELECT * FROM shipments WHERE isArchived = 0 ORDER BY lastUpdate DESC")
+    fun getAllActiveShipments(): Flow<List<ShipmentWithEvents>>
+
+    @Transaction
+    @Query("SELECT * FROM shipments WHERE id = :id")
+    fun getShipmentById(id: String): Flow<ShipmentWithEvents?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertShipment(shipment: ShipmentEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEvents(events: List<TrackingEventEntity>)
+
+    @Query("DELETE FROM tracking_events WHERE shipmentId = :shipmentId")
+    suspend fun clearEventsForShipment(shipmentId: String)
+
+    @Query("UPDATE shipments SET isArchived = 1 WHERE id = :id")
+    suspend fun archiveShipment(id: String)
+    
+    @Query("DELETE FROM shipments WHERE id = :id")
+    suspend fun deleteShipment(id: String)
+}
