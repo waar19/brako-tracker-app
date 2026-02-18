@@ -278,7 +278,6 @@ class ShipmentRepository @Inject constructor(
         // 1. Intentar ISO 8601 (formato API)
         try {
             if (dateStr.contains("T") && dateStr.endsWith("Z")) {
-                // Ej: "2023-10-27T10:00:00Z" (tomando hasta segundos para evitar problemas con milisegundos variables)
                 val cleanDate = if (dateStr.length > 19) dateStr.substring(0, 19) else dateStr.replace("Z", "")
                 val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
                 isoFormat.timeZone = TimeZone.getTimeZone("UTC")
@@ -291,10 +290,12 @@ class ShipmentRepository @Inject constructor(
         val now = Calendar.getInstance()
         val currentYear = now.get(Calendar.YEAR)
         
-        // Formatos scrapeados (sin año)
-        // Probamos Español e Inglés
+        // Pre-procesamiento para Español: Pasar a minúsculas para asegurar que "Febrero" coincida con "febrero"
+        // (SimpleDateFormat en Android para 'es' suele requerir minúsculas)
+        val lowerDateStr = dateStr.lowercase()
+
         val formats = listOf(
-            // Español (con y sin coma, con y sin hora)
+            // Español (con y sin coma, con y sin hora) - Usamos lowerDateStr
             Pair("EEEE dd 'de' MMMM HH:mm", Locale("es", "ES")),
             Pair("EEEE, dd 'de' MMMM HH:mm", Locale("es", "ES")),
             Pair("dd 'de' MMMM HH:mm", Locale("es", "ES")),
@@ -302,7 +303,7 @@ class ShipmentRepository @Inject constructor(
             Pair("EEEE, dd 'de' MMMM", Locale("es", "ES")),
             Pair("dd 'de' MMMM", Locale("es", "ES")),
             
-            // Inglés
+            // Inglés - Usamos dateStr original (Case Sensitive a veces importa, pero US suele ser Capitalized)
             Pair("EEEE, MMMM d h:mm a", Locale.US),
             Pair("MMMM d, h:mm a", Locale.US),
             Pair("EEEE, MMMM d", Locale.US),
@@ -315,11 +316,13 @@ class ShipmentRepository @Inject constructor(
         
         for ((pattern, locale) in formats) {
             try {
-                val format = SimpleDateFormat(pattern, locale)
-                format.isLenient = false 
-                // Fix para meses en español si el sistema no tiene Locale data completo (raro en Android pero posible)
+                // Seleccionar string según idioma del patrón
+                val input = if (locale.language == "es") lowerDateStr else dateStr
                 
-                val date = format.parse(dateStr) ?: continue
+                val format = SimpleDateFormat(pattern, locale)
+                format.isLenient = true // Permitir cierta flexibilidad
+                
+                val date = format.parse(input) ?: continue
                 
                 val calendar = Calendar.getInstance()
                 calendar.time = date
@@ -338,6 +341,7 @@ class ShipmentRepository @Inject constructor(
             }
         }
         
+        android.util.Log.w("ShipmentRepository", "No se pudo parsear fecha: $dateStr")
         return null
     }
 }

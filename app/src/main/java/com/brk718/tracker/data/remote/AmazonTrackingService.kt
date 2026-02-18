@@ -79,6 +79,7 @@ class AmazonTrackingService @Inject constructor(
             try {
                 val cookies = sessionManager.getCookies() ?: throw Exception("No cookies")
                 val info = scraper.scrapeOrder(trackingNumber, cookies)
+                Log.d(TAG, "Scraped Info for $trackingNumber: Status=${info.status}, Loc=${info.location}, Events=${info.events.size}")
                 
                 // Mapear info scrapeada a resultado
                 val events = mutableListOf<AmazonTrackingEvent>()

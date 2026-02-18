@@ -43,9 +43,11 @@ class AmazonScraper @Inject constructor() {
                 throw Exception("Sign-In required")
             }
 
-            // 2. Buscar el enlace de "Rastrear paquete"
+            // 2. Buscar el enlace de "Rastrear paquete" (Soporte Multi-idioma)
             val trackingLink = doc.select("a:contains(Track package)").firstOrNull()?.attr("abs:href") 
                 ?: doc.select("a[href*='ship-track']").firstOrNull()?.attr("abs:href")
+                ?: doc.select("a:contains(Rastrear)").firstOrNull()?.attr("abs:href")
+                ?: doc.select("a:contains(Seguimiento)").firstOrNull()?.attr("abs:href")
             
             if (!trackingLink.isNullOrBlank()) {
                 // Si encontramos el enlace, lo seguimos
@@ -113,24 +115,43 @@ class AmazonScraper @Inject constructor() {
 
             // Selectores para eventos (Mobile & Desktop fallbacks)
             // Mobile suele usar: .tracking-event-row o .transport-event-row
-            val eventRows = doc.select("div.tracking-event-row, div.transport-event-row, div.a-row.tracking-event-row")
+            // Reforzado con más selectores para layouts alternativos (ej: Pasarex)
+            val eventRows = doc.select("""
+                div.tracking-event-row, 
+                div.transport-event-row, 
+                div.a-row.tracking-event-row,
+                div[class*='tracking-event-row'],
+                li[class*='a-carousel-card'] div.a-row
+            """.trimIndent())
             
             if (eventRows.isNotEmpty()) {
                 for (row in eventRows) {
-                    val date = row.select("span.tracking-event-date-header, h2.transport-event-date-header").text()
-                    val time = row.select("div.tracking-event-time, span.transport-event-time").text()
-                    val message = row.select("div.tracking-event-message, div.transport-event-message").text()
-                    val loc = row.select("span.tracking-event-location, div.transport-event-location").text()
+                    val date = row.select("span.tracking-event-date-header, h2.transport-event-date-header, span.a-text-bold").text()
+                    val time = row.select("div.tracking-event-time, span.transport-event-time, span.a-color-secondary").text()
+                    val message = row.select("div.tracking-event-message, div.transport-event-message, span.a-size-medium").text()
+                    val loc = row.select("span.tracking-event-location, div.transport-event-location, span.a-color-tertiary").text()
                     
                     if (message.isNotBlank()) {
                          // Combinar fecha y hora
                         val fullDate = if (time.isNotBlank()) "$date $time".trim() else date
-                        events.add(ScrapedEvent(fullDate, message, loc.takeIf { it.isNotBlank() }))
+                        // Evitar agregar eventos duplicados o vacíos
+                        if (fullDate.isNotBlank()) {
+                             events.add(ScrapedEvent(fullDate, message, loc.takeIf { it.isNotBlank() }))
+                        }
                     }
                 }
             } else {
-                 // Fallback para estructura antigua de escritorio (Table based?)
-                 // Raramente necesario con Mobile UA, pero por si acaso
+                 // Fallback: Intentar buscar en tabla (Desktop view en algunas tablets/modos)
+                 val tableRows = doc.select("table.tracking-event-table tr")
+                 for (row in tableRows) {
+                     val cols = row.select("td")
+                     if (cols.size >= 2) {
+                         val combinedDate = cols[0].text() // Fecha + Hora
+                         val message = cols[1].text()
+                         val loc = if (cols.size > 2) cols[2].text() else null
+                         events.add(ScrapedEvent(combinedDate, message, loc))
+                     }
+                 }
             }
 
             // Usar la ubicación del primer evento (más reciente) si existe
