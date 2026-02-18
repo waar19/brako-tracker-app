@@ -2,6 +2,7 @@ package com.brk718.tracker.ui.auth
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -18,7 +20,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -66,9 +73,19 @@ fun AmazonAuthScreen(
                     WebView(context).apply {
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
-                        // settings.userAgentString = ... // Dejamos el default del sistema para evitar errores de JS
+                        
+                        settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                        
+                        // Desactivar aceleración de hardware para evitar pantallazo blanco en Samsung/Adreno
+                        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                         
                         webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                                val url = request?.url?.toString()
+                                if (checkLogin(url)) return true
+                                return super.shouldOverrideUrlLoading(view, request)
+                            }
+
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 super.onPageStarted(view, url, favicon)
                                 isLoading = true
@@ -86,19 +103,19 @@ fun AmazonAuthScreen(
                                 checkLogin(url)
                             }
                             
-                            private fun checkLogin(url: String?) {
-                                if (url == null) return
-                                // Detectar redirección a distintas variantes de "Mi Cuenta" o "Mis Pedidos"
+                            private fun checkLogin(url: String?): Boolean {
+                                if (url == null) return false
                                 val lowerUrl = url.lowercase()
                                 if (lowerUrl.contains("your-account") || 
                                     lowerUrl.contains("order-history") ||
                                     lowerUrl.contains("css/order-history") ||
                                     lowerUrl.contains("/gp/aw/ya")) {
                                     
-                                    // Guardamos las cookies de la URL actual
                                     viewModel.saveCookies(url)
                                     onLoginSuccess()
+                                    return true
                                 }
+                                return false
                             }
                         }
                         

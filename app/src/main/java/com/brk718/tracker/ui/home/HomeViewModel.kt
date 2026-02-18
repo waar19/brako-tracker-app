@@ -25,8 +25,11 @@ class HomeViewModel @Inject constructor(
 
     fun refreshAll() {
         viewModelScope.launch {
-            // Lógica para iterar y refrescar todos
-            // shipments.value.forEach { repository.refreshShipment(it.shipment.id) }
+            shipments.value.forEach { shipmentWithEvents ->
+                // Solo refrescar si no está entregado o si es reciente (opcional)
+                // Por ahora refrescamos todo para asegurar que el login se refleje
+                repository.refreshShipment(shipmentWithEvents.shipment.id)
+            }
         }
     }
 

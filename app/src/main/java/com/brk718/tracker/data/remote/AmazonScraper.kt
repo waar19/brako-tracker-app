@@ -16,18 +16,15 @@ class AmazonScraper @Inject constructor() {
 
     fun scrapeOrder(orderId: String, cookies: String): ScrapedInfo {
         try {
-            // URL de detalles del pedido
-            val url = "https://www.amazon.com/gp/your-account/order-details?orderID=$orderId"
+            // URL de seguimiento "moderna" (la que usa el usuario)
+            val url = "https://www.amazon.com/gp/your-account/ship-track?orderId=$orderId"
             
             val doc = Jsoup.connect(url)
                 .header("Cookie", cookies)
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 .timeout(10000)
                 .get()
 
-            // Lógica de scraping (aproximada, Amazon cambia esto a menudo)
-            // Buscamos contenedores comunes de estado
-            
             // Verificar si nos redirigió al login
             val title = doc.title()
             if (title.contains("Sign-In", ignoreCase = true) || 
@@ -37,13 +34,51 @@ class AmazonScraper @Inject constructor() {
 
             // Lógica de scraping (multi-selector para robustez)
             // 1. Estado principal
-            var status = doc.select("div.shipment-top-status").text() // Mobile new
-            if (status.isEmpty()) status = doc.select("h2.a-color-state").text() // Mobile generic
-            if (status.isEmpty()) status = doc.select("div.js-shipment-info-container h2").text() // Desktop generic
-            if (status.isEmpty()) status = doc.select("div.pt-delivery-card-primary-status").text() // Another mobile variant
-            
-            // Fallback: buscar cualquier texto grande en la cabecera
+            var status = doc.select("div.shipment-top-status").text()
+            if (status.isEmpty()) status = doc.select("h3.a-spacing-small").text() // User provided selector
+            if (status.isEmpty()) status = doc.select("h2.a-color-state").text()
+            if (status.isEmpty()) status = doc.select("div.js-shipment-info-container h2").text()
+            if (status.isEmpty()) status = doc.select("div.pt-delivery-card-primary-status").text()
             if (status.isEmpty()) status = doc.select("h1.a-spacing-small").text()
+            
+            // Generic Fallbacks for Desktop/Mobile
+            if (status.isEmpty()) status = doc.select("div.shipment-status").text()
+            if (status.isEmpty()) status = doc.select("span.shipment-status-label").text()
+            if (status.isEmpty()) status = doc.select("h1").firstOrNull()?.text() ?: ""
+            
+            // Refinamiento: Si el estado es genérico
+            if (status.equals("Detalles del pedido", ignoreCase = true) || 
+                status.equals("Resumen del pedido", ignoreCase = true) ||
+                status.contains("Order Details", ignoreCase = true)) {
+                
+                val eventMessage = doc.select("div.tracking-event-message").firstOrNull()?.text()
+                if (!eventMessage.isNullOrBlank()) {
+                    status = eventMessage
+                } else {
+                    val mobileEvent = doc.select("div.transport-event-message").firstOrNull()?.text()
+                    if (!mobileEvent.isNullOrBlank()) {
+                        status = mobileEvent
+                    } else {
+                        // Último recurso: Buscar palabras clave en todo el texto del cuerpo
+                        val bodyText = doc.body().text()
+                        when {
+                            bodyText.contains("Entregado", ignoreCase = true) -> status = "Entregado"
+                            bodyText.contains("Llega mañana", ignoreCase = true) -> status = "Llega mañana"
+                            bodyText.contains("Llega hoy", ignoreCase = true) -> status = "Llega hoy"
+                            bodyText.contains("En camino", ignoreCase = true) -> status = "En camino"
+                            bodyText.contains("En tránsito", ignoreCase = true) -> status = "En tránsito"
+                            bodyText.contains("Tu paquete", ignoreCase = true) -> status = "En reparto"
+                        }
+                    }
+                }
+            }
+            
+            // DEBUG: Si no encontramos estado después de probar todo, devolvemos el título
+            if (status.isEmpty()) {
+                val title = doc.title()
+                status = "Debug: $title"
+            }
+            // FIN DEBUG
 
             // 2. Fecha de entrega
             var arrivalDate = doc.select("span.arrival-date-text").text()
