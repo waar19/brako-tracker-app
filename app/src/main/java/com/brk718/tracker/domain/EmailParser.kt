@@ -38,10 +38,28 @@ object EmailParser {
         
         amazonTrackRegex.findAll(text).forEach { match ->
             val id = match.groupValues[1]
-            // Validar que no sea un Order ID (111-...) a menos que venga explícitamente como trackingId
-            // (A veces Amazon usa el Order ID como trackingId en URLs, lo permitimos si cumple el formato)
              if (results.none { it.trackingNumber == id }) {
                 results.add(ParsedShipment(id, "Amazon", null))
+            }
+        }
+
+        // 4. Amazon Order ID (111-xxxxxxx-xxxxxxx) - SOLO si no se encontraron tracking numbers reales
+        // Esto sirve de fallback para que el usuario pueda importar el pedido aunque sea para seguimiento manual
+        val amazonOrderRegex = Regex("""\b\d{3}-\d{7}-\d{7}\b""")
+        val orderMatches = mutableListOf<String>()
+        amazonOrderRegex.findAll(text).forEach { match ->
+            orderMatches.add(match.value)
+        }
+
+        // Si encontramos Order IDs y NO hay tracking numbers de Amazon (TBA/AMZ), agregamos los Order IDs
+        // para que el usuario no se quede sin nada.
+        val hasRealAmazonTracking = results.any { it.carrier == "Amazon" && !it.trackingNumber.matches(Regex("""\d{3}-\d{7}-\d{7}""")) }
+        
+        if (!hasRealAmazonTracking && orderMatches.isNotEmpty()) {
+            orderMatches.distinct().forEach { orderId ->
+                if (results.none { it.trackingNumber == orderId }) {
+                    results.add(ParsedShipment(orderId, "Amazon", null))
+                }
             }
         }
 
