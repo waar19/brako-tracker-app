@@ -203,6 +203,16 @@ class ShipmentRepository @Inject constructor(
         try {
             val result = amazonService.getTracking(shipment.trackingNumber)
 
+            if (result.error == "LOGIN_REQUIRED") {
+                android.util.Log.w("AmazonTracking", "Requiere login")
+                dao.insertShipment(shipment.copy(
+                    carrier = "Amazon",
+                    status = "LOGIN_REQUIRED",
+                    lastUpdate = System.currentTimeMillis()
+                ))
+                return@withContext
+            }
+
             if (result.error != null) {
                 android.util.Log.w("AmazonTracking", "Error: ${result.error}")
                 dao.insertShipment(shipment.copy(
@@ -230,7 +240,9 @@ class ShipmentRepository @Inject constructor(
                         timestamp = System.currentTimeMillis() - (index * 3600000L),
                         description = event.description,
                         location = event.location,
-                        status = ""
+                        status = "",
+                        latitude = event.latitude,
+                        longitude = event.longitude
                     )
                 }
                 dao.clearEventsForShipment(id)

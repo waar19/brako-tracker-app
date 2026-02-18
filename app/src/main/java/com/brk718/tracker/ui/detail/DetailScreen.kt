@@ -14,6 +14,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.viewinterop.AndroidView
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import android.preference.PreferenceManager
 import com.brk718.tracker.data.local.TrackingEventEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +89,47 @@ fun DetailScreen(
                     )
 
                     Divider(modifier = Modifier.padding(vertical = 16.dp))
+
+                    // Mapa
+                    val eventsWithLoc = events.filter { it.latitude != null && it.longitude != null }
+                    if (eventsWithLoc.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(250.dp)
+                                .padding(bottom = 16.dp)
+                        ) {
+                            AndroidView(
+                                factory = { context ->
+                                    Configuration.getInstance().load(context, PreferenceManager.getDefaultSharedPreferences(context))
+                                    MapView(context).apply {
+                                        setTileSource(TileSourceFactory.MAPNIK)
+                                        setMultiTouchControls(true)
+                                        controller.setZoom(10.0)
+                                    }
+                                },
+                                update = { mapView ->
+                                    mapView.overlays.clear()
+                                    
+                                    val points = eventsWithLoc.map { 
+                                        GeoPoint(it.latitude!!, it.longitude!!) 
+                                    }
+                                    
+                                    points.forEachIndexed { index, point ->
+                                        val marker = Marker(mapView)
+                                        marker.position = point
+                                        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                        marker.title = eventsWithLoc[index].description
+                                        mapView.overlays.add(marker)
+                                    }
+
+                                    if (points.isNotEmpty()) {
+                                        mapView.controller.setCenter(points.first()) // Último evento primero
+                                    }
+                                }
+                            )
+                        }
+                    }
 
                     Text(
                         text = "Historial",

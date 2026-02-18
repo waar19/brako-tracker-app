@@ -38,7 +38,9 @@ data class TrackingEventEntity(
     val timestamp: Long,
     val description: String,
     val location: String?,
-    val status: String // Estado en ese momento
+    val status: String, // Estado en ese momento
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 data class ShipmentWithEvents(

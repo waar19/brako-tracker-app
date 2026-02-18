@@ -10,12 +10,14 @@ import com.brk718.tracker.ui.add.AddScreen
 import com.brk718.tracker.ui.detail.DetailScreen
 import com.brk718.tracker.ui.gmail.GmailScreen
 import com.brk718.tracker.ui.home.HomeScreen
+import com.brk718.tracker.ui.auth.AmazonAuthScreen
 
 object Routes {
     const val LIST = "list"
     const val ADD = "add"
     const val DETAIL = "detail/{shipmentId}"
     const val GMAIL = "gmail"
+    const val AMAZON_AUTH = "amazon_auth"
     fun detail(id: String) = "detail/$id"
 }
 
@@ -28,7 +30,8 @@ fun App() {
             HomeScreen(
                 onAddClick = { navController.navigate(Routes.ADD) },
                 onShipmentClick = { id -> navController.navigate(Routes.detail(id)) },
-                onGmailClick = { navController.navigate(Routes.GMAIL) }
+                onGmailClick = { navController.navigate(Routes.GMAIL) },
+                onAmazonAuthClick = { navController.navigate(Routes.AMAZON_AUTH) }
             )
         }
         composable(Routes.ADD) {
@@ -40,6 +43,12 @@ fun App() {
         composable(Routes.GMAIL) {
             GmailScreen(
                 onBack = { navController.popBackStack() }
+            )
+        }
+        composable(Routes.AMAZON_AUTH) {
+            AmazonAuthScreen(
+                onBack = { navController.popBackStack() },
+                onLoginSuccess = { navController.popBackStack() }
             )
         }
         composable(

@@ -101,6 +101,12 @@ dependencies {
     implementation(libs.google.api.services.gmail) {
         exclude(group = "org.apache.httpcomponents")
     }
+    
+    // HTML Parsing (Amazon Scraper)
+    implementation(libs.jsoup)
+    
+    // Maps (OpenStreetMap)
+    implementation(libs.osmdroid.android)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

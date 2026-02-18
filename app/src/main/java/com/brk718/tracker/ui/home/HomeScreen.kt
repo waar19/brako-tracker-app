@@ -27,6 +27,7 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     onShipmentClick: (String) -> Unit,
     onGmailClick: () -> Unit = {},
+    onAmazonAuthClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val shipments by viewModel.shipments.collectAsState()
@@ -68,7 +69,8 @@ fun HomeScreen(
                         item = item,
                         onClick = { onShipmentClick(item.shipment.id) },
                         onArchive = { viewModel.archiveShipment(item.shipment.id) },
-                        onDelete = { viewModel.deleteShipment(item.shipment.id) }
+                        onDelete = { viewModel.deleteShipment(item.shipment.id) },
+                        onAmazonAuthClick = onAmazonAuthClick
                     )
                 }
             }
@@ -81,7 +83,8 @@ fun ShipmentCard(
     item: ShipmentWithEvents,
     onClick: () -> Unit,
     onArchive: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onAmazonAuthClick: () -> Unit
 ) {
     ElevatedCard(
         onClick = onClick,
@@ -121,14 +124,25 @@ fun ShipmentCard(
                     else -> MaterialTheme.colorScheme.tertiary
                 }
                 
-                AssistChip(
-                    onClick = {},
-                    label = { Text(item.shipment.status) },
-                    colors = AssistChipDefaults.assistChipColors(
-                        labelColor = statusColor
-                    ),
-                    border = BorderStroke(1.dp, statusColor)
-                )
+                if (item.shipment.status == "LOGIN_REQUIRED") {
+                    Button(
+                        onClick = onAmazonAuthClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("Conectar Amazon")
+                    }
+                } else {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(item.shipment.status) },
+                        colors = AssistChipDefaults.assistChipColors(
+                            labelColor = statusColor
+                        ),
+                        border = BorderStroke(1.dp, statusColor)
+                    )
+                }
                 
                 Row {
                     IconButton(onClick = onArchive) {

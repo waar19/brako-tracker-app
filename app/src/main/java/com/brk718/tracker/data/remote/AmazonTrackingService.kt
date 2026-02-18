@@ -15,7 +15,11 @@ import javax.inject.Singleton
  * como TBA, AMZPSR, etc.
  */
 @Singleton
-class AmazonTrackingService @Inject constructor() {
+class AmazonTrackingService @Inject constructor(
+    private val sessionManager: com.brk718.tracker.data.local.AmazonSessionManager,
+    private val scraper: com.brk718.tracker.data.remote.AmazonScraper,
+    private val geocodingService: com.brk718.tracker.data.remote.GeocodingService
+) {
 
     // Cliente HTTP propio (sin interceptores de AfterShip)
     private val httpClient = OkHttpClient.Builder()
@@ -38,7 +42,9 @@ class AmazonTrackingService @Inject constructor() {
     data class AmazonTrackingEvent(
         val timestamp: String,
         val description: String,
-        val location: String
+        val location: String,
+        val latitude: Double? = null,
+        val longitude: Double? = null
     )
 
     /**
@@ -55,7 +61,69 @@ class AmazonTrackingService @Inject constructor() {
     /**
      * Consulta el estado de un tracking de Amazon
      */
+    /**
+     * Consulta el estado de un tracking de Amazon.
+     * Si es un tracking ID normal (TBA...), usa la API interna.
+     * Si es un Order ID (111-...), intenta usar el scraper (requiere login).
+     */
     suspend fun getTracking(trackingNumber: String): AmazonTrackingResult = withContext(Dispatchers.IO) {
+        // 1. Si es Order ID (111-...), usar Scraper
+        if (trackingNumber.matches(Regex("^\\d{3}-\\d{7}-\\d{7}$"))) {
+            if (!sessionManager.isLoggedIn()) {
+                return@withContext AmazonTrackingResult(
+                    status = null, expectedDelivery = null, events = emptyList(), 
+                    error = "LOGIN_REQUIRED"
+                )
+            }
+            
+            try {
+                val cookies = sessionManager.getCookies() ?: throw Exception("No cookies")
+                val info = scraper.scrapeOrder(trackingNumber, cookies)
+                
+                // Mapear info scrapeada a resultado
+                val events = mutableListOf<AmazonTrackingEvent>()
+                if (info.location != null || info.status.isNotEmpty()) {
+                    var lat: Double? = null
+                    var lon: Double? = null
+                    
+                    if (!info.location.isNullOrBlank()) {
+                        val coords = geocodingService.getCoordinates(info.location)
+                        lat = coords?.lat
+                        lon = coords?.lon
+                    }
+                    
+                    events.add(AmazonTrackingEvent(
+                        timestamp = System.currentTimeMillis().toString(), // No tenemos hora exacta
+                        description = info.status,
+                        location = info.location ?: "",
+                        latitude = lat,
+                        longitude = lon
+                    ))
+                }
+                
+                return@withContext AmazonTrackingResult(
+                    status = info.status,
+                    expectedDelivery = info.arrivalDate,
+                    events = events
+                )
+            } catch (e: Exception) {
+                // Si falla por auth, borrar sesión
+                if (e.message?.contains("Sign-In") == true || e.message?.contains("auth") == true) {
+                    sessionManager.clearSession()
+                    return@withContext AmazonTrackingResult(
+                        status = null, expectedDelivery = null, events = emptyList(), 
+                        error = "LOGIN_REQUIRED"
+                    )
+                }
+                
+                return@withContext AmazonTrackingResult(
+                    status = null, expectedDelivery = null, events = emptyList(),
+                    error = "Error de conexión con Amazon: ${e.message}"
+                )
+            }
+        }
+
+        // 2. Si es tracking ID normal (TBA...), usar API
         try {
             val request = Request.Builder()
                 .url("$BASE_URL$trackingNumber")
@@ -144,6 +212,8 @@ class AmazonTrackingService @Inject constructor() {
             status.contains("departed", ignoreCase = true) -> "En camino"
             else -> status
         }
+
+
 
         return AmazonTrackingResult(
             status = statusText,
