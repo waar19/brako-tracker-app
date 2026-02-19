@@ -382,8 +382,10 @@ class InterrapidisimoScraper @Inject constructor(
                     override fun onPageFinished(view: WebView?, pageUrl: String?) {
                         super.onPageFinished(view, pageUrl)
                         Log.d(TAG, "WebView loaded: $pageUrl")
+                        // Guard: solo disparar extracción una vez
+                        if (isResumed) return
                         handler.postDelayed({
-                            extractAndParse(wv) { resumeOnce(it) }
+                            if (!isResumed) extractAndParse(wv) { resumeOnce(it) }
                         }, JS_DELAY_MS)
                     }
 
@@ -399,7 +401,7 @@ class InterrapidisimoScraper @Inject constructor(
                 }
 
                 handler.postDelayed({
-                    if (!isResumed) {
+                    if (!isResumed && webView != null) {
                         Log.w(TAG, "WebView timeout — extrayendo lo que haya")
                         extractAndParse(wv) { resumeOnce(it) }
                     }
@@ -416,26 +418,35 @@ class InterrapidisimoScraper @Inject constructor(
         }
     }
 
-    private fun extractAndParse(webView: WebView, callback: (TrackingResult) -> Unit) {
+    private fun extractAndParse(webView: WebView?, callback: (TrackingResult) -> Unit) {
+        if (webView == null) {
+            callback(TrackingResult(null, null, null, emptyList(), error = "WebView ya destruido"))
+            return
+        }
         val htmlScript = "document.body ? document.body.innerHTML : ''"
-        webView.evaluateJavascript(htmlScript) { rawHtml ->
-            try {
-                val html = rawHtml
-                    ?.removeSurrounding("\"")
-                    ?.replace("\\u003C", "<")?.replace("\\u003E", ">")
-                    ?.replace("\\u003c", "<")?.replace("\\u003e", ">")
-                    ?.replace("\\u0026", "&")?.replace("\\u0027", "'")
-                    ?.replace("\\n", "\n")?.replace("\\t", "\t")
-                    ?.replace("\\r", "\r")?.replace("\\\"", "\"")
-                    ?.replace("\\/", "/")?.replace("\\\\", "\\")
-                    ?: ""
+        try {
+            webView.evaluateJavascript(htmlScript) { rawHtml ->
+                try {
+                    val html = rawHtml
+                        ?.removeSurrounding("\"")
+                        ?.replace("\\u003C", "<")?.replace("\\u003E", ">")
+                        ?.replace("\\u003c", "<")?.replace("\\u003e", ">")
+                        ?.replace("\\u0026", "&")?.replace("\\u0027", "'")
+                        ?.replace("\\n", "\n")?.replace("\\t", "\t")
+                        ?.replace("\\r", "\r")?.replace("\\\"", "\"")
+                        ?.replace("\\/", "/")?.replace("\\\\", "\\")
+                        ?: ""
 
-                Log.d(TAG, "WebView HTML length: ${html.length}")
-                callback(parseHtml(html))
-            } catch (e: Exception) {
-                Log.e(TAG, "extractAndParse error: ${e.message}")
-                callback(TrackingResult(null, null, null, emptyList(), error = e.message))
+                    Log.d(TAG, "WebView HTML length: ${html.length}")
+                    callback(parseHtml(html))
+                } catch (e: Exception) {
+                    Log.e(TAG, "extractAndParse error: ${e.message}")
+                    callback(TrackingResult(null, null, null, emptyList(), error = e.message))
+                }
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "evaluateJavascript skipped — WebView destroyed: ${e.message}")
+            // No llamar callback; isResumed ya fue seteado o lo hará el primer intento exitoso
         }
     }
 
@@ -602,7 +613,15 @@ class InterrapidisimoScraper @Inject constructor(
             ))
         }
 
-        val translatedStatus = translateStatus(statusText ?: "En seguimiento")
+        // Si la novedad indica un problema, darle prioridad sobre el estado técnico
+        val effectiveStatus = when {
+            !novedadDesc.isNullOrBlank() &&
+            (novedadDesc.contains("novedad", ignoreCase = true) ||
+             novedadDesc.contains("incidencia", ignoreCase = true) ||
+             novedadDesc.contains("problema", ignoreCase = true)) -> "NOVEDAD"
+            else -> statusText ?: "En seguimiento"
+        }
+        val translatedStatus = translateStatus(effectiveStatus)
         Log.d(TAG, "Resultado WebView — status: $translatedStatus | origen: $origin | destino: $destination | eventos: ${events.size}")
 
         return TrackingResult(

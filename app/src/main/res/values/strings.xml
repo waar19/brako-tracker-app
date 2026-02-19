@@ -1,3 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Tracker</string>
+
+    <!-- ══════════════════════════════════════════
+         HOME SCREEN
+    ══════════════════════════════════════════ -->
+    <string name="home_title">Mis Envíos</string>
+    <string name="home_refresh_all">Actualizar todos</string>
+    <string name="home_import_gmail">Importar de Gmail</string>
+    <string name="home_settings">Ajustes</string>
+    <string name="home_new_shipment">Nuevo envío</string>
+    <string name="home_empty_title">No hay envíos activos</string>
+    <string name="home_empty_subtitle">Toca el botón para añadir uno</string>
+    <string name="home_menu_archive">Archivar</string>
+    <string name="home_menu_delete">Eliminar</string>
+    <string name="home_menu_options">Opciones</string>
+    <string name="home_reconnect_amazon">Reconectar Amazon</string>
+    <string name="home_events_count">%d eventos</string>
+
+    <!-- ══════════════════════════════════════════
+         DETAIL SCREEN
+    ══════════════════════════════════════════ -->
+    <string name="detail_title">Detalle de Envío</string>
+    <string name="detail_back">Atrás</string>
+    <string name="detail_refresh">Actualizar</string>
+    <string name="detail_error_prefix">Error: </string>
+    <string name="detail_reconnect_amazon">Reconectar Amazon</string>
+    <string name="detail_expand_map">Ampliar</string>
+    <string name="detail_map_origin">Origen</string>
+    <string name="detail_map_transit">Tránsito</string>
+    <string name="detail_map_current">Actual</string>
+    <string name="detail_map_current_location">Ubicación actual</string>
+    <string name="detail_map_close">Cerrar mapa</string>
+    <string name="detail_history_title">Historial</string>
+    <string name="detail_events_count">%d eventos</string>
+    <string name="detail_no_events">No hay eventos registrados aún.</string>
+    <string name="detail_show_less">Ver menos</string>
+    <string name="detail_show_all">Ver todos (%d)</string>
+
+    <!-- ══════════════════════════════════════════
+         ADD SCREEN
+    ══════════════════════════════════════════ -->
+    <string name="add_title">Nuevo Envío</string>
+    <string name="add_back">Atrás</string>
+    <string name="add_tracking_label">Número de Seguimiento</string>
+    <string name="add_tracking_placeholder">Ej: 111-XXXXXXX-XXXXXXX</string>
+    <string name="add_tracking_hint_default">Amazon, UPS, FedEx, USPS, DHL</string>
+    <string name="add_hint_amazon">Formato: 111-XXXXXXX-XXXXXXX o TBA…</string>
+    <string name="add_hint_ups">Formato: 1Z + 16 caracteres</string>
+    <string name="add_hint_fedex">Formato: 12 o 15 dígitos</string>
+    <string name="add_hint_usps">Formato: 20-22 dígitos</string>
+    <string name="add_hint_dhl">Formato: JD… o 10 dígitos</string>
+    <string name="add_hint_interrapidisimo">Formato: 24 + 10 dígitos (ej: 240046650823)</string>
+    <string name="add_hint_coordinadora">Formato: 10 dígitos (ej: 5XXXXXXXXX)</string>
+    <string name="add_hint_servientrega">Formato: 10-11 dígitos (ej: 9XXXXXXXXX)</string>
+    <string name="add_hint_envia">Formato: 12-13 dígitos (ej: 1XXXXXXXXXXXX)</string>
+    <string name="add_title_label">Título (opcional)</string>
+    <string name="add_title_placeholder">Ej: Zapatillas Nike, Pedido Amazon…</string>
+    <string name="add_carrier_label">Transportista (opcional)</string>
+    <string name="add_carrier_placeholder_detected">Detectado: %s</string>
+    <string name="add_carrier_placeholder_auto">Auto-detectado si se deja vacío</string>
+    <string name="add_carrier_supporting">Deja vacío para usar la detección automática</string>
+    <string name="add_save_button">Guardar Envío</string>
+
+    <!-- ══════════════════════════════════════════
+         SETTINGS SCREEN
+    ══════════════════════════════════════════ -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_back">Atrás</string>
+
+    <!-- Secciones -->
+    <string name="settings_section_notifications">Notificaciones</string>
+    <string name="settings_section_sync">Sincronización</string>
+    <string name="settings_section_shipments">Envíos</string>
+    <string name="settings_section_integrations">Integraciones</string>
+    <string name="settings_section_appearance">Apariencia</string>
+    <string name="settings_section_about">Acerca de</string>
+
+    <!-- Notificaciones -->
+    <string name="settings_notifications_title">Notificaciones de seguimiento</string>
+    <string name="settings_notifications_subtitle">Recibir alertas de cambios de estado</string>
+    <string name="settings_important_only_title">Solo eventos importantes</string>
+    <string name="settings_important_only_subtitle">Entregado, En camino, Problema</string>
+
+    <!-- Sincronización -->
+    <string name="settings_autosync_title">Sincronización automática</string>
+    <string name="settings_autosync_subtitle">Actualiza los envíos en segundo plano</string>
+    <string name="settings_sync_interval_title">Frecuencia de sincronización</string>
+    <string name="settings_sync_wifi_title">Solo con WiFi</string>
+    <string name="settings_sync_wifi_subtitle">No sincronizar usando datos móviles</string>
+    <string name="settings_sync_status_title">Estado de sincronización</string>
+    <string name="settings_sync_manual">Solo manual</string>
+    <string name="settings_sync_1h">Cada hora</string>
+    <string name="settings_sync_2h">Cada 2 horas</string>
+    <string name="settings_sync_6h">Cada 6 horas</string>
+    <string name="settings_sync_12h">Cada 12 horas</string>
+    <string name="settings_sync_nh">Cada %d horas</string>
+
+    <!-- Envíos -->
+    <string name="settings_archived_title">Envíos archivados</string>
+    <string name="settings_archived_subtitle">Ver y gestionar envíos archivados</string>
+
+    <!-- Integraciones -->
+    <string name="settings_amazon_session_active">Sesión activa</string>
+    <string name="settings_amazon_not_connected">No conectado</string>
+    <string name="settings_amazon_disconnect">Desconectar</string>
+    <string name="settings_amazon_connect">Conectar</string>
+    <string name="settings_gmail_title">Gmail</string>
+    <string name="settings_gmail_subtitle">Importar envíos desde correos de Gmail</string>
+
+    <!-- Apariencia -->
+    <string name="settings_theme_title">Tema</string>
+    <string name="settings_theme_light">Claro</string>
+    <string name="settings_theme_dark">Oscuro</string>
+    <string name="settings_theme_system">Seguir el sistema</string>
+
+    <!-- Mapa -->
+    <string name="settings_clear_map_cache_title">Limpiar caché de mapas</string>
+    <string name="settings_clear_map_cache_subtitle">Liberar espacio de tiles descargados</string>
+    <string name="settings_map_cache_cleared">¡Caché eliminada!</string>
+
+    <!-- Acerca de -->
+    <string name="settings_version_title">Versión</string>
+
+    <!-- Diálogos -->
+    <string name="dialog_disconnect_amazon_title">Desconectar Amazon</string>
+    <string name="dialog_disconnect_amazon_text">Se eliminará la sesión guardada. Tendrás que iniciar sesión de nuevo para rastrear pedidos de Amazon.</string>
+    <string name="dialog_clear_cache_title">Limpiar caché de mapas</string>
+    <string name="dialog_clear_cache_text">Se eliminarán todos los tiles de mapa descargados. Se volverán a descargar cuando uses el mapa.</string>
+    <string name="dialog_clear_cache_confirm">Limpiar</string>
+    <string name="dialog_cancel">Cancelar</string>
+
+    <!-- ══════════════════════════════════════════
+         ARCHIVED SCREEN
+    ══════════════════════════════════════════ -->
+    <string name="archived_title">Envíos archivados</string>
+    <string name="archived_back">Atrás</string>
+    <string name="archived_empty">No hay envíos archivados</string>
+    <string name="archived_unarchive">Desarchivar</string>
+    <string name="archived_delete">Eliminar</string>
+
+    <!-- ══════════════════════════════════════════
+         GMAIL SCREEN
+    ══════════════════════════════════════════ -->
+    <string name="gmail_title">Importar de Gmail</string>
+    <string name="gmail_back">Atrás</string>
+    <string name="gmail_scan">Escanear</string>
+    <string name="gmail_connect_heading">Conecta tu cuenta de Gmail</string>
+    <string name="gmail_connect_description">Escanearemos tus emails de envío para detectar tracking numbers automáticamente</string>
+    <string name="gmail_connect_button">Conectar Gmail</string>
+    <string name="gmail_scanning">Escaneando emails de envío…</string>
+    <string name="gmail_no_results_title">No se encontraron tracking numbers</string>
+    <string name="gmail_no_results_subtitle">Intenta escanear de nuevo o añade manualmente</string>
+    <string name="gmail_rescan">Escanear de nuevo</string>
+    <string name="gmail_scan_button">Escanear emails de envío</string>
+    <string name="gmail_found_count">%d envíos detectados</string>
+    <string name="gmail_imported_chip">Importado</string>
+    <string name="gmail_importing_button">Importando…</string>
+    <string name="gmail_import_button">Importar</string>
+
+    <!-- ══════════════════════════════════════════
+         AMAZON AUTH SCREEN
+    ══════════════════════════════════════════ -->
+    <string name="amazon_auth_title">Conectar Amazon</string>
+    <string name="amazon_auth_back">Volver</string>
+    <string name="amazon_auth_done">Listo</string>
+
+    <!-- ══════════════════════════════════════════
+         ESTADOS DE ENVÍO (para traducción dinámica)
+    ══════════════════════════════════════════ -->
+    <string name="status_delivered">Entregado</string>
+    <string name="status_in_transit">En tránsito</string>
+    <string name="status_out_for_delivery">En reparto</string>
+    <string name="status_pending">Pendiente</string>
+    <string name="status_admitted">Admitido</string>
+    <string name="status_picked_up">Recogido</string>
+    <string name="status_incident">Novedad</string>
+    <string name="status_attempt_failed">Intento fallido</string>
+    <string name="status_returned">Devuelto</string>
+    <string name="status_pre_shipment">Pre-envío</string>
+    <string name="status_tracking">En seguimiento</string>
+    <string name="status_manual">Seguimiento manual</string>
 </resources>

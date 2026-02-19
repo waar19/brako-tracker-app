@@ -19,6 +19,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.res.stringResource
+import com.brk718.tracker.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,10 +47,10 @@ fun AmazonAuthScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Conectar Amazon") },
+                title = { Text(stringResource(R.string.amazon_auth_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.amazon_auth_back))
                     }
                 },
                 actions = {
@@ -58,7 +60,7 @@ fun AmazonAuthScreen(
                         viewModel.saveCookies(url)
                         onLoginSuccess()
                     }) {
-                        Icon(Icons.Default.Check, contentDescription = "Listo")
+                        Icon(Icons.Default.Check, contentDescription = stringResource(R.string.amazon_auth_done))
                     }
                 }
             )

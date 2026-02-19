@@ -21,7 +21,11 @@
       "Bash(cmd.exe /c:*)",
       "Bash(powershell.exe -Command:*)",
       "Bash(powershell.exe -NoProfile -Command:*)",
-      "Bash(adb devices:*)"
+      "Bash(adb devices:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(echo:*)",
+      "Bash(\"C:\\\\Users\\\\waar1\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" install -r \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\\\\app-debug.apk\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker && gradlew.bat assembleDebug\")"
     ]
   }
 }

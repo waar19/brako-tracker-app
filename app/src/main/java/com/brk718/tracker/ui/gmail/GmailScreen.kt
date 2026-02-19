@@ -15,9 +15,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brk718.tracker.R
 import com.brk718.tracker.domain.ParsedShipment
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,16 +41,16 @@ fun GmailScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Importar de Gmail") },
+                title = { Text(stringResource(R.string.gmail_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.gmail_back))
                     }
                 },
                 actions = {
                     if (uiState.isConnected) {
                         IconButton(onClick = { viewModel.scanEmails() }) {
-                            Icon(Icons.Default.Refresh, "Escanear")
+                            Icon(Icons.Default.Refresh, stringResource(R.string.gmail_scan))
                         }
                     }
                 }
@@ -73,13 +75,13 @@ fun GmailScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "Conecta tu cuenta de Gmail",
+                    stringResource(R.string.gmail_connect_heading),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "Escanearemos tus emails de envío para detectar tracking numbers automáticamente",
+                    stringResource(R.string.gmail_connect_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -87,7 +89,7 @@ fun GmailScreen(
                 Button(
                     onClick = { signInLauncher.launch(viewModel.getSignInIntent()) }
                 ) {
-                    Text("Conectar Gmail")
+                    Text(stringResource(R.string.gmail_connect_button))
                 }
                 Spacer(modifier = Modifier.weight(1f))
             } else if (uiState.isScanning) {
@@ -95,24 +97,24 @@ fun GmailScreen(
                 Spacer(modifier = Modifier.weight(1f))
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Escaneando emails de envío...")
+                Text(stringResource(R.string.gmail_scanning))
                 Spacer(modifier = Modifier.weight(1f))
             } else if (uiState.foundShipments.isEmpty() && uiState.hasScanned) {
                 // Sin resultados
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
-                    "No se encontraron tracking numbers",
+                    stringResource(R.string.gmail_no_results_title),
                     style = MaterialTheme.typography.titleMedium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "Intenta escanear de nuevo o añade manualmente",
+                    stringResource(R.string.gmail_no_results_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedButton(onClick = { viewModel.scanEmails() }) {
-                    Text("Escanear de nuevo")
+                    Text(stringResource(R.string.gmail_rescan))
                 }
                 Spacer(modifier = Modifier.weight(1f))
             } else {
@@ -126,14 +128,14 @@ fun GmailScreen(
 
                 if (!uiState.hasScanned) {
                     Button(onClick = { viewModel.scanEmails() }) {
-                        Text("Escanear emails de envío")
+                        Text(stringResource(R.string.gmail_scan_button))
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 if (uiState.foundShipments.isNotEmpty()) {
                     Text(
-                        "${uiState.foundShipments.size} envíos detectados",
+                        stringResource(R.string.gmail_found_count, uiState.foundShipments.size),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -199,7 +201,7 @@ fun DetectedShipmentCard(
             when {
                 isImported -> AssistChip(
                     onClick = {},
-                    label = { Text("Importado") },
+                    label = { Text(stringResource(R.string.gmail_imported_chip)) },
                     colors = AssistChipDefaults.assistChipColors(
                         labelColor = MaterialTheme.colorScheme.primary
                     )
@@ -214,10 +216,10 @@ fun DetectedShipmentCard(
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Importando...")
+                    Text(stringResource(R.string.gmail_importing_button))
                 }
                 else -> FilledTonalButton(onClick = onImport) {
-                    Text("Importar")
+                    Text(stringResource(R.string.gmail_import_button))
                 }
             }
         }

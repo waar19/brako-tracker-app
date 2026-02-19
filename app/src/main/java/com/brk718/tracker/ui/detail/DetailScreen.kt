@@ -35,11 +35,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brk718.tracker.R
 import androidx.compose.ui.viewinterop.AndroidView
 import com.brk718.tracker.data.local.TrackingEventEntity
 import com.brk718.tracker.data.repository.ShipmentRepository
@@ -172,10 +174,10 @@ fun DetailScreen(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("Detalle de Envío") },
+                    title = { Text(stringResource(R.string.detail_title)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.detail_back))
                         }
                     },
                     actions = {
@@ -183,14 +185,14 @@ fun DetailScreen(
                             onClick = { viewModel.refresh() },
                             enabled = !isRefreshing
                         ) {
-                            Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
+                            Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.detail_refresh))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     )
                 )
-                if (isRefreshing) {
+                if (isRefreshing || uiState is DetailUiState.Loading) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
@@ -199,13 +201,11 @@ fun DetailScreen(
     ) { padding ->
         when (val state = uiState) {
             is DetailUiState.Loading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                // La barra de progreso ya se muestra en el TopAppBar — nada más aquí
             }
             is DetailUiState.Error -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Error: ${state.message}")
+                    Text(stringResource(R.string.detail_error_prefix) + state.message)
                 }
             }
             is DetailUiState.Success -> {
@@ -254,7 +254,7 @@ fun DetailScreen(
                                 shipment.status == "Sign-In required"
                             if (needsLogin && onAmazonAuthClick != null) {
                                 Button(onClick = onAmazonAuthClick) {
-                                    Text("Reconectar Amazon")
+                                    Text(stringResource(R.string.detail_reconnect_amazon))
                                 }
                             } else {
                                 // Badge de estado
@@ -334,7 +334,7 @@ fun DetailScreen(
                                             tint = MaterialTheme.colorScheme.primary
                                         )
                                         Text(
-                                            "Ampliar",
+                                            stringResource(R.string.detail_expand_map),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.primary,
                                             fontWeight = FontWeight.Medium
@@ -356,9 +356,9 @@ fun DetailScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        LegendDot(Color(0xFF22C55E), "Origen")
-                                        LegendDot(Color(0xFF3B82F6), "Tránsito")
-                                        LegendDot(Color(0xFFEF4444), "Actual")
+                                        LegendDot(Color(0xFF22C55E), stringResource(R.string.detail_map_origin))
+                                        LegendDot(Color(0xFF3B82F6), stringResource(R.string.detail_map_transit))
+                                        LegendDot(Color(0xFFEF4444), stringResource(R.string.detail_map_current))
                                     }
                                 }
                             }
@@ -412,7 +412,7 @@ fun DetailScreen(
                                     ) {
                                         Icon(
                                             Icons.Default.Close,
-                                            contentDescription = "Cerrar mapa",
+                                            contentDescription = stringResource(R.string.detail_map_close),
                                             tint = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
@@ -431,9 +431,9 @@ fun DetailScreen(
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            LegendDot(Color(0xFF22C55E), "Origen")
-                                            LegendDot(Color(0xFF3B82F6), "Tránsito")
-                                            LegendDot(Color(0xFFEF4444), "Ubicación actual")
+                                            LegendDot(Color(0xFF22C55E), stringResource(R.string.detail_map_origin))
+                                            LegendDot(Color(0xFF3B82F6), stringResource(R.string.detail_map_transit))
+                                            LegendDot(Color(0xFFEF4444), stringResource(R.string.detail_map_current_location))
                                         }
                                     }
                                 }
@@ -465,14 +465,14 @@ fun DetailScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Historial",
+                                    text = stringResource(R.string.detail_history_title),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 if (events.size > maxCollapsed) {
                                     Text(
-                                        text = "${events.size} eventos",
+                                        text = stringResource(R.string.detail_events_count, events.size),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.outline
                                     )
@@ -481,7 +481,7 @@ fun DetailScreen(
 
                             if (events.isEmpty()) {
                                 Text(
-                                    text = "No hay eventos registrados aún.",
+                                    text = stringResource(R.string.detail_no_events),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -539,9 +539,9 @@ fun DetailScreen(
                                         Spacer(Modifier.width(4.dp))
                                         Text(
                                             text = if (historialExpanded)
-                                                "Ver menos"
+                                                stringResource(R.string.detail_show_less)
                                             else
-                                                "Ver todos (${events.size})",
+                                                stringResource(R.string.detail_show_all, events.size),
                                             style = MaterialTheme.typography.labelMedium
                                         )
                                     }

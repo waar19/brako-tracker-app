@@ -24,10 +24,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brk718.tracker.R
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.repository.ShipmentRepository
 import java.text.SimpleDateFormat
@@ -63,7 +65,7 @@ fun HomeScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        "Mis Envíos",
+                        stringResource(R.string.home_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -76,13 +78,13 @@ fun HomeScreen(
                         onClick = { viewModel.refreshAll() },
                         enabled = !isRefreshing
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Actualizar todos")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.home_refresh_all))
                     }
                     IconButton(onClick = onGmailClick) {
-                        Icon(Icons.Default.Email, contentDescription = "Importar de Gmail")
+                        Icon(Icons.Default.Email, contentDescription = stringResource(R.string.home_import_gmail))
                     }
                     IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Ajustes")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
                     }
                 }
             )
@@ -91,7 +93,7 @@ fun HomeScreen(
             ExtendedFloatingActionButton(
                 onClick = onAddClick,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Nuevo envío") }
+                text = { Text(stringResource(R.string.home_new_shipment)) }
             )
         },
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -117,12 +119,12 @@ fun HomeScreen(
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            "No hay envíos activos",
+                            stringResource(R.string.home_empty_title),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            "Toca el botón para añadir uno",
+                            stringResource(R.string.home_empty_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -263,7 +265,7 @@ fun ShipmentCard(
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(
                             Icons.Default.MoreVert,
-                            contentDescription = "Opciones",
+                            contentDescription = stringResource(R.string.home_menu_options),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -272,7 +274,7 @@ fun ShipmentCard(
                         onDismissRequest = { menuExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Archivar") },
+                            text = { Text(stringResource(R.string.home_menu_archive)) },
                             leadingIcon = {
                                 Icon(Icons.Default.Archive, null,
                                     tint = MaterialTheme.colorScheme.secondary)
@@ -280,7 +282,7 @@ fun ShipmentCard(
                             onClick = { menuExpanded = false; onArchive() }
                         )
                         DropdownMenuItem(
-                            text = { Text("Eliminar", color = MaterialTheme.colorScheme.error) },
+                            text = { Text(stringResource(R.string.home_menu_delete), color = MaterialTheme.colorScheme.error) },
                             leadingIcon = {
                                 Icon(Icons.Default.Delete, null,
                                     tint = MaterialTheme.colorScheme.error)
@@ -299,7 +301,7 @@ fun ShipmentCard(
                     onClick = onAmazonAuthClick,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Reconectar Amazon")
+                    Text(stringResource(R.string.home_reconnect_amazon))
                 }
             } else {
                 Row(

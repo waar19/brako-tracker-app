@@ -15,10 +15,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brk718.tracker.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brk718.tracker.data.local.ShipmentWithEvents
@@ -60,10 +62,10 @@ fun ArchivedScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Envíos archivados") },
+                title = { Text(stringResource(R.string.archived_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.archived_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -89,7 +91,7 @@ fun ArchivedScreen(
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "No hay envíos archivados",
+                        stringResource(R.string.archived_empty),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -159,14 +161,14 @@ private fun ArchivedShipmentCard(
             IconButton(onClick = onUnarchive) {
                 Icon(
                     Icons.Default.Unarchive,
-                    contentDescription = "Desarchivar",
+                    contentDescription = stringResource(R.string.archived_unarchive),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "Eliminar",
+                    contentDescription = stringResource(R.string.archived_delete),
                     tint = MaterialTheme.colorScheme.error
                 )
             }

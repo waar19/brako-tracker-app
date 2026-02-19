@@ -13,9 +13,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brk718.tracker.R
 
 // Detecta el transportista en base al formato del número de tracking
 private fun detectCarrier(tracking: String): String? {
@@ -68,16 +70,17 @@ private fun carrierTextColor(carrier: String): Color = when (carrier.lowercase()
     else  -> Color.White
 }
 
+@Composable
 private fun carrierHint(carrier: String): String = when (carrier.lowercase()) {
-    "amazon"          -> "Formato: 111-XXXXXXX-XXXXXXX o TBA..."
-    "ups"             -> "Formato: 1Z + 16 caracteres"
-    "fedex"           -> "Formato: 12 o 15 dígitos"
-    "usps"             -> "Formato: 20-22 dígitos"
-    "dhl"             -> "Formato: JD... o 10 dígitos"
-    "interrapidísimo" -> "Formato: 24 + 10 dígitos (ej: 240046650823)"
-    "coordinadora"    -> "Formato: 10 dígitos (ej: 5XXXXXXXXX)"
-    "servientrega"    -> "Formato: 10-11 dígitos (ej: 9XXXXXXXXX)"
-    "envía"           -> "Formato: 12-13 dígitos (ej: 1XXXXXXXXXXXX)"
+    "amazon"          -> stringResource(R.string.add_hint_amazon)
+    "ups"             -> stringResource(R.string.add_hint_ups)
+    "fedex"           -> stringResource(R.string.add_hint_fedex)
+    "usps"            -> stringResource(R.string.add_hint_usps)
+    "dhl"             -> stringResource(R.string.add_hint_dhl)
+    "interrapidísimo" -> stringResource(R.string.add_hint_interrapidisimo)
+    "coordinadora"    -> stringResource(R.string.add_hint_coordinadora)
+    "servientrega"    -> stringResource(R.string.add_hint_servientrega)
+    "envía"           -> stringResource(R.string.add_hint_envia)
     else              -> ""
 }
 
@@ -110,14 +113,14 @@ fun AddScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Nuevo Envío",
+                        stringResource(R.string.add_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.add_back))
                     }
                 }
             )
@@ -134,14 +137,14 @@ fun AddScreen(
                 OutlinedTextField(
                     value = trackingNumber,
                     onValueChange = { trackingNumber = it },
-                    label = { Text("Número de Seguimiento") },
-                    placeholder = { Text("Ej: 111-XXXXXXX-XXXXXXX") },
+                    label = { Text(stringResource(R.string.add_tracking_label)) },
+                    placeholder = { Text(stringResource(R.string.add_tracking_placeholder)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     supportingText = if (detectedCarrier != null) {
                         { Text(carrierHint(detectedCarrier!!), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     } else {
-                        { Text("Amazon, UPS, FedEx, USPS, DHL") }
+                        { Text(stringResource(R.string.add_tracking_hint_default)) }
                     },
                     trailingIcon = {
                         AnimatedVisibility(
@@ -172,8 +175,8 @@ fun AddScreen(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Título (opcional)") },
-                placeholder = { Text("Ej: Zapatillas Nike, Pedido Amazon...") },
+                label = { Text(stringResource(R.string.add_title_label)) },
+                placeholder = { Text(stringResource(R.string.add_title_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -181,16 +184,18 @@ fun AddScreen(
             OutlinedTextField(
                 value = carrier,
                 onValueChange = { carrier = it },
-                label = { Text("Transportista (opcional)") },
+                label = { Text(stringResource(R.string.add_carrier_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 placeholder = {
                     Text(
-                        if (detectedCarrier != null) "Detectado: $detectedCarrier"
-                        else "Auto-detectado si se deja vacío"
+                        if (detectedCarrier != null)
+                            stringResource(R.string.add_carrier_placeholder_detected, detectedCarrier!!)
+                        else
+                            stringResource(R.string.add_carrier_placeholder_auto)
                     )
                 },
-                supportingText = { Text("Deja vacío para usar la detección automática") }
+                supportingText = { Text(stringResource(R.string.add_carrier_supporting)) }
             )
 
             // === Error ===
@@ -234,7 +239,7 @@ fun AddScreen(
                     )
                 } else {
                     Text(
-                        "Guardar Envío",
+                        stringResource(R.string.add_save_button),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )

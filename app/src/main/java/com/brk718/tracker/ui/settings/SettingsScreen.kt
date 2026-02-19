@@ -16,9 +16,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brk718.tracker.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,10 +52,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ajustes") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.settings_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -74,12 +76,12 @@ fun SettingsScreen(
             // NOTIFICACIONES
             // ──────────────────────────────────────────────
             item {
-                SettingsSectionHeader(title = "Notificaciones", icon = Icons.Default.Notifications)
+                SettingsSectionHeader(title = stringResource(R.string.settings_section_notifications), icon = Icons.Default.Notifications)
             }
             item {
                 SettingsSwitchItem(
-                    title = "Notificaciones de seguimiento",
-                    subtitle = "Recibir alertas de cambios de estado",
+                    title = stringResource(R.string.settings_notifications_title),
+                    subtitle = stringResource(R.string.settings_notifications_subtitle),
                     icon = Icons.Default.NotificationsActive,
                     checked = prefs.notificationsEnabled,
                     onCheckedChange = { enable ->
@@ -94,8 +96,8 @@ fun SettingsScreen(
             }
             item {
                 SettingsSwitchItem(
-                    title = "Solo eventos importantes",
-                    subtitle = "Entregado, En camino, Problema",
+                    title = stringResource(R.string.settings_important_only_title),
+                    subtitle = stringResource(R.string.settings_important_only_subtitle),
                     icon = Icons.Default.FilterList,
                     checked = prefs.onlyImportantEvents,
                     enabled = prefs.notificationsEnabled,
@@ -109,12 +111,12 @@ fun SettingsScreen(
             // SINCRONIZACIÓN
             // ──────────────────────────────────────────────
             item {
-                SettingsSectionHeader(title = "Sincronización", icon = Icons.Default.Sync)
+                SettingsSectionHeader(title = stringResource(R.string.settings_section_sync), icon = Icons.Default.Sync)
             }
             item {
                 SettingsSwitchItem(
-                    title = "Sincronización automática",
-                    subtitle = "Actualiza los envíos en segundo plano",
+                    title = stringResource(R.string.settings_autosync_title),
+                    subtitle = stringResource(R.string.settings_autosync_subtitle),
                     icon = Icons.Default.Autorenew,
                     checked = prefs.autoSync,
                     onCheckedChange = { viewModel.setAutoSync(it) }
@@ -122,15 +124,15 @@ fun SettingsScreen(
             }
             item {
                 val intervalLabel = when (prefs.syncIntervalHours) {
-                    0    -> "Solo manual"
-                    1    -> "Cada hora"
-                    2    -> "Cada 2 horas"
-                    6    -> "Cada 6 horas"
-                    12   -> "Cada 12 horas"
-                    else -> "Cada ${prefs.syncIntervalHours} horas"
+                    0    -> stringResource(R.string.settings_sync_manual)
+                    1    -> stringResource(R.string.settings_sync_1h)
+                    2    -> stringResource(R.string.settings_sync_2h)
+                    6    -> stringResource(R.string.settings_sync_6h)
+                    12   -> stringResource(R.string.settings_sync_12h)
+                    else -> stringResource(R.string.settings_sync_nh, prefs.syncIntervalHours)
                 }
                 SettingsNavigationItem(
-                    title = "Frecuencia de sincronización",
+                    title = stringResource(R.string.settings_sync_interval_title),
                     subtitle = intervalLabel,
                     icon = Icons.Default.Schedule,
                     enabled = prefs.autoSync,
@@ -139,8 +141,8 @@ fun SettingsScreen(
             }
             item {
                 SettingsSwitchItem(
-                    title = "Solo con WiFi",
-                    subtitle = "No sincronizar usando datos móviles",
+                    title = stringResource(R.string.settings_sync_wifi_title),
+                    subtitle = stringResource(R.string.settings_sync_wifi_subtitle),
                     icon = Icons.Default.Wifi,
                     checked = prefs.syncOnlyOnWifi,
                     enabled = prefs.autoSync,
@@ -149,7 +151,7 @@ fun SettingsScreen(
             }
             item {
                 SettingsInfoItem(
-                    title = "Estado de sincronización",
+                    title = stringResource(R.string.settings_sync_status_title),
                     subtitle = state.lastSyncText,
                     icon = Icons.Default.CloudDone
                 )
@@ -161,12 +163,12 @@ fun SettingsScreen(
             // ENVÍOS
             // ──────────────────────────────────────────────
             item {
-                SettingsSectionHeader(title = "Envíos", icon = Icons.Default.Inventory2)
+                SettingsSectionHeader(title = stringResource(R.string.settings_section_shipments), icon = Icons.Default.Inventory2)
             }
             item {
                 SettingsNavigationItem(
-                    title = "Envíos archivados",
-                    subtitle = "Ver y gestionar envíos archivados",
+                    title = stringResource(R.string.settings_archived_title),
+                    subtitle = stringResource(R.string.settings_archived_subtitle),
                     icon = Icons.Default.Archive,
                     onClick = onArchivedClick
                 )
@@ -178,10 +180,10 @@ fun SettingsScreen(
             // INTEGRACIONES
             // ──────────────────────────────────────────────
             item {
-                SettingsSectionHeader(title = "Integraciones", icon = Icons.Default.Link)
+                SettingsSectionHeader(title = stringResource(R.string.settings_section_integrations), icon = Icons.Default.Link)
             }
             item {
-                val amazonSubtitle = if (state.isAmazonConnected) "Sesión activa" else "No conectado"
+                val amazonSubtitle = if (state.isAmazonConnected) stringResource(R.string.settings_amazon_session_active) else stringResource(R.string.settings_amazon_not_connected)
                 val amazonTrailing: @Composable () -> Unit = {
                     if (state.isAmazonConnected) {
                         TextButton(
@@ -189,9 +191,9 @@ fun SettingsScreen(
                             colors = ButtonDefaults.textButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
                             )
-                        ) { Text("Desconectar") }
+                        ) { Text(stringResource(R.string.settings_amazon_disconnect)) }
                     } else {
-                        TextButton(onClick = onAmazonAuthClick) { Text("Conectar") }
+                        TextButton(onClick = onAmazonAuthClick) { Text(stringResource(R.string.settings_amazon_connect)) }
                     }
                 }
                 SettingsCustomTrailingItem(
@@ -203,8 +205,8 @@ fun SettingsScreen(
             }
             item {
                 SettingsNavigationItem(
-                    title = "Gmail",
-                    subtitle = "Importar envíos desde correos de Gmail",
+                    title = stringResource(R.string.settings_gmail_title),
+                    subtitle = stringResource(R.string.settings_gmail_subtitle),
                     icon = Icons.Default.Email,
                     onClick = onGmailClick
                 )
@@ -216,16 +218,16 @@ fun SettingsScreen(
             // APARIENCIA
             // ──────────────────────────────────────────────
             item {
-                SettingsSectionHeader(title = "Apariencia", icon = Icons.Default.Palette)
+                SettingsSectionHeader(title = stringResource(R.string.settings_section_appearance), icon = Icons.Default.Palette)
             }
             item {
                 val themeLabel = when (prefs.theme) {
-                    "light"  -> "Claro"
-                    "dark"   -> "Oscuro"
-                    else     -> "Seguir el sistema"
+                    "light"  -> stringResource(R.string.settings_theme_light)
+                    "dark"   -> stringResource(R.string.settings_theme_dark)
+                    else     -> stringResource(R.string.settings_theme_system)
                 }
                 SettingsNavigationItem(
-                    title = "Tema",
+                    title = stringResource(R.string.settings_theme_title),
                     subtitle = themeLabel,
                     icon = Icons.Default.DarkMode,
                     onClick = { showThemeDialog = true }
@@ -238,19 +240,19 @@ fun SettingsScreen(
             // ACERCA DE
             // ──────────────────────────────────────────────
             item {
-                SettingsSectionHeader(title = "Acerca de", icon = Icons.Default.Info)
+                SettingsSectionHeader(title = stringResource(R.string.settings_section_about), icon = Icons.Default.Info)
             }
             item {
                 SettingsInfoItem(
-                    title = "Versión",
+                    title = stringResource(R.string.settings_version_title),
                     subtitle = state.appVersion,
                     icon = Icons.Default.Tag
                 )
             }
             item {
                 SettingsNavigationItem(
-                    title = "Limpiar caché de mapas",
-                    subtitle = if (cacheCleared) "¡Caché eliminada!" else "Liberar espacio de tiles descargados",
+                    title = stringResource(R.string.settings_clear_map_cache_title),
+                    subtitle = if (cacheCleared) stringResource(R.string.settings_map_cache_cleared) else stringResource(R.string.settings_clear_map_cache_subtitle),
                     icon = Icons.Default.DeleteSweep,
                     onClick = { showClearCacheDialog = true }
                 )
@@ -282,8 +284,8 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showDisconnectAmazonDialog = false },
             icon = { Icon(Icons.Default.LinkOff, null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("Desconectar Amazon") },
-            text = { Text("Se eliminará la sesión guardada. Tendrás que iniciar sesión de nuevo para rastrear pedidos de Amazon.") },
+            title = { Text(stringResource(R.string.dialog_disconnect_amazon_title)) },
+            text = { Text(stringResource(R.string.dialog_disconnect_amazon_text)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -291,10 +293,10 @@ fun SettingsScreen(
                         showDisconnectAmazonDialog = false
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Desconectar") }
+                ) { Text(stringResource(R.string.settings_amazon_disconnect)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDisconnectAmazonDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { showDisconnectAmazonDialog = false }) { Text(stringResource(R.string.dialog_cancel)) }
             }
         )
     }
@@ -303,17 +305,17 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showClearCacheDialog = false },
             icon = { Icon(Icons.Default.DeleteSweep, null) },
-            title = { Text("Limpiar caché de mapas") },
-            text = { Text("Se eliminarán todos los tiles de mapa descargados. Se volverán a descargar cuando uses el mapa.") },
+            title = { Text(stringResource(R.string.dialog_clear_cache_title)) },
+            text = { Text(stringResource(R.string.dialog_clear_cache_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.clearMapCache()
                     cacheCleared = true
                     showClearCacheDialog = false
-                }) { Text("Limpiar") }
+                }) { Text(stringResource(R.string.dialog_clear_cache_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { showClearCacheDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { showClearCacheDialog = false }) { Text(stringResource(R.string.dialog_cancel)) }
             }
         )
     }
@@ -535,11 +537,15 @@ private fun ThemePickerDialog(
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val options = listOf("system" to "Seguir el sistema", "light" to "Claro", "dark" to "Oscuro")
+    val options = listOf(
+        "system" to stringResource(R.string.settings_theme_system),
+        "light"  to stringResource(R.string.settings_theme_light),
+        "dark"   to stringResource(R.string.settings_theme_dark)
+    )
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.DarkMode, null) },
-        title = { Text("Tema") },
+        title = { Text(stringResource(R.string.settings_theme_title)) },
         text = {
             Column {
                 options.forEach { (value, label) ->
@@ -562,7 +568,7 @@ private fun ThemePickerDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_cancel)) }
         }
     )
 }
@@ -573,11 +579,17 @@ private fun SyncIntervalDialog(
     onSelect: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val options = listOf(1 to "Cada hora", 2 to "Cada 2 horas", 6 to "Cada 6 horas", 12 to "Cada 12 horas", 0 to "Solo manual")
+    val options = listOf(
+        1  to stringResource(R.string.settings_sync_1h),
+        2  to stringResource(R.string.settings_sync_2h),
+        6  to stringResource(R.string.settings_sync_6h),
+        12 to stringResource(R.string.settings_sync_12h),
+        0  to stringResource(R.string.settings_sync_manual)
+    )
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Schedule, null) },
-        title = { Text("Frecuencia de sincronización") },
+        title = { Text(stringResource(R.string.settings_sync_interval_title)) },
         text = {
             Column {
                 options.forEach { (value, label) ->
@@ -600,7 +612,7 @@ private fun SyncIntervalDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_cancel)) }
         }
     )
 }
