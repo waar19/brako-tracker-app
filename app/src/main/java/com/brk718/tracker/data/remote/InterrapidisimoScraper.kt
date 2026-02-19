@@ -50,8 +50,14 @@ class InterrapidisimoScraper @Inject constructor(
         private const val TAG = "InterrapidisimoScraper"
         private const val BASE_URL        = "https://www3.interrapidisimo.com"
         private const val AUTH_URL        = "$BASE_URL/ApiLogin/api/Autenticacion/GenerarTokenTemporal"
-        private const val TRACKING_URL    = "$BASE_URL/ApiServInter/api/Mensajeria/ObtenerRastreoGuias"
         private const val SPA_BASE_URL    = "$BASE_URL/SiguetuEnvio/shipment/"
+
+        // Endpoints candidatos (el primero suele dar 404; se prueban en orden)
+        private val TRACKING_ENDPOINTS = listOf(
+            "$BASE_URL/ApiServInter/api/Mensajeria/ObtenerRastreoGuiasClientePost",
+            "$BASE_URL/ApiServInter/api/Mensajeria/ObtenerRastreoGuiasPortalClientesPost",
+            "$BASE_URL/ApiServInter/api/Mensajeria/ObtenerRastreoGuias"
+        )
 
         // Credenciales temporales que usa la app pública (sin login de usuario requerido)
         private const val APP_USER        = "AppPublica"
@@ -116,27 +122,37 @@ class InterrapidisimoScraper @Inject constructor(
                 }
                 Log.d(TAG, "Token obtenido: ${token.take(20)}...")
 
-                // Paso 2: consultar rastreo
-                val body = JSONObject().apply {
+                // Paso 2: probar cada endpoint hasta encontrar uno que responda 2xx
+                val bodyJson = JSONObject().apply {
                     put("NumeroGuia", trackingNumber)
-                }.toString().toRequestBody(JSON_MEDIA_TYPE)
+                    // Algunos endpoints esperan el número en distintos campos
+                    put("Guia", trackingNumber)
+                }.toString()
 
-                val request = Request.Builder()
-                    .url(TRACKING_URL)
-                    .post(body)
-                    .header("Authorization", "Bearer $token")
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
-                    .build()
+                for (endpoint in TRACKING_ENDPOINTS) {
+                    val requestBody = bodyJson.toRequestBody(JSON_MEDIA_TYPE)
+                    val request = Request.Builder()
+                        .url(endpoint)
+                        .post(requestBody)
+                        .header("Authorization", "Bearer $token")
+                        .header("Content-Type", "application/json")
+                        .header("Accept", "application/json")
+                        .header("Origin", "https://interrapidisimo.com")
+                        .header("Referer", "https://interrapidisimo.com/")
+                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+                        .build()
 
-                val response = httpClient.newCall(request).execute()
-                val responseBody = response.body?.string() ?: return@withContext null
-                Log.d(TAG, "API response [${response.code}]: ${responseBody.take(500)}")
+                    val response = httpClient.newCall(request).execute()
+                    val responseBody = response.body?.string() ?: continue
+                    Log.d(TAG, "API [$endpoint] response [${response.code}]: ${responseBody.take(500)}")
 
-                if (!response.isSuccessful) return@withContext null
-
-                parseApiResponse(responseBody)
+                    if (response.isSuccessful) {
+                        val result = parseApiResponse(responseBody)
+                        if (result != null) return@withContext result
+                    }
+                    // Si es 404, continúa con el siguiente endpoint
+                }
+                null
             } catch (e: Exception) {
                 Log.w(TAG, "tryDirectApi error: ${e.message}")
                 null
@@ -426,110 +442,174 @@ class InterrapidisimoScraper @Inject constructor(
     /**
      * Parsea el HTML de la Angular SPA de Interrapidísimo.
      *
-     * Estructura observada (página de resultados):
-     *   - Número de guía: <h2 class="orange-inter"> o título principal
-     *   - Origen/Destino: elementos con texto "BOGOTA\CUND\COL"
-     *   - Estado: elemento con clase "subtitle" o similar
-     *   - Última actualización: texto "Última actualización: dd/MM/yyyy"
-     *   - Eventos (modal "Ver más detalle"): tabla o lista de novedades
+     * La SPA renderiza el contenido como texto plano con etiquetas sencillas.
+     * Estructura observada en los logs:
+     *
+     *   "Novedades Descripción: Su envío presenta una novedad. PreviousNext
+     *    Origen BOGOTA\CUND\COL  Destino SOGAMOSO\BOYA\COL  Ver más detalle
+     *    PRE ENVÍO: Guía generada por el usuario 240046650823
+     *    Estado ENVÍO PENDIENTE POR ADMITIR  Ciudad: BOGOTA\CUND\COL
+     *    Ver más detalle  Última actualización: 19/02/2026"
+     *
+     * Usamos el texto plano del body completo y expresiones regulares para extraer
+     * cada campo, sin depender de clases CSS que pueden cambiar.
      */
     private fun parseHtml(html: String): TrackingResult {
         if (html.isBlank()) {
             return TrackingResult(null, null, null, emptyList(), error = "HTML vacío")
         }
 
-        val doc = Jsoup.parse(html)
+        val doc  = Jsoup.parse(html)
+        // Texto plano completo del body (sin saltos de línea extra)
+        val full = doc.body().text().trim()
+        Log.d(TAG, "Body text (primeros 600): ${full.take(600)}")
 
-        // Detectar error del servidor
-        val errorText = doc.selectFirst(".error-message, [class*=error]")?.text()?.trim()
-        if (!errorText.isNullOrBlank() && errorText.contains("error", ignoreCase = true)) {
-            return TrackingResult(null, null, null, emptyList(), error = errorText)
+        // ── Verificar que realmente cargaron datos (no pantalla de verificación) ──
+        // La pantalla de verificación tiene "ingresa tu documento" o similar
+        val isVerificationScreen = full.contains("ingresa tu", ignoreCase = true) ||
+            full.contains("número de documento", ignoreCase = true) ||
+            full.contains("verificar identidad", ignoreCase = true)
+        if (isVerificationScreen && !full.contains("Origen", ignoreCase = true)) {
+            Log.w(TAG, "Pantalla de verificación detectada, sin datos de guía")
+            return TrackingResult(null, null, null, emptyList(),
+                error = "Verificación requerida")
         }
 
-        // Número de guía (para validar que cargó bien)
-        val guideNumber = doc.selectFirst(".orange-inter, h2.orange-inter, [class*=guide-number]")
-            ?.text()?.trim()
-        Log.d(TAG, "Guía extraída del HTML: $guideNumber")
-
-        // Origen y destino
-        val allLabels = doc.select("span, p, div, h3, h4, h5")
+        // ── Origen ──────────────────────────────────────────────────────────────
+        // Patrón: "Origen BOGOTA\CUND\COL" o "Origen: BOGOTA\CUND\COL"
         var origin: String? = null
+        val origenMatch = Regex(
+            """(?i)Origen\s*:?\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\\\/]+?)(?=\s{2,}|\s*Destino|\s*Ver más|\s*${'$'})"""
+        ).find(full)
+        if (origenMatch != null) {
+            origin = origenMatch.groupValues[1].trim().replace("\\", " / ")
+        } else {
+            // Fallback: buscar primer texto con patrón CIUDAD\PROV\PAIS
+            val geoMatch = Regex("""([A-ZÁÉÍÓÚÑ]{3,}\\[A-ZÁÉÍÓÚÑ]{2,}\\[A-Z]{2,3})""").find(full)
+            origin = geoMatch?.groupValues?.get(1)?.replace("\\", " / ")
+        }
+
+        // ── Destino ─────────────────────────────────────────────────────────────
         var destination: String? = null
+        val destinoMatch = Regex(
+            """(?i)Destino\s*:?\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\\\/]+?)(?=\s{2,}|\s*Ver más|\s*Estado|\s*${'$'})"""
+        ).find(full)
+        if (destinoMatch != null) {
+            destination = destinoMatch.groupValues[1].trim().replace("\\", " / ")
+        } else {
+            // Fallback: segundo texto con patrón CIUDAD\PROV\PAIS
+            val geoMatches = Regex("""([A-ZÁÉÍÓÚÑ]{3,}\\[A-ZÁÉÍÓÚÑ]{2,}\\[A-Z]{2,3})""")
+                .findAll(full).toList()
+            if (geoMatches.size >= 2) {
+                destination = geoMatches[1].groupValues[1].replace("\\", " / ")
+            }
+        }
+
+        // ── Estado ──────────────────────────────────────────────────────────────
+        // Patrón: "Estado ENVÍO PENDIENTE POR ADMITIR Ciudad:" o "Estado: ENTREGADO"
         var statusText: String? = null
-
-        // Buscar el bloque con "Origen" y "Destino"
-        for (el in doc.select("[class*=orange-inter], .orange-inter")) {
-            val text = el.text().trim()
-            if (text.contains("\\") || text.matches(Regex("[A-Z]+\\\\[A-Z]+.*"))) {
-                // Puede ser origen o destino — ver el label previo hermano
-                val parent = el.parent()
-                val label = parent?.selectFirst("span, p, label, h5, h6")?.text()?.trim()?.lowercase()
-                when {
-                    label?.contains("origen") == true  -> origin = text.replace("\\", " / ")
-                    label?.contains("destino") == true -> destination = text.replace("\\", " / ")
-                    origin == null                     -> origin = text.replace("\\", " / ")
-                    destination == null                -> destination = text.replace("\\", " / ")
-                }
-            }
+        val estadoMatch = Regex(
+            """(?i)Estado\s*:?\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+?)(?=\s*Ciudad:|\s{2,}|\s*Ver más|\s*${'$'})"""
+        ).find(full)
+        if (estadoMatch != null) {
+            statusText = estadoMatch.groupValues[1].trim()
         }
 
-        // Estado: dentro de la tarjeta principal
-        val subtitleEl = doc.selectFirst(".subtitle, [class*=subtitle], [class*=estado-text]")
-        statusText = subtitleEl?.text()?.trim()
-
-        // Fallback: buscar texto en mayúsculas que parezca un estado
+        // Fallback: buscar texto en MAYÚSCULAS completas que parezca un estado
         if (statusText.isNullOrBlank()) {
-            for (el in doc.select("span, p, div, h3, h4, h5")) {
-                val t = el.text().trim()
-                if (t.length in 5..60 &&
-                    t == t.uppercase() &&
-                    t.contains(" ") &&
+            val capsMatch = Regex("""((?:[A-ZÁÉÍÓÚÑ]{2,}\s+){1,5}[A-ZÁÉÍÓÚÑ]{2,})""").findAll(full)
+                .map { it.groupValues[1].trim() }
+                .filter { t ->
+                    t.length in 6..70 &&
+                    t == t.uppercase(java.util.Locale.ROOT) &&
                     !t.contains("\\") &&
-                    !t.matches(Regex(".*\\d{2}/\\d{2}/\\d{4}.*"))) {
-                    statusText = t
-                    break
+                    !t.matches(Regex(""".*\d{2}/\d{2}/\d{4}.*""")) &&
+                    !listOf("ORIGEN", "DESTINO", "ESTADO", "CIUDAD", "NOVEDADES",
+                            "VER MAS", "VER MÁS", "DESCRIPCION", "DESCRIPCIÓN",
+                            "PREVIOUSNEXT").any { kw -> t == kw }
                 }
-            }
+                .firstOrNull()
+            statusText = capsMatch
         }
 
-        // Fecha de última actualización
-        val lastUpdateEl = doc.getElementsContainingText("ltima actualizaci").firstOrNull()
-        val lastUpdate = lastUpdateEl?.text()?.trim()
+        // ── Ciudad del estado ────────────────────────────────────────────────────
+        val ciudadEstadoMatch = Regex(
+            """(?i)Ciudad:\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\\]+?)(?=\s{2,}|\s*Ver más|\s*${'$'})"""
+        ).find(full)
+        val ciudadEstado = ciudadEstadoMatch?.groupValues?.get(1)?.trim()
+            ?.replace("\\", " / ")
+
+        // Si no tenemos origen todavía, usar ciudad del estado
+        if (origin == null && ciudadEstado != null) {
+            origin = ciudadEstado
+        }
+
+        // ── Última actualización ─────────────────────────────────────────────────
+        val lastUpdateMatch = Regex(
+            """(?i)[ÚU]ltima\s+actualizaci[oó]n\s*:\s*(\d{2}/\d{2}/\d{4})"""
+        ).find(full)
+        val lastUpdate = lastUpdateMatch?.groupValues?.get(1)  // "19/02/2026"
         Log.d(TAG, "Última actualización: $lastUpdate")
 
-        // Eventos (tabla de novedades — dentro del modal o en la página)
+        // ── Novedades / Descripción de eventos ──────────────────────────────────
+        // Patrón: "Novedades Descripción: Su envío presenta una novedad."
+        val novedadMatch = Regex(
+            """(?i)Descripci[oó]n\s*:\s+(.+?)(?=\s*PreviousNext|\s*Siguiente|\s*${'$'})"""
+        ).find(full)
+        val novedadDesc = novedadMatch?.groupValues?.get(1)?.trim()
+
+        // ── Construir lista de eventos ───────────────────────────────────────────
         val events = mutableListOf<TrackingEvent>()
-        val rows = doc.select("table tr, .novedad-row, [class*=novedad], [class*=event-row]")
-        for (row in rows) {
-            val cells = row.select("td, th, span, div")
+
+        // Intentar extraer filas de tabla (si hay tabla de novedades en el DOM)
+        val tableRows = doc.select("table tbody tr, table tr:not(:first-child)")
+        for (row in tableRows) {
+            val cells = row.select("td")
             if (cells.size >= 2) {
-                val desc = cells.getOrNull(0)?.text()?.trim() ?: continue
-                val loc  = cells.getOrNull(1)?.text()?.trim() ?: ""
-                val ts   = cells.getOrNull(2)?.text()?.trim() ?: ""
-                if (desc.length >= 3) {
-                    events.add(TrackingEvent(timestamp = ts, description = desc, location = loc))
+                val desc  = cells.getOrNull(0)?.text()?.trim() ?: continue
+                val fecha = cells.getOrNull(1)?.text()?.trim() ?: ""
+                val loc   = cells.getOrNull(2)?.text()?.trim() ?: ""
+                if (desc.length >= 3 && !desc.equals("descripción", ignoreCase = true)) {
+                    events.add(TrackingEvent(timestamp = fecha, description = desc, location = loc))
                 }
             }
         }
 
-        // Si no hay eventos pero hay estado, crear evento sintético
-        if (events.isEmpty() && !statusText.isNullOrBlank()) {
-            val loc = origin ?: ""
+        // Si no hay filas de tabla, crear evento con novedad + estado
+        if (events.isEmpty()) {
+            val eventDesc = when {
+                !novedadDesc.isNullOrBlank() -> novedadDesc
+                !statusText.isNullOrBlank()  -> statusText
+                else                         -> null
+            }
+            if (eventDesc != null) {
+                events.add(TrackingEvent(
+                    timestamp = lastUpdate ?: "",
+                    description = eventDesc,
+                    location    = ciudadEstado ?: origin ?: ""
+                ))
+            }
+        }
+
+        // Agregar evento "PRE ENVÍO" si aparece en el texto y no está en eventos
+        val preEnvioMatch = Regex("""(?i)(PRE ENV[IÍ]O[^.]+\.)""").find(full)
+        val preEnvioText  = preEnvioMatch?.groupValues?.get(1)?.trim()
+        if (preEnvioText != null && events.none { it.description.contains("PRE ENV", ignoreCase = true) }) {
             events.add(TrackingEvent(
-                timestamp = lastUpdate ?: "",
-                description = statusText,
-                location = loc
+                timestamp   = lastUpdate ?: "",
+                description = preEnvioText,
+                location    = origin ?: ""
             ))
         }
 
         val translatedStatus = translateStatus(statusText ?: "En seguimiento")
-        Log.d(TAG, "Resultado WebView — status: $translatedStatus, origen: $origin, destino: $destination, eventos: ${events.size}")
+        Log.d(TAG, "Resultado WebView — status: $translatedStatus | origen: $origin | destino: $destination | eventos: ${events.size}")
 
         return TrackingResult(
-            status = translatedStatus,
-            origin = origin,
+            status      = translatedStatus,
+            origin      = origin,
             destination = destination,
-            events = events
+            events      = events
         )
     }
 

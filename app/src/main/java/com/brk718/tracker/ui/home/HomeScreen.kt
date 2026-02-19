@@ -165,10 +165,20 @@ fun ShipmentCard(
     val (statusColor, statusContainerColor) = when {
         statusLower == "entregado" ->
             MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.primaryContainer
-        statusLower.contains("error") || statusLower.contains("incidencia") ->
+        statusLower.contains("error") || statusLower.contains("incidencia") ||
+        statusLower.contains("novedad") || statusLower.contains("intento") ->
             MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.errorContainer
-        statusLower.contains("manual") || statusLower.contains("no soportado") ->
+        statusLower.contains("manual") || statusLower.contains("no soportado") ||
+        statusLower.contains("seguimiento manual") ->
             MaterialTheme.colorScheme.outline to MaterialTheme.colorScheme.surfaceVariant
+        statusLower.contains("pendiente") || statusLower.contains("pre-envío") ||
+        statusLower.contains("pre envío") || statusLower.contains("registrando") ->
+            Color(0xFFF57F17) to Color(0xFFFFF9C4)   // amarillo — aún no enviado
+        statusLower.contains("tránsito") || statusLower.contains("transito") ||
+        statusLower.contains("reparto") || statusLower.contains("camino") ->
+            MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.tertiaryContainer
+        statusLower.contains("devuelto") ->
+            MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.errorContainer
         else ->
             MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.tertiaryContainer
     }

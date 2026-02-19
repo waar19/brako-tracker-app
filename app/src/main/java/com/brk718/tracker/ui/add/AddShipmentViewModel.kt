@@ -28,7 +28,7 @@ class AddShipmentViewModel @Inject constructor(
             }
 
             try {
-                repository.addShipment(trackingNumber, carrier, title.ifBlank { "Envío sin título" })
+                repository.addShipment(trackingNumber, carrier, title.ifBlank { trackingNumber })
                 _uiState.value = AddUiState.Success
             } catch (e: Exception) {
                 _uiState.value = AddUiState.Error(e.message ?: "Error desconocido")

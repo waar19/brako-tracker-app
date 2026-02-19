@@ -202,7 +202,13 @@ class ShipmentRepository @Inject constructor(
 
     suspend fun refreshShipment(id: String) = withContext(Dispatchers.IO) {
         val shipmentWithEvents = dao.getShipmentById(id).first() ?: return@withContext
-        val shipment = shipmentWithEvents.shipment
+        var shipment = shipmentWithEvents.shipment
+
+        // Auto-corregir título genérico heredado de versiones anteriores
+        if (shipment.title == "Envío sin título" || shipment.title.isBlank()) {
+            shipment = shipment.copy(title = shipment.trackingNumber)
+            dao.insertShipment(shipment)
+        }
 
         // Si es un tracking de Amazon, usar el servicio de Amazon directamente
         if (amazonService.isAmazonTracking(shipment.trackingNumber)) {
@@ -266,6 +272,9 @@ class ShipmentRepository @Inject constructor(
     private suspend fun refreshShipmentAmazon(id: String) = withContext(Dispatchers.IO) {
         val shipmentWithEvents = dao.getShipmentById(id).first() ?: return@withContext
         val shipment = shipmentWithEvents.shipment
+        // Auto-corregir título genérico heredado de versiones anteriores
+        val fixedTitle = if (shipment.title == "Envío sin título" || shipment.title.isBlank())
+            shipment.trackingNumber else shipment.title
 
         try {
             val result = amazonService.getTracking(shipment.trackingNumber)
@@ -274,6 +283,7 @@ class ShipmentRepository @Inject constructor(
                 android.util.Log.w("AmazonTracking", "Requiere login")
                 dao.insertShipment(shipment.copy(
                     carrier = "Amazon",
+                    title = fixedTitle,
                     status = "LOGIN_REQUIRED",
                     lastUpdate = System.currentTimeMillis()
                 ))
@@ -284,6 +294,7 @@ class ShipmentRepository @Inject constructor(
                 android.util.Log.w("AmazonTracking", "Error: ${result.error}")
                 dao.insertShipment(shipment.copy(
                     carrier = "Amazon",
+                    title = fixedTitle,
                     status = "Seguimiento manual",
                     lastUpdate = System.currentTimeMillis()
                 ))
@@ -294,6 +305,7 @@ class ShipmentRepository @Inject constructor(
             val status = result.status ?: "En seguimiento"
             dao.insertShipment(shipment.copy(
                 carrier = "Amazon",
+                title = fixedTitle,
                 status = status,
                 lastUpdate = System.currentTimeMillis()
             ))
@@ -344,17 +356,15 @@ class ShipmentRepository @Inject constructor(
                 return@withContext
             }
 
-            // Actualizar estado con origen/destino si disponibles
-            val displayStatus = buildString {
-                append(result.status ?: "En seguimiento")
-                if (!result.destination.isNullOrBlank()) {
-                    append(" → ${result.destination}")
-                }
-            }
+            val displayStatus = result.status ?: "En seguimiento"
+            // Auto-corregir título genérico heredado de versiones anteriores
+            val fixedTitle = if (shipment.title == "Envío sin título" || shipment.title.isBlank())
+                shipment.trackingNumber else shipment.title
 
             dao.insertShipment(shipment.copy(
                 carrier = "interrapidisimo-scraper",
                 status = displayStatus,
+                title = fixedTitle,
                 lastUpdate = System.currentTimeMillis()
             ))
 
