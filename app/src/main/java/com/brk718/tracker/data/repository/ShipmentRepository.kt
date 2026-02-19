@@ -71,6 +71,7 @@ class ShipmentRepository @Inject constructor(
     }
 
     val activeShipments: Flow<List<ShipmentWithEvents>> = dao.getAllActiveShipments()
+    val archivedShipments: Flow<List<ShipmentWithEvents>> = dao.getAllArchivedShipments()
 
     fun getShipment(id: String): Flow<ShipmentWithEvents?> = dao.getShipmentById(id)
 
@@ -266,6 +267,10 @@ class ShipmentRepository @Inject constructor(
 
     suspend fun archiveShipment(id: String) {
         dao.archiveShipment(id)
+    }
+
+    suspend fun unarchiveShipment(id: String) {
+        dao.unarchiveShipment(id)
     }
 
     suspend fun deleteShipment(id: String) {

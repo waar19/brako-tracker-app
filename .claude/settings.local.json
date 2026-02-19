@@ -6,7 +6,8 @@
       "Bash(cmd /c \"cd /d C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker && gradlew.bat compileDebugKotlin 2>&1\")",
       "Bash(powershell -Command:*)",
       "Bash(adb shell run-as com.brk718.tracker cat files/amazon_debug.html)",
-      "Bash(\"C:\\\\Users\\\\waar1\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" shell run-as com.brk718.tracker cat files/amazon_debug.html)"
+      "Bash(\"C:\\\\Users\\\\waar1\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" shell run-as com.brk718.tracker cat files/amazon_debug.html)",
+      "Bash(dir /s \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\app\\\\src\\\\main\\\\java\\\\com\\\\brk718\\\\tracker\")"
     ]
   }
 }

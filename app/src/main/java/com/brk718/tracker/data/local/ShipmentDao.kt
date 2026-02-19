@@ -14,6 +14,13 @@ interface ShipmentDao {
     fun getAllActiveShipments(): Flow<List<ShipmentWithEvents>>
 
     @Transaction
+    @Query("SELECT * FROM shipments WHERE isArchived = 1 ORDER BY lastUpdate DESC")
+    fun getAllArchivedShipments(): Flow<List<ShipmentWithEvents>>
+
+    @Query("UPDATE shipments SET isArchived = 0 WHERE id = :id")
+    suspend fun unarchiveShipment(id: String)
+
+    @Transaction
     @Query("SELECT * FROM shipments WHERE id = :id")
     fun getShipmentById(id: String): Flow<ShipmentWithEvents?>
 

@@ -96,6 +96,9 @@ dependencies {
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
 
+    // DataStore (preferencias de usuario)
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     // Play Services Auth (Gmail)
     implementation(libs.play.services.auth)
     implementation(libs.google.api.client.android)

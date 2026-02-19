@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.brk718.tracker.ui.App
-import com.brk718.tracker.ui.theme.TrackerTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -14,9 +13,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            TrackerTheme {
-                App()
-            }
+            // TrackerTheme se aplica dentro de App() para que el tema sea reactivo
+            App()
         }
     }
 }
