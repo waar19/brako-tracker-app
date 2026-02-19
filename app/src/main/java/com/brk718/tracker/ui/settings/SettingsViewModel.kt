@@ -10,6 +10,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.brk718.tracker.BuildConfig
+import com.brk718.tracker.data.billing.BillingRepository
+import com.brk718.tracker.data.billing.BillingState
 import com.brk718.tracker.data.local.AmazonSessionManager
 import com.brk718.tracker.data.local.UserPreferences
 import com.brk718.tracker.data.local.UserPreferencesRepository
@@ -31,14 +33,17 @@ data class SettingsUiState(
     val isAmazonConnected: Boolean = false,
     val appVersion: String = "",
     val cacheCleared: Boolean = false,
-    val lastSyncText: String = "Nunca"
+    val lastSyncText: String = "Nunca",
+    val subscriptionPriceText: String = "—",
+    val billingState: BillingState = BillingState.Idle
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val prefsRepo: UserPreferencesRepository,
-    private val amazonSessionManager: AmazonSessionManager
+    private val amazonSessionManager: AmazonSessionManager,
+    private val billingRepository: BillingRepository
 ) : ViewModel() {
 
     // Flow de WorkInfo para la tarea periódica "TrackerSync"
@@ -47,8 +52,10 @@ class SettingsViewModel @Inject constructor(
 
     val uiState: StateFlow<SettingsUiState> = combine(
         prefsRepo.preferences,
-        syncWorkInfoFlow
-    ) { prefs, workInfoList ->
+        syncWorkInfoFlow,
+        billingRepository.productDetails,
+        billingRepository.billingState
+    ) { prefs, workInfoList, productDetails, billingState ->
         val lastSyncText = workInfoList
             .firstOrNull()
             ?.let { formatLastSync(it) }
@@ -58,7 +65,9 @@ class SettingsViewModel @Inject constructor(
             isAmazonConnected = amazonSessionManager.isLoggedIn(),
             appVersion = BuildConfig.VERSION_NAME,
             cacheCleared = false,
-            lastSyncText = lastSyncText
+            lastSyncText = lastSyncText,
+            subscriptionPriceText = billingRepository.getPriceText(),
+            billingState = billingState
         )
     }.stateIn(
         scope = viewModelScope,
@@ -124,6 +133,15 @@ class SettingsViewModel @Inject constructor(
     // === Amazon ===
     fun disconnectAmazon() {
         amazonSessionManager.clearSession()
+    }
+
+    // === Suscripción Premium ===
+    fun purchaseSubscription(activity: android.app.Activity) {
+        billingRepository.purchaseSubscription(activity)
+    }
+
+    fun restorePurchases() {
+        billingRepository.restorePurchases()
     }
 
     // === Caché de mapas ===

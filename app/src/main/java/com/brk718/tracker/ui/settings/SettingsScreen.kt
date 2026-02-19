@@ -15,12 +15,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
+import com.brk718.tracker.data.billing.BillingState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +36,7 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val prefs = state.preferences
+    val activity = LocalContext.current as android.app.Activity
 
     // Launcher para solicitar permiso POST_NOTIFICATIONS (Android 13+)
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -71,6 +75,128 @@ fun SettingsScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
+
+            // ──────────────────────────────────────────────
+            // PREMIUM
+            // ──────────────────────────────────────────────
+            item {
+                SettingsSectionHeader(
+                    title = "Premium",
+                    icon = Icons.Default.WorkspacePremium
+                )
+            }
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (prefs.isPremium)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        if (prefs.isPremium) {
+                            // Estado premium activo
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Plan Premium activo",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Disfrutas de anuncios eliminados y envíos ilimitados.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = { viewModel.restorePurchases() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Restaurar compra")
+                            }
+                        } else {
+                            // Oferta premium
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.WorkspacePremium,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFB400),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Hazte Premium",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "✓ Sin anuncios  ✓ Envíos ilimitados",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            // Feedback de error si aplica
+                            if (state.billingState is BillingState.Error) {
+                                Text(
+                                    (state.billingState as BillingState.Error).message,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+                            Button(
+                                onClick = { viewModel.purchaseSubscription(activity) },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = state.billingState !is BillingState.Loading
+                            ) {
+                                if (state.billingState is BillingState.Loading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    val price = state.subscriptionPriceText
+                                    Text(
+                                        if (price == "—") "Suscribirse — anual"
+                                        else "Suscribirse — $price / año"
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(
+                                onClick = { viewModel.restorePurchases() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    "Restaurar compra anterior",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item { SettingsDivider() }
 
             // ──────────────────────────────────────────────
             // NOTIFICACIONES

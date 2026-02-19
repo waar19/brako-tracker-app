@@ -1,13 +1,16 @@
 package com.brk718.tracker.ui
 
+import android.app.Activity
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -15,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.brk718.tracker.ui.add.AddScreen
+import com.brk718.tracker.ui.ads.AdManager
 import com.brk718.tracker.ui.auth.AmazonAuthScreen
 import com.brk718.tracker.ui.detail.DetailScreen
 import com.brk718.tracker.ui.gmail.GmailScreen
@@ -38,11 +42,15 @@ object Routes {
 private const val TRANSITION_DURATION = 300
 
 @Composable
-fun App() {
+fun App(
+    adManager: AdManager? = null
+) {
     val navController = rememberNavController()
+    val context = LocalContext.current
 
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val settingsState by settingsViewModel.uiState.collectAsState()
+    val isPremium = settingsState.preferences.isPremium
     val darkTheme = when (settingsState.preferences.theme) {
         "light" -> false
         "dark"  -> true
@@ -86,7 +94,10 @@ fun App() {
                     onShipmentClick   = { id -> navController.navigate(Routes.detail(id)) },
                     onGmailClick      = { navController.navigate(Routes.GMAIL) },
                     onAmazonAuthClick = { navController.navigate(Routes.AMAZON_AUTH) },
-                    onSettingsClick   = { navController.navigate(Routes.SETTINGS) }
+                    onSettingsClick   = { navController.navigate(Routes.SETTINGS) },
+                    onUpgradeClick    = { navController.navigate(Routes.SETTINGS) },
+                    isPremium         = isPremium,
+                    adManager         = adManager
                 )
             }
             composable(Routes.ADD) {
@@ -119,6 +130,10 @@ fun App() {
                 route     = Routes.DETAIL,
                 arguments = listOf(navArgument("shipmentId") { type = NavType.StringType })
             ) {
+                // Mostrar interstitial al abrir detalle (máx cada 3 veces, solo free)
+                LaunchedEffect(Unit) {
+                    adManager?.onDetailScreenOpened(context as Activity, isPremium)
+                }
                 DetailScreen(
                     onBack            = { navController.popBackStack() },
                     onAmazonAuthClick = { navController.navigate(Routes.AMAZON_AUTH) }

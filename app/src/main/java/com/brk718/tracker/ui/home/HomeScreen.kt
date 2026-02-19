@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -28,13 +29,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.repository.ShipmentRepository
+import com.brk718.tracker.ui.ads.AdManager
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private const val FREE_SHIPMENT_LIMIT = 5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,11 +50,17 @@ fun HomeScreen(
     onGmailClick: () -> Unit = {},
     onAmazonAuthClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onUpgradeClick: () -> Unit = {},
+    isPremium: Boolean = false,
+    adManager: AdManager? = null,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val shipments by viewModel.shipments.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val canAddMore = isPremium || shipments.size < FREE_SHIPMENT_LIMIT
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -61,6 +73,7 @@ fun HomeScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -74,6 +87,16 @@ fun HomeScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
                 actions = {
+                    // Botón Premium (solo si no es premium)
+                    if (!isPremium) {
+                        IconButton(onClick = onUpgradeClick) {
+                            Icon(
+                                Icons.Default.WorkspacePremium,
+                                contentDescription = "Premium",
+                                tint = Color(0xFFFFB400)
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = { viewModel.refreshAll() },
                         enabled = !isRefreshing
@@ -91,10 +114,35 @@ fun HomeScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = onAddClick,
+                onClick = {
+                    if (canAddMore) {
+                        onAddClick()
+                    } else {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                message = "Límite de $FREE_SHIPMENT_LIMIT envíos activos alcanzado",
+                                actionLabel = "Ver Premium",
+                                duration = SnackbarDuration.Short
+                            )
+                        }
+                    }
+                },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text(stringResource(R.string.home_new_shipment)) }
+                text = { Text(stringResource(R.string.home_new_shipment)) },
+                containerColor = if (canAddMore)
+                    MaterialTheme.colorScheme.primaryContainer
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
             )
+        },
+        bottomBar = {
+            // Banner AdMob (solo en tier gratuito)
+            if (!isPremium && adManager != null) {
+                AndroidView(
+                    factory = { adManager.createBannerAdView() },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) { padding ->

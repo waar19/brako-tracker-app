@@ -24,6 +24,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_SYNC_INTERVAL_HOURS    = intPreferencesKey("sync_interval_hours")
         val KEY_SYNC_ONLY_WIFI         = booleanPreferencesKey("sync_only_wifi")
         val KEY_THEME                  = stringPreferencesKey("theme")
+        val KEY_IS_PREMIUM             = booleanPreferencesKey("is_premium")
     }
 
     val preferences: Flow<UserPreferences> = dataStore.data.map { prefs ->
@@ -33,7 +34,8 @@ class UserPreferencesRepository @Inject constructor(
             autoSync             = prefs[KEY_AUTO_SYNC] ?: true,
             syncIntervalHours    = prefs[KEY_SYNC_INTERVAL_HOURS] ?: 2,
             syncOnlyOnWifi       = prefs[KEY_SYNC_ONLY_WIFI] ?: false,
-            theme                = prefs[KEY_THEME] ?: "system"
+            theme                = prefs[KEY_THEME] ?: "system",
+            isPremium            = prefs[KEY_IS_PREMIUM] ?: false
         )
     }
 
@@ -59,5 +61,9 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setTheme(value: String) {
         dataStore.edit { it[KEY_THEME] = value }
+    }
+
+    suspend fun setIsPremium(value: Boolean) {
+        dataStore.edit { it[KEY_IS_PREMIUM] = value }
     }
 }

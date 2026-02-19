@@ -102,6 +102,12 @@ dependencies {
     // Splash Screen API (compat Android 6+)
     implementation("androidx.core:core-splashscreen:1.0.1")
 
+    // Google Mobile Ads (AdMob)
+    implementation("com.google.android.gms:play-services-ads:23.3.0")
+
+    // Google Play Billing
+    implementation("com.android.billingclient:billing-ktx:7.0.0")
+
     // Play Services Auth (Gmail)
     implementation(libs.play.services.auth)
     implementation(libs.google.api.client.android)
