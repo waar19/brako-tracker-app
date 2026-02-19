@@ -40,7 +40,7 @@ private fun detectCarrier(tracking: String): String? {
         t.startsWith("JD", ignoreCase = true) && t.length >= 10 -> "DHL"
         t.matches(Regex("\\d{10}")) -> "DHL"
         // Carriers colombianos — guías numéricas típicas
-        // Interrapidísimo: 12 dígitos que comienzan con 2400, 2401, 2402, 2403
+        // Interrapidísimo: 12 dígitos que comienzan con 24
         t.matches(Regex("24\\d{10}")) -> "Interrapidísimo"
         // Coordinadora: 10 dígitos que comienzan con 5, 6, 7 u 8
         t.matches(Regex("[5-8]\\d{9}")) -> "Coordinadora"
@@ -48,6 +48,16 @@ private fun detectCarrier(tracking: String): String? {
         t.matches(Regex("9\\d{9,10}")) -> "Servientrega"
         // Envía / Colvanes: 12-13 dígitos que comienzan con 1
         t.matches(Regex("1\\d{11,12}")) -> "Envía"
+        // Listo: empieza con L + 8-12 dígitos
+        t.matches(Regex("L\\d{8,12}", RegexOption.IGNORE_CASE)) -> "Listo"
+        // Treda: empieza con T + 9 dígitos
+        t.matches(Regex("T\\d{9}", RegexOption.IGNORE_CASE)) -> "Treda"
+        // Speed Colombia: empieza con S + 10 dígitos
+        t.matches(Regex("S\\d{10}", RegexOption.IGNORE_CASE)) -> "Speed"
+        // Castores: empieza con C + 9-10 dígitos
+        t.matches(Regex("C\\d{9,10}", RegexOption.IGNORE_CASE)) -> "Castores"
+        // Avianca Cargo: 11 dígitos que comienzan con 134
+        t.matches(Regex("134\\d{8}")) -> "Avianca Cargo"
         else -> null
     }
 }
@@ -62,6 +72,11 @@ private fun carrierColor(carrier: String): Color = when (carrier.lowercase()) {
     "coordinadora"    -> Color(0xFF003087) // azul Coordinadora
     "servientrega"    -> Color(0xFF009B48) // verde Servientrega
     "envía"           -> Color(0xFFFF6B00) // naranja Envía
+    "listo"           -> Color(0xFF00B4D8) // azul claro Listo
+    "treda"           -> Color(0xFF7209B7) // morado Treda
+    "speed"           -> Color(0xFFE63946) // rojo Speed
+    "castores"        -> Color(0xFF2D6A4F) // verde oscuro Castores
+    "avianca cargo"   -> Color(0xFFD62828) // rojo Avianca
     else              -> Color(0xFF535D7E)
 }
 

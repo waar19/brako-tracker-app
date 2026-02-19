@@ -31,7 +31,8 @@
       "Bash(adb install:*)",
       "Bash(\"C:/Users/waar1/AppData/Local/Android/Sdk/platform-tools/adb.exe\" install -r \"C:/Users/waar1/AndroidStudioProjects/Tracker/app/build/outputs/apk/debug/app-debug.apk\")",
       "Bash(dir \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\app\\\\src\\\\main\\\\java\\\\com\\\\brk718\\\\tracker\")",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(if not exist \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\app\\\\src\\\\main\\\\res\\\\xml\" mkdir \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\app\\\\src\\\\main\\\\res\\\\xml\")"
     ]
   }
 }

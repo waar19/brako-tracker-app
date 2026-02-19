@@ -1,32 +1,47 @@
 package com.brk718.tracker.ui.home
 
+import android.content.Intent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -57,10 +72,16 @@ fun HomeScreen(
 ) {
     val shipments by viewModel.shipments.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val canAddMore = isPremium || shipments.size < FREE_SHIPMENT_LIMIT
+
+    // Estado de la barra de búsqueda
+    var searchVisible by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -72,45 +93,121 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Al cerrar búsqueda limpiar query
+    LaunchedEffect(searchVisible) {
+        if (!searchVisible) {
+            viewModel.clearSearch()
+        } else {
+            // Pequeño delay para que el campo esté renderizado antes de pedir foco
+            kotlinx.coroutines.delay(100)
+            focusRequester.requestFocus()
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.home_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                actions = {
-                    // Botón Premium (solo si no es premium)
-                    if (!isPremium) {
-                        IconButton(onClick = onUpgradeClick) {
+            Column {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            stringResource(R.string.home_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    navigationIcon = {
+                        // Al activar búsqueda mostramos "X" en la izquierda
+                        if (searchVisible) {
+                            IconButton(onClick = {
+                                searchVisible = false
+                                keyboardController?.hide()
+                            }) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Cerrar búsqueda"
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        if (!isPremium) {
+                            IconButton(onClick = onUpgradeClick) {
+                                Icon(
+                                    Icons.Default.WorkspacePremium,
+                                    contentDescription = "Premium",
+                                    tint = Color(0xFFFFB400)
+                                )
+                            }
+                        }
+                        // Ícono de búsqueda — toggle
+                        IconButton(onClick = { searchVisible = !searchVisible }) {
                             Icon(
-                                Icons.Default.WorkspacePremium,
-                                contentDescription = "Premium",
-                                tint = Color(0xFFFFB400)
+                                if (searchVisible) Icons.Default.Search else Icons.Default.Search,
+                                contentDescription = "Buscar",
+                                tint = if (searchVisible) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurface
                             )
                         }
+                        IconButton(
+                            onClick = { viewModel.refreshAll() },
+                            enabled = !isRefreshing
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.home_refresh_all))
+                        }
+                        IconButton(onClick = onGmailClick) {
+                            Icon(Icons.Default.Email, contentDescription = stringResource(R.string.home_import_gmail))
+                        }
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
+                        }
                     }
-                    IconButton(
-                        onClick = { viewModel.refreshAll() },
-                        enabled = !isRefreshing
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.home_refresh_all))
-                    }
-                    IconButton(onClick = onGmailClick) {
-                        Icon(Icons.Default.Email, contentDescription = stringResource(R.string.home_import_gmail))
-                    }
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
+                )
+
+                // Barra de búsqueda colapsable
+                AnimatedVisibility(
+                    visible = searchVisible,
+                    enter = expandVertically(),
+                    exit = shrinkVertically()
+                ) {
+                    Surface(color = MaterialTheme.colorScheme.surface) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.setSearchQuery(it) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .focusRequester(focusRequester),
+                            placeholder = { Text("Buscar por título, número, transportista…") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.clearSearch() }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Limpiar",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(28.dp),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = {
+                                keyboardController?.hide()
+                            }),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
+                        )
                     }
                 }
-            )
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -160,22 +257,27 @@ fun HomeScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            Icons.Default.Add,
+                            if (searchQuery.isNotEmpty()) Icons.Default.Search else Icons.Default.Add,
                             contentDescription = null,
                             modifier = Modifier.size(56.dp),
                             tint = MaterialTheme.colorScheme.outline
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            stringResource(R.string.home_empty_title),
+                            if (searchQuery.isNotEmpty())
+                                "No se encontraron envíos para \"$searchQuery\""
+                            else
+                                stringResource(R.string.home_empty_title),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(
-                            stringResource(R.string.home_empty_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.outline
-                        )
+                        if (searchQuery.isEmpty()) {
+                            Text(
+                                stringResource(R.string.home_empty_subtitle),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
                 }
             } else {
@@ -208,6 +310,7 @@ fun ShipmentCard(
     onAmazonAuthClick: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val status = item.shipment.status
     val statusLower = status.lowercase()
@@ -321,6 +424,35 @@ fun ShipmentCard(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false }
                     ) {
+                        // ── Compartir ──────────────────────────────────────────
+                        DropdownMenuItem(
+                            text = { Text("Compartir") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Share, null,
+                                    tint = MaterialTheme.colorScheme.primary)
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                val dateStr = lastEvent?.let {
+                                    SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                                        .format(Date(it.timestamp))
+                                } ?: "—"
+                                val shareText = buildString {
+                                    appendLine("📦 ${item.shipment.title}")
+                                    appendLine("Transportista: ${ShipmentRepository.displayName(item.shipment.carrier)}")
+                                    appendLine("Número: ${item.shipment.trackingNumber}")
+                                    appendLine("Estado: ${item.shipment.status}")
+                                    append("Última actualización: $dateStr")
+                                }
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                }
+                                context.startActivity(
+                                    Intent.createChooser(shareIntent, "Compartir envío")
+                                )
+                            }
+                        )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.home_menu_archive)) },
                             leadingIcon = {

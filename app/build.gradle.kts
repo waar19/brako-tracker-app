@@ -122,6 +122,10 @@ dependencies {
     // Maps (OpenStreetMap)
     implementation(libs.osmdroid.android)
 
+    // Jetpack Glance (Widget — solo premium)
+    implementation("androidx.glance:glance-appwidget:1.1.0")
+    implementation("androidx.glance:glance-material3:1.1.0")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

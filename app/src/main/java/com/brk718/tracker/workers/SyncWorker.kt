@@ -9,6 +9,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.brk718.tracker.MainActivity
+import com.brk718.tracker.R
 import com.brk718.tracker.TrackerApp
 import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
@@ -92,7 +93,7 @@ class SyncWorker @AssistedInject constructor(
         )
 
         val notification = NotificationCompat.Builder(appContext, TrackerApp.CHANNEL_SHIPMENT_UPDATES)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(newStatus)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

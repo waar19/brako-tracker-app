@@ -57,6 +57,19 @@ class ShipmentRepository @Inject constructor(
             // PASAREX = Amazon last-mile Colombia → se trackea vía Amazon
             "pasarex" to "amazon",
             "amazon / pasarex" to "amazon",
+            // Carriers colombianos adicionales
+            "listo" to "listo",
+            "treda" to "treda",
+            "speed" to "speed-co",
+            "speed-co" to "speed-co",
+            "castores" to "castores",
+            "avianca cargo" to "avianca-cargo",
+            "avianca-cargo" to "avianca-cargo",
+            "la 14" to "la-14",
+            "la14" to "la-14",
+            "picap" to "picap",
+            "mensajeros urbanos" to "mensajerosurbanos",
+            "mensajerosurbanos" to "mensajerosurbanos",
             // Internacionales
             "fedex" to "fedex",
             "ups" to "ups",
@@ -80,21 +93,31 @@ class ShipmentRepository @Inject constructor(
          */
         fun displayName(carrier: String): String = when (carrier.lowercase().trim()) {
             "interrapidisimo-scraper", "inter-rapidisimo" -> "Interrapidísimo"
-            "coordinadora"   -> "Coordinadora"
-            "servientrega"   -> "Servientrega"
-            "envia-co"       -> "Envía"
-            "tcc-co"         -> "TCC"
-            "472-co"         -> "472"
-            "logysto"        -> "Logysto"
-            "saferbo"        -> "Saferbo"
-            "deprisa"        -> "Deprisa"
-            "amazon"         -> "Amazon"
-            "fedex"          -> "FedEx"
-            "ups"            -> "UPS"
-            "usps"           -> "USPS"
-            "dhl"            -> "DHL"
-            "manual"         -> "Manual"
-            else             -> carrier.replaceFirstChar { it.uppercaseChar() }
+            "coordinadora"        -> "Coordinadora"
+            "servientrega"        -> "Servientrega"
+            "envia-co"            -> "Envía"
+            "tcc-co"              -> "TCC"
+            "472-co"              -> "472"
+            "logysto"             -> "Logysto"
+            "saferbo"             -> "Saferbo"
+            "deprisa"             -> "Deprisa"
+            // Carriers adicionales colombianos
+            "listo"               -> "Listo"
+            "treda"               -> "Treda"
+            "speed-co"            -> "Speed"
+            "castores"            -> "Castores"
+            "avianca-cargo"       -> "Avianca Cargo"
+            "la-14"               -> "La 14"
+            "picap"               -> "Picap"
+            "mensajerosurbanos"   -> "Mensajeros Urbanos"
+            // Internacionales
+            "amazon"              -> "Amazon"
+            "fedex"               -> "FedEx"
+            "ups"                 -> "UPS"
+            "usps"                -> "USPS"
+            "dhl"                 -> "DHL"
+            "manual"              -> "Manual"
+            else                  -> carrier.replaceFirstChar { it.uppercaseChar() }
         }
     }
 

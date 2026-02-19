@@ -181,4 +181,16 @@
     <string name="status_pre_shipment">Pre-envío</string>
     <string name="status_tracking">En seguimiento</string>
     <string name="status_manual">Seguimiento manual</string>
+
+    <!-- ══════════════════════════════════════════
+         WIDGET
+    ══════════════════════════════════════════ -->
+    <string name="widget_description">Muestra el estado de tu último envío en la pantalla de inicio</string>
+    <string name="widget_title">Brako Tracker</string>
+    <string name="widget_no_shipments">Sin envíos activos</string>
+    <string name="widget_open_app">Abrir app</string>
+    <string name="widget_premium_required">Solo para usuarios Premium</string>
+    <string name="widget_premium_upgrade">Hazte Premium</string>
+    <string name="widget_updated_prefix">Act: </string>
+    <string name="widget_refresh">Actualizar</string>
 </resources>
