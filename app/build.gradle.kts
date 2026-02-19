@@ -91,6 +91,7 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
@@ -102,9 +103,10 @@ dependencies {
         exclude(group = "org.apache.httpcomponents")
     }
     
-    // HTML Parsing (Amazon Scraper)
-    implementation(libs.jsoup)
     
+    // HTML parsing
+    implementation(libs.jsoup)
+
     // Maps (OpenStreetMap)
     implementation(libs.osmdroid.android)
 

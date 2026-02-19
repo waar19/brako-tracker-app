@@ -289,26 +289,45 @@ class ShipmentRepository @Inject constructor(
 
         val now = Calendar.getInstance()
         val currentYear = now.get(Calendar.YEAR)
-        
-        // Pre-procesamiento para Español: Pasar a minúsculas para asegurar que "Febrero" coincida con "febrero"
-        // (SimpleDateFormat en Android para 'es' suele requerir minúsculas)
+
+        // Pre-procesamiento para Español:
+        // - Minúsculas: "Febrero" → "febrero" (SimpleDateFormat en Android para 'es' requiere minúsculas)
+        // - Normalizar AM/PM: Amazon móvil muestra "5:14 PM" en inglés incluso en páginas en español.
+        //   Locale("es","ES") no reconoce "PM" → normalizamos a "p.m." antes de parsear.
         val lowerDateStr = dateStr.lowercase()
+            .replace(" pm", " p.m.")
+            .replace(" am", " a.m.")
 
         val formats = listOf(
-            // Español (con y sin coma, con y sin hora) - Usamos lowerDateStr
-            Pair("EEEE dd 'de' MMMM HH:mm", Locale("es", "ES")),
+            // Formato Amazon mobile español: "miércoles, 18 de febrero 5:14 p.m."
+            // (después de normalizar "PM" → "p.m." que es lo que Locale es_ES reconoce)
+            Pair("EEEE, d 'de' MMMM h:mm a", Locale("es", "ES")),
+            Pair("EEEE d 'de' MMMM h:mm a", Locale("es", "ES")),
+            Pair("d 'de' MMMM h:mm a", Locale("es", "ES")),
+            // Variante con dd (día con cero)
+            Pair("EEEE, dd 'de' MMMM h:mm a", Locale("es", "ES")),
+            Pair("EEEE dd 'de' MMMM h:mm a", Locale("es", "ES")),
+            Pair("dd 'de' MMMM h:mm a", Locale("es", "ES")),
+            // Español con hora 24h
+            Pair("EEEE, d 'de' MMMM HH:mm", Locale("es", "ES")),
+            Pair("EEEE d 'de' MMMM HH:mm", Locale("es", "ES")),
             Pair("EEEE, dd 'de' MMMM HH:mm", Locale("es", "ES")),
+            Pair("EEEE dd 'de' MMMM HH:mm", Locale("es", "ES")),
             Pair("dd 'de' MMMM HH:mm", Locale("es", "ES")),
-            Pair("EEEE dd 'de' MMMM", Locale("es", "ES")),
+            // Español solo fecha
+            Pair("EEEE, d 'de' MMMM", Locale("es", "ES")),
+            Pair("EEEE d 'de' MMMM", Locale("es", "ES")),
             Pair("EEEE, dd 'de' MMMM", Locale("es", "ES")),
+            Pair("EEEE dd 'de' MMMM", Locale("es", "ES")),
+            Pair("d 'de' MMMM", Locale("es", "ES")),
             Pair("dd 'de' MMMM", Locale("es", "ES")),
-            
-            // Inglés - Usamos dateStr original (Case Sensitive a veces importa, pero US suele ser Capitalized)
+
+            // Inglés - Usamos dateStr original
             Pair("EEEE, MMMM d h:mm a", Locale.US),
             Pair("MMMM d, h:mm a", Locale.US),
             Pair("EEEE, MMMM d", Locale.US),
             Pair("MMMM d", Locale.US),
-            
+
             // Variaciones simples
             Pair("dd/MM/yyyy HH:mm", Locale.getDefault()),
             Pair("dd/MM/yyyy", Locale.getDefault())

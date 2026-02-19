@@ -66,11 +66,11 @@ class AmazonTrackingService @Inject constructor(
      * Si es un tracking ID normal (TBA...), usa la API interna.
      * Si es un Order ID (111-...), intenta usar el scraper (requiere login).
      */
-    suspend fun getTracking(trackingNumber: String): AmazonTrackingResult = withContext(Dispatchers.IO) {
-        // 1. Si es Order ID (111-...), usar Scraper
+    suspend fun getTracking(trackingNumber: String): AmazonTrackingResult {
+        // 1. Si es Order ID (111-...), usar Scraper (WebView-based)
         if (trackingNumber.matches(Regex("^\\d{3}-\\d{7}-\\d{7}$"))) {
             if (!sessionManager.isLoggedIn()) {
-                return@withContext AmazonTrackingResult(
+                return AmazonTrackingResult(
                     status = null, expectedDelivery = null, events = emptyList(), 
                     error = "LOGIN_REQUIRED"
                 )
@@ -78,6 +78,7 @@ class AmazonTrackingService @Inject constructor(
             
             try {
                 val cookies = sessionManager.getCookies() ?: throw Exception("No cookies")
+                // scrapeOrder es suspend y maneja internamente el Main thread para WebView
                 val info = scraper.scrapeOrder(trackingNumber, cookies)
                 Log.d(TAG, "Scraped Info for $trackingNumber: Status=${info.status}, Loc=${info.location}, Events=${info.events.size}")
                 
@@ -130,7 +131,7 @@ class AmazonTrackingService @Inject constructor(
                     }
                 }
                 
-                return@withContext AmazonTrackingResult(
+                return AmazonTrackingResult(
                     status = info.status,
                     expectedDelivery = info.arrivalDate,
                     events = events
@@ -139,13 +140,13 @@ class AmazonTrackingService @Inject constructor(
                 // Si falla por auth, borrar sesión
                 if (e.message?.contains("Sign-In") == true || e.message?.contains("auth") == true) {
                     sessionManager.clearSession()
-                    return@withContext AmazonTrackingResult(
+                    return AmazonTrackingResult(
                         status = null, expectedDelivery = null, events = emptyList(), 
                         error = "LOGIN_REQUIRED"
                     )
                 }
                 
-                return@withContext AmazonTrackingResult(
+                return AmazonTrackingResult(
                     status = null, expectedDelivery = null, events = emptyList(),
                     error = "Error de conexión con Amazon: ${e.message}"
                 )
@@ -153,26 +154,28 @@ class AmazonTrackingService @Inject constructor(
         }
 
         // 2. Si es tracking ID normal (TBA...), usar API
-        try {
-            val request = Request.Builder()
-                .url("$BASE_URL$trackingNumber")
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
-                .header("Accept", "application/json")
-                .build()
+        return withContext(Dispatchers.IO) {
+            try {
+                val request = Request.Builder()
+                    .url("$BASE_URL$trackingNumber")
+                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+                    .header("Accept", "application/json")
+                    .build()
 
-            val response = httpClient.newCall(request).execute()
-            val body = response.body?.string() ?: return@withContext AmazonTrackingResult(
-                status = null, expectedDelivery = null, events = emptyList(), error = "Sin respuesta"
-            )
+                val response = httpClient.newCall(request).execute()
+                val body = response.body?.string() ?: return@withContext AmazonTrackingResult(
+                    status = null, expectedDelivery = null, events = emptyList(), error = "Sin respuesta"
+                )
 
-            Log.d(TAG, "Response: ${body.take(500)}")
-            parseResponse(body)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error: ${e.message}")
-            AmazonTrackingResult(
-                status = null, expectedDelivery = null, events = emptyList(),
-                error = e.message
-            )
+                Log.d(TAG, "Response: ${body.take(500)}")
+                parseResponse(body)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error: ${e.message}")
+                AmazonTrackingResult(
+                    status = null, expectedDelivery = null, events = emptyList(),
+                    error = e.message
+                )
+            }
         }
     }
 

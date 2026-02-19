@@ -141,15 +141,17 @@ fun ShipmentCard(
                     else -> MaterialTheme.colorScheme.tertiary
                 }
                 
-                if (item.shipment.status == "LOGIN_REQUIRED" || 
-                    (item.shipment.trackingNumber.startsWith("111-") && item.shipment.status == "No disponible")) {
+                val needsAmazonLogin = item.shipment.status == "LOGIN_REQUIRED" ||
+                    item.shipment.status == "Sign-In required" ||
+                    (item.shipment.trackingNumber.startsWith("111-") && item.shipment.status == "No disponible")
+                if (needsAmazonLogin) {
                     Button(
                         onClick = onAmazonAuthClick,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text(if (item.shipment.status == "No disponible") "Reconectar Amazon" else "Conectar Amazon")
+                        Text("Reconectar Amazon")
                     }
                 } else {
                     AssistChip(

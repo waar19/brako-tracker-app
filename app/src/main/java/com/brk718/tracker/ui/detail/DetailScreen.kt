@@ -2,16 +2,16 @@ package com.brk718.tracker.ui.detail
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.viewinterop.AndroidView
@@ -20,13 +20,16 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
 import android.preference.PreferenceManager
+import android.graphics.Paint
 import com.brk718.tracker.data.local.TrackingEventEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreen(
     onBack: () -> Unit,
+    onAmazonAuthClick: (() -> Unit)? = null,
     viewModel: DetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -38,6 +41,11 @@ fun DetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, "Atrás")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.refresh() }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
                     }
                 }
             )
@@ -62,6 +70,7 @@ fun DetailScreen(
                     modifier = Modifier
                         .padding(padding)
                         .padding(16.dp)
+                        .verticalScroll(rememberScrollState())
                 ) {
                     // Header
                     Text(
@@ -81,12 +90,20 @@ fun DetailScreen(
                         else -> MaterialTheme.colorScheme.tertiary
                     }
                     
-                    AssistChip(
-                        onClick = {},
-                        label = { Text(shipment.status) },
-                        colors = AssistChipDefaults.assistChipColors(labelColor = statusColor),
-                        border = BorderStroke(1.dp, statusColor)
-                    )
+                    val needsLogin = shipment.status == "LOGIN_REQUIRED" ||
+                        shipment.status == "Sign-In required"
+                    if (needsLogin && onAmazonAuthClick != null) {
+                        Button(onClick = onAmazonAuthClick) {
+                            Text("Reconectar Amazon")
+                        }
+                    } else {
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(shipment.status) },
+                            colors = AssistChipDefaults.assistChipColors(labelColor = statusColor),
+                            border = BorderStroke(1.dp, statusColor)
+                        )
+                    }
 
                     Divider(modifier = Modifier.padding(vertical = 16.dp))
 

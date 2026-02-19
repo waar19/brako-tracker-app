@@ -56,7 +56,8 @@ fun App() {
             arguments = listOf(navArgument("shipmentId") { type = NavType.StringType })
         ) {
             DetailScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onAmazonAuthClick = { navController.navigate(Routes.AMAZON_AUTH) }
             )
         }
     }
