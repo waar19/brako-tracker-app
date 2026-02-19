@@ -1,8 +1,16 @@
 package com.brk718.tracker.ui.detail
 
-import android.graphics.Paint
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint as AndroidPaint
 import android.preference.PreferenceManager
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -10,23 +18,33 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.viewinterop.AndroidView
 import com.brk718.tracker.data.local.TrackingEventEntity
+import com.brk718.tracker.data.repository.ShipmentRepository
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.util.MapTileIndex
@@ -55,6 +73,88 @@ private val CARTO_POSITRON = object : OnlineTileSourceBase(
     }
 }
 
+/** Crea un marcador circular dibujado con Canvas, sin depender de drawables del sistema */
+private fun makeCircleMarker(color: Int, sizePx: Int = 36, strokeColor: Int = android.graphics.Color.WHITE): Bitmap {
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        style = AndroidPaint.Style.FILL
+        this.color = color
+    }
+    val stroke = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        style = AndroidPaint.Style.STROKE
+        this.color = strokeColor
+        strokeWidth = sizePx * 0.12f
+    }
+    val r = sizePx / 2f
+    canvas.drawCircle(r, r, r - stroke.strokeWidth, paint)
+    canvas.drawCircle(r, r, r - stroke.strokeWidth, stroke)
+    return bitmap
+}
+
+/** Configura los overlays del mapa (polilínea + marcadores) */
+private fun setupMapOverlays(
+    mapView: MapView,
+    points: List<GeoPoint>,
+    events: List<TrackingEventEntity>
+) {
+    mapView.overlays.clear()
+
+    // Polilínea
+    if (points.size >= 2) {
+        val polyline = Polyline(mapView).apply {
+            setPoints(points)
+            outlinePaint.color = android.graphics.Color.parseColor("#2952CC")
+            outlinePaint.strokeWidth = 7f
+            outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+            outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+            outlinePaint.style = android.graphics.Paint.Style.STROKE
+            outlinePaint.isAntiAlias = true
+        }
+        mapView.overlays.add(polyline)
+    }
+
+    // Marcadores: verde=origen, azul=intermedios, rojo=destino actual
+    val colorOrigin      = android.graphics.Color.parseColor("#22C55E")  // verde
+    val colorIntermediate = android.graphics.Color.parseColor("#3B82F6") // azul
+    val colorDestination = android.graphics.Color.parseColor("#EF4444")  // rojo
+
+    points.forEachIndexed { index, point ->
+        val markerColor = when (index) {
+            0               -> colorOrigin
+            points.lastIndex -> colorDestination
+            else             -> colorIntermediate
+        }
+        val sizePx = if (index == 0 || index == points.lastIndex) 42 else 30
+
+        val bitmapDrawable = android.graphics.drawable.BitmapDrawable(
+            mapView.resources,
+            makeCircleMarker(markerColor, sizePx)
+        )
+
+        val marker = Marker(mapView).apply {
+            position = point
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            title = events[index].description
+            snippet = events[index].location ?: ""
+            icon = bitmapDrawable
+        }
+        mapView.overlays.add(marker)
+    }
+
+    // Ajustar zoom
+    if (points.size == 1) {
+        mapView.controller.setCenter(points.first())
+        mapView.controller.setZoom(10.0)
+    } else {
+        val boundingBox = BoundingBox.fromGeoPoints(points)
+        mapView.post {
+            mapView.zoomToBoundingBox(boundingBox, true, 80)
+        }
+    }
+    mapView.invalidate()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreen(
@@ -64,6 +164,9 @@ fun DetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+
+    // Estado para el diálogo del mapa
+    var showMapDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -141,7 +244,7 @@ fun DetailScreen(
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                text = "${shipment.carrier} • ${shipment.trackingNumber}",
+                                text = "${ShipmentRepository.displayName(shipment.carrier)} • ${shipment.trackingNumber}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = headerContentColor.copy(alpha = 0.75f)
                             )
@@ -176,90 +279,172 @@ fun DetailScreen(
                     // ===== MAPA =====
                     val eventsWithLoc = events.filter { it.latitude != null && it.longitude != null }
                     if (eventsWithLoc.isNotEmpty()) {
+                        val orderedEvents = eventsWithLoc.reversed()
+                        val uniqueEvents = orderedEvents.distinctBy { Pair(it.latitude, it.longitude) }
+                        val mapPoints = uniqueEvents.map { GeoPoint(it.latitude!!, it.longitude!!) }
+
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
-                                .height(240.dp),
+                                .height(240.dp)
+                                .clickable { showMapDialog = true },
                             shape = RoundedCornerShape(20.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            AndroidView(
-                                modifier = Modifier.fillMaxSize(),
-                                factory = { context ->
-                                    Configuration.getInstance().load(
-                                        context,
-                                        PreferenceManager.getDefaultSharedPreferences(context)
-                                    )
-                                    MapView(context).apply {
-                                        setTileSource(CARTO_POSITRON)
-                                        setMultiTouchControls(true)
-                                        controller.setZoom(5.0)
-                                        // Desactivar UI innecesaria
-                                        isTilesScaledToDpi = true
-                                    }
-                                },
-                                update = { mapView ->
-                                    mapView.overlays.clear()
-
-                                    val ordered = eventsWithLoc.reversed()
-                                    val uniqueOrdered = ordered.distinctBy { Pair(it.latitude, it.longitude) }
-                                    val points = uniqueOrdered.map { GeoPoint(it.latitude!!, it.longitude!!) }
-
-                                    // Polilínea
-                                    if (points.size >= 2) {
-                                        val polyline = Polyline(mapView).apply {
-                                            setPoints(points)
-                                            outlinePaint.color = android.graphics.Color.parseColor("#2952CC")
-                                            outlinePaint.strokeWidth = 7f
-                                            outlinePaint.strokeJoin = Paint.Join.ROUND
-                                            outlinePaint.strokeCap = Paint.Cap.ROUND
-                                            outlinePaint.style = Paint.Style.STROKE
-                                            outlinePaint.isAntiAlias = true
+                            Box {
+                                AndroidView(
+                                    modifier = Modifier.fillMaxSize(),
+                                    factory = { ctx ->
+                                        Configuration.getInstance().load(
+                                            ctx,
+                                            PreferenceManager.getDefaultSharedPreferences(ctx)
+                                        )
+                                        MapView(ctx).apply {
+                                            setTileSource(CARTO_POSITRON)
+                                            setMultiTouchControls(false) // desactivado en preview
+                                            controller.setZoom(5.0)
+                                            isTilesScaledToDpi = true
+                                            isClickable = false
                                         }
-                                        mapView.overlays.add(polyline)
+                                    },
+                                    update = { mapView ->
+                                        setupMapOverlays(mapView, mapPoints, uniqueEvents)
                                     }
+                                )
 
-                                    // Marcadores con colores diferenciados
-                                    points.forEachIndexed { index, point ->
-                                        val marker = Marker(mapView).apply {
-                                            position = point
-                                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                                            title = uniqueOrdered[index].description
-                                            snippet = uniqueOrdered[index].location
-                                            // Origen=verde, destino/último=rojo, intermedios=azul
-                                            icon = when (index) {
-                                                0 -> mapView.context.getDrawable(
-                                                    android.R.drawable.presence_online // verde
-                                                )
-                                                points.lastIndex -> mapView.context.getDrawable(
-                                                    android.R.drawable.presence_busy   // rojo
-                                                )
-                                                else -> mapView.context.getDrawable(
-                                                    android.R.drawable.presence_away   // amarillo/intermedio
-                                                )
-                                            }
-                                        }
-                                        mapView.overlays.add(marker)
+                                // Botón "Ampliar" superpuesto
+                                Surface(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(8.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Map,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            "Ampliar",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Medium
+                                        )
                                     }
-
-                                    if (points.size == 1) {
-                                        mapView.controller.setCenter(points.first())
-                                        mapView.controller.setZoom(10.0)
-                                    } else {
-                                        val boundingBox = BoundingBox.fromGeoPoints(points)
-                                        mapView.post {
-                                            mapView.zoomToBoundingBox(boundingBox, true, 80)
-                                        }
-                                    }
-                                    mapView.invalidate()
                                 }
-                            )
+
+                                // Leyenda de colores en la esquina inferior izquierda
+                                Surface(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(8.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        LegendDot(Color(0xFF22C55E), "Origen")
+                                        LegendDot(Color(0xFF3B82F6), "Tránsito")
+                                        LegendDot(Color(0xFFEF4444), "Actual")
+                                    }
+                                }
+                            }
                         }
                         Spacer(Modifier.height(16.dp))
+
+                        // ===== DIÁLOGO MAPA AMPLIADO =====
+                        if (showMapDialog) {
+                            Dialog(
+                                onDismissRequest = { showMapDialog = false },
+                                properties = DialogProperties(
+                                    usePlatformDefaultWidth = false,
+                                    dismissOnBackPress = true,
+                                    dismissOnClickOutside = false
+                                )
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.surface)
+                                ) {
+                                    AndroidView(
+                                        modifier = Modifier.fillMaxSize(),
+                                        factory = { ctx ->
+                                            Configuration.getInstance().load(
+                                                ctx,
+                                                PreferenceManager.getDefaultSharedPreferences(ctx)
+                                            )
+                                            MapView(ctx).apply {
+                                                setTileSource(CARTO_POSITRON)
+                                                setMultiTouchControls(true) // táctil habilitado
+                                                controller.setZoom(5.0)
+                                                isTilesScaledToDpi = true
+                                            }
+                                        },
+                                        update = { mapView ->
+                                            setupMapOverlays(mapView, mapPoints, uniqueEvents)
+                                        }
+                                    )
+
+                                    // Botón cerrar
+                                    IconButton(
+                                        onClick = { showMapDialog = false },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(12.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                                CircleShape
+                                            )
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Cerrar mapa",
+                                            tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+
+                                    // Leyenda en pantalla completa
+                                    Surface(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomStart)
+                                            .padding(16.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                        shadowElevation = 4.dp
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            LegendDot(Color(0xFF22C55E), "Origen")
+                                            LegendDot(Color(0xFF3B82F6), "Tránsito")
+                                            LegendDot(Color(0xFFEF4444), "Ubicación actual")
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // ===== HISTORIAL =====
+                    val maxCollapsed = 3
+                    var historialExpanded by remember { mutableStateOf(false) }
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -271,13 +456,28 @@ fun DetailScreen(
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "Historial",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
+                            // Cabecera con contador
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Historial",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (events.size > maxCollapsed) {
+                                    Text(
+                                        text = "${events.size} eventos",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
 
                             if (events.isEmpty()) {
                                 Text(
@@ -286,12 +486,63 @@ fun DetailScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             } else {
+                                // Primeros N eventos siempre visibles
                                 Column {
-                                    events.forEachIndexed { index, event ->
+                                    val alwaysVisible = events.take(minOf(maxCollapsed, events.size))
+                                    alwaysVisible.forEachIndexed { index, event ->
                                         EventItem(
                                             event = event,
                                             isFirst = index == 0,
-                                            isLast = index == events.lastIndex
+                                            isLast = isLast(
+                                                index = index,
+                                                alwaysVisibleSize = alwaysVisible.size,
+                                                totalSize = events.size,
+                                                maxCollapsed = maxCollapsed,
+                                                expanded = historialExpanded
+                                            )
+                                        )
+                                    }
+                                }
+
+                                // Eventos extra — animados
+                                if (events.size > maxCollapsed) {
+                                    AnimatedVisibility(
+                                        visible = historialExpanded,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Column {
+                                            events.drop(maxCollapsed).forEachIndexed { index, event ->
+                                                EventItem(
+                                                    event = event,
+                                                    isFirst = false,
+                                                    isLast = index == events.size - maxCollapsed - 1
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Botón expandir/colapsar
+                                    Spacer(Modifier.height(8.dp))
+                                    TextButton(
+                                        onClick = { historialExpanded = !historialExpanded },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = if (historialExpanded)
+                                                Icons.Default.KeyboardArrowUp
+                                            else
+                                                Icons.Default.KeyboardArrowDown,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            text = if (historialExpanded)
+                                                "Ver menos"
+                                            else
+                                                "Ver todos (${events.size})",
+                                            style = MaterialTheme.typography.labelMedium
                                         )
                                     }
                                 }
@@ -303,6 +554,42 @@ fun DetailScreen(
                 }
             }
         }
+    }
+}
+
+/** Calcula si un evento visible es el último de la línea de tiempo visible */
+private fun isLast(
+    index: Int,
+    alwaysVisibleSize: Int,
+    totalSize: Int,
+    maxCollapsed: Int,
+    expanded: Boolean
+): Boolean {
+    return when {
+        totalSize <= maxCollapsed -> index == totalSize - 1       // todos visibles
+        expanded                 -> false                          // hay más abajo expandidos
+        else                     -> index == alwaysVisibleSize - 1 // último de los colapsados
+    }
+}
+
+/** Punto de leyenda con etiqueta */
+@Composable
+private fun LegendDot(color: Color, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

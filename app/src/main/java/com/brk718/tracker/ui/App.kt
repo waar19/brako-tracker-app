@@ -1,5 +1,9 @@
 package com.brk718.tracker.ui
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -21,32 +25,62 @@ import com.brk718.tracker.ui.settings.SettingsViewModel
 import com.brk718.tracker.ui.theme.TrackerTheme
 
 object Routes {
-    const val LIST     = "list"
-    const val ADD      = "add"
-    const val DETAIL   = "detail/{shipmentId}"
-    const val GMAIL    = "gmail"
+    const val LIST        = "list"
+    const val ADD         = "add"
+    const val DETAIL      = "detail/{shipmentId}"
+    const val GMAIL       = "gmail"
     const val AMAZON_AUTH = "amazon_auth"
-    const val SETTINGS = "settings"
-    const val ARCHIVED = "archived"
+    const val SETTINGS    = "settings"
+    const val ARCHIVED    = "archived"
     fun detail(id: String) = "detail/$id"
 }
+
+private const val TRANSITION_DURATION = 300
 
 @Composable
 fun App() {
     val navController = rememberNavController()
 
-    // El SettingsViewModel vive a nivel de App para que el tema sea reactivo
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val settingsState by settingsViewModel.uiState.collectAsState()
     val darkTheme = when (settingsState.preferences.theme) {
-        "light"  -> false
-        "dark"   -> true
-        else     -> isSystemInDarkTheme()
+        "light" -> false
+        "dark"  -> true
+        else    -> isSystemInDarkTheme()
     }
 
     TrackerTheme(darkTheme = darkTheme) {
-        NavHost(navController = navController, startDestination = Routes.LIST) {
-            composable(Routes.LIST) {
+        NavHost(
+            navController    = navController,
+            startDestination = Routes.LIST,
+            // Transición por defecto para todas las pantallas
+            enterTransition  = {
+                slideIntoContainer(
+                    towards   = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(TRANSITION_DURATION)
+                )
+            },
+            exitTransition   = {
+                fadeOut(animationSpec = tween(TRANSITION_DURATION / 2))
+            },
+            popEnterTransition = {
+                fadeIn(animationSpec = tween(TRANSITION_DURATION / 2))
+            },
+            popExitTransition  = {
+                slideOutOfContainer(
+                    towards   = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(TRANSITION_DURATION)
+                )
+            }
+        ) {
+            // La pantalla principal entra con fade (sin slide, es el destino raíz)
+            composable(
+                route        = Routes.LIST,
+                enterTransition  = { fadeIn(tween(TRANSITION_DURATION)) },
+                exitTransition   = { fadeOut(tween(TRANSITION_DURATION / 2)) },
+                popEnterTransition = { fadeIn(tween(TRANSITION_DURATION)) },
+                popExitTransition  = { fadeOut(tween(TRANSITION_DURATION / 2)) }
+            ) {
                 HomeScreen(
                     onAddClick        = { navController.navigate(Routes.ADD) },
                     onShipmentClick   = { id -> navController.navigate(Routes.detail(id)) },

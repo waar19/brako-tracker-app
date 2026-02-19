@@ -5,6 +5,7 @@ import com.brk718.tracker.data.local.ShipmentEntity
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.local.TrackingEventEntity
 import com.brk718.tracker.data.remote.AmazonTrackingService
+import com.brk718.tracker.data.remote.InterrapidisimoScraper
 import com.brk718.tracker.data.remote.CreateTrackingBody
 import com.brk718.tracker.data.remote.CreateTrackingRequest
 import com.brk718.tracker.data.remote.DetectCourierBody
@@ -26,7 +27,8 @@ import javax.inject.Singleton
 class ShipmentRepository @Inject constructor(
     private val dao: ShipmentDao,
     private val api: TrackingApi,
-    private val amazonService: AmazonTrackingService
+    private val amazonService: AmazonTrackingService,
+    private val interrapidisimoScraper: InterrapidisimoScraper
 ) {
     companion object {
         // Mapeo conocido: nombre del carrier → slug de AfterShip
@@ -35,9 +37,13 @@ class ShipmentRepository @Inject constructor(
             // Carriers colombianos
             "coordinadora" to "coordinadora",
             "servientrega" to "servientrega",
-            "inter rapidísimo" to "inter-rapidisimo",
-            "inter rapidisimo" to "inter-rapidisimo",
-            "interrapidisimo" to "inter-rapidisimo",
+            // Interrapidísimo → scraper directo (AfterShip no lo soporta)
+            "inter rapidísimo" to "interrapidisimo-scraper",
+            "inter rapidisimo" to "interrapidisimo-scraper",
+            "interrapidísimo" to "interrapidisimo-scraper",   // con tilde (AddScreen)
+            "interrapidisimo" to "interrapidisimo-scraper",
+            "inter-rapidisimo" to "interrapidisimo-scraper",
+            "interrapidisimo-scraper" to "interrapidisimo-scraper",
             "deprisa" to "deprisa",
             "envía / colvanes" to "envia-co",
             "envía" to "envia-co",
@@ -62,11 +68,33 @@ class ShipmentRepository @Inject constructor(
         )
 
         /**
-         * Resuelve el slug de AfterShip a partir del nombre del carrier
+         * Resuelve el slug de AfterShip (o slug interno) a partir del nombre del carrier
          */
         fun resolveSlug(carrier: String): String? {
             val normalized = carrier.lowercase().trim()
             return CARRIER_SLUG_MAP[normalized]
+        }
+
+        /**
+         * Convierte un slug interno o slug de AfterShip a un nombre para mostrar al usuario.
+         */
+        fun displayName(carrier: String): String = when (carrier.lowercase().trim()) {
+            "interrapidisimo-scraper", "inter-rapidisimo" -> "Interrapidísimo"
+            "coordinadora"   -> "Coordinadora"
+            "servientrega"   -> "Servientrega"
+            "envia-co"       -> "Envía"
+            "tcc-co"         -> "TCC"
+            "472-co"         -> "472"
+            "logysto"        -> "Logysto"
+            "saferbo"        -> "Saferbo"
+            "deprisa"        -> "Deprisa"
+            "amazon"         -> "Amazon"
+            "fedex"          -> "FedEx"
+            "ups"            -> "UPS"
+            "usps"           -> "USPS"
+            "dhl"            -> "DHL"
+            "manual"         -> "Manual"
+            else             -> carrier.replaceFirstChar { it.uppercaseChar() }
         }
     }
 
@@ -111,9 +139,20 @@ class ShipmentRepository @Inject constructor(
                 android.util.Log.d("AfterShip", "Slug mapeado: $carrier → $slug")
             }
 
+            // Paso 2: Si el slug es interrapidisimo-scraper, usar scraper directo
+            if (slug == "interrapidisimo-scraper" ||
+                InterrapidisimoScraper.isInterrapidisimoTracking(trackingNumber)) {
+                android.util.Log.d("Tracking", "Usando Interrapidísimo scraper para $trackingNumber")
+                dao.insertShipment(shipment.copy(carrier = "interrapidisimo-scraper"))
+                refreshShipmentInterrapidisimo(id)
+                return@withContext
+            }
+
             // Paso 2: Si tenemos slug, crear tracking en AfterShip
             var afterShipOk = false
             if (slug != null && slug != "amazon") {
+                // Guardar el slug correcto en BD antes de consultar (corrige carrier guardado)
+                dao.insertShipment(shipment.copy(carrier = slug))
                 try {
                     api.createTracking(
                         CreateTrackingRequest(
@@ -125,8 +164,15 @@ class ShipmentRepository @Inject constructor(
                         )
                     )
                     afterShipOk = true
-                    dao.insertShipment(shipment.copy(carrier = slug))
                     android.util.Log.d("AfterShip", "Tracking creado: $slug/$trackingNumber")
+                } catch (e: retrofit2.HttpException) {
+                    // 4009 = tracking ya existe → es válido, podemos consultar igual
+                    if (e.code() == 4009 || e.code() == 409) {
+                        afterShipOk = true
+                        android.util.Log.d("AfterShip", "Tracking ya existe en AfterShip, consultando: $slug/$trackingNumber")
+                    } else {
+                        android.util.Log.w("AfterShip", "Create tracking falló HTTP ${e.code()}: ${e.message()}")
+                    }
                 } catch (e: Exception) {
                     android.util.Log.w("AfterShip", "Create tracking falló: ${e.message}")
                 }
@@ -164,8 +210,24 @@ class ShipmentRepository @Inject constructor(
             return@withContext
         }
 
+        // Si es Interrapidísimo, usar el scraper directo
+        if (shipment.carrier == "interrapidisimo-scraper" ||
+            InterrapidisimoScraper.isInterrapidisimoTracking(shipment.trackingNumber)) {
+            refreshShipmentInterrapidisimo(id)
+            return@withContext
+        }
+
+        // Resolver el slug correcto: el carrier guardado puede ser el nombre (ej. "interrapidisimo")
+        // o ya el slug (ej. "inter-rapidisimo"). Intentar resolución siempre.
+        val effectiveSlug = resolveSlug(shipment.carrier) ?: shipment.carrier
+        // Si el slug efectivo difiere del carrier guardado, corregirlo en la BD
+        if (effectiveSlug != shipment.carrier) {
+            dao.insertShipment(shipment.copy(carrier = effectiveSlug))
+            android.util.Log.d("AfterShip", "Corrigiendo carrier guardado: ${shipment.carrier} → $effectiveSlug")
+        }
+
         try {
-            val response = api.getTrackingInfo(shipment.carrier, shipment.trackingNumber)
+            val response = api.getTrackingInfo(effectiveSlug, shipment.trackingNumber)
             val tracking = response.data?.tracking ?: return@withContext
 
             val statusText = when (tracking.tag) {
@@ -263,6 +325,86 @@ class ShipmentRepository @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("AmazonTracking", "Error: ${e.message}")
         }
+    }
+
+    private suspend fun refreshShipmentInterrapidisimo(id: String) = withContext(Dispatchers.IO) {
+        val shipmentWithEvents = dao.getShipmentById(id).first() ?: return@withContext
+        val shipment = shipmentWithEvents.shipment
+
+        try {
+            val result = interrapidisimoScraper.getTracking(shipment.trackingNumber)
+
+            if (result.error != null) {
+                android.util.Log.w("InterrapidisimoTracking", "Error: ${result.error}")
+                dao.insertShipment(shipment.copy(
+                    carrier = "interrapidisimo-scraper",
+                    status = "Seguimiento manual",
+                    lastUpdate = System.currentTimeMillis()
+                ))
+                return@withContext
+            }
+
+            // Actualizar estado con origen/destino si disponibles
+            val displayStatus = buildString {
+                append(result.status ?: "En seguimiento")
+                if (!result.destination.isNullOrBlank()) {
+                    append(" → ${result.destination}")
+                }
+            }
+
+            dao.insertShipment(shipment.copy(
+                carrier = "interrapidisimo-scraper",
+                status = displayStatus,
+                lastUpdate = System.currentTimeMillis()
+            ))
+
+            // Guardar eventos
+            if (result.events.isNotEmpty()) {
+                val events = result.events.mapIndexed { index, event ->
+                    val realTimestamp = parseInterrapidisimoDate(event.timestamp)
+                    val finalTimestamp = realTimestamp
+                        ?: (System.currentTimeMillis() - (index * 3600000L))
+
+                    TrackingEventEntity(
+                        id = 0L,
+                        shipmentId = id,
+                        timestamp = finalTimestamp,
+                        description = event.description,
+                        location = event.location,
+                        status = "",
+                        latitude = event.latitude,
+                        longitude = event.longitude
+                    )
+                }
+                dao.clearEventsForShipment(id)
+                dao.insertEvents(events)
+            }
+
+            android.util.Log.d("InterrapidisimoTracking",
+                "Estado: ${result.status}, Eventos: ${result.events.size}")
+        } catch (e: Exception) {
+            android.util.Log.e("InterrapidisimoTracking", "Error: ${e.message}")
+        }
+    }
+
+    private fun parseInterrapidisimoDate(dateStr: String): Long? {
+        if (dateStr.isBlank()) return null
+        // Formatos posibles: "dd/MM/yyyy HH:mm:ss", "dd/MM/yyyy", "yyyy-MM-dd HH:mm:ss"
+        val formats = listOf(
+            java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()),
+            java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()),
+            java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()),
+            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US),
+            java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        )
+        for (fmt in formats) {
+            try {
+                return fmt.parse(dateStr.trim())?.time
+            } catch (_: Exception) {}
+        }
+        android.util.Log.w("ShipmentRepository", "No se pudo parsear fecha Inter: $dateStr")
+        return null
     }
 
     suspend fun archiveShipment(id: String) {

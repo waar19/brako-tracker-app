@@ -7,7 +7,15 @@
       "Bash(powershell -Command:*)",
       "Bash(adb shell run-as com.brk718.tracker cat files/amazon_debug.html)",
       "Bash(\"C:\\\\Users\\\\waar1\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" shell run-as com.brk718.tracker cat files/amazon_debug.html)",
-      "Bash(dir /s \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\app\\\\src\\\\main\\\\java\\\\com\\\\brk718\\\\tracker\")"
+      "Bash(dir /s \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\app\\\\src\\\\main\\\\java\\\\com\\\\brk718\\\\tracker\")",
+      "WebFetch(domain:www.interrapidisimo.com)",
+      "Bash(python3 -c:*)",
+      "Bash(gradlew.bat assembleDebug:*)",
+      "Bash(cmd /c \"gradlew.bat assembleDebug --warning-mode none 2>&1\")",
+      "Bash(cmd /c \"gradlew.bat assembleDebug --warning-mode none\")",
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(cmd /c \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\gradlew.bat assembleDebug --warning-mode none 2>&1\")",
+      "Bash(powershell -NoProfile -Command \"& { Set-Location ''C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker''; $output = .\\\\gradlew.bat assembleDebug --warning-mode none 2>&1; $output | Select-Object -Last 40 | ForEach-Object { $_ToString\\(\\) } }\")"
     ]
   }
 }

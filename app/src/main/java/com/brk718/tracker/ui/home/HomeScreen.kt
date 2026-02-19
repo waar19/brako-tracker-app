@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.data.local.ShipmentWithEvents
+import com.brk718.tracker.data.repository.ShipmentRepository
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -58,37 +60,32 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
-            Column {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            "Mis Envíos",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    actions = {
-                        IconButton(
-                            onClick = { viewModel.refreshAll() },
-                            enabled = !isRefreshing
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Actualizar todos")
-                        }
-                        IconButton(onClick = onGmailClick) {
-                            Icon(Icons.Default.Email, contentDescription = "Importar de Gmail")
-                        }
-                        IconButton(onClick = onSettingsClick) {
-                            Icon(Icons.Default.Settings, contentDescription = "Ajustes")
-                        }
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        "Mis Envíos",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.refreshAll() },
+                        enabled = !isRefreshing
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Actualizar todos")
                     }
-                )
-                if (isRefreshing) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    IconButton(onClick = onGmailClick) {
+                        Icon(Icons.Default.Email, contentDescription = "Importar de Gmail")
+                    }
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = "Ajustes")
+                    }
                 }
-            }
+            )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -99,47 +96,53 @@ fun HomeScreen(
         },
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) { padding ->
-        if (shipments.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(56.dp),
-                        tint = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "No hay envíos activos",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        "Toca el botón para añadir uno",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.refreshAll() },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            if (shipments.isEmpty() && !isRefreshing) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(56.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "No hay envíos activos",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Toca el botón para añadir uno",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
-            }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(padding)
-            ) {
-                items(shipments, key = { it.shipment.id }) { item ->
-                    ShipmentCard(
-                        item = item,
-                        onClick = { onShipmentClick(item.shipment.id) },
-                        onArchive = { viewModel.archiveShipment(item.shipment.id) },
-                        onDelete = { viewModel.deleteShipment(item.shipment.id) },
-                        onAmazonAuthClick = onAmazonAuthClick
-                    )
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(shipments, key = { it.shipment.id }) { item ->
+                        ShipmentCard(
+                            item = item,
+                            onClick = { onShipmentClick(item.shipment.id) },
+                            onArchive = { viewModel.archiveShipment(item.shipment.id) },
+                            onDelete = { viewModel.deleteShipment(item.shipment.id) },
+                            onAmazonAuthClick = onAmazonAuthClick
+                        )
+                    }
                 }
             }
         }
@@ -170,19 +173,24 @@ fun ShipmentCard(
             MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.tertiaryContainer
     }
 
-    // Inicial del transportista para el avatar
-    val carrierInitial = item.shipment.carrier.firstOrNull()?.uppercaseChar() ?: '?'
+    // Inicial del transportista para el avatar (usando nombre de display)
+    val carrierDisplayName = ShipmentRepository.displayName(item.shipment.carrier)
+    val carrierInitial = carrierDisplayName.firstOrNull()?.uppercaseChar() ?: '?'
     val carrierAvatarColor = when (item.shipment.carrier.lowercase()) {
-        "amazon"  -> Color(0xFFFF9900)
-        "ups"     -> Color(0xFF351C15)
-        "fedex"   -> Color(0xFF4D148C)
-        "usps"    -> Color(0xFF004B87)
-        "dhl"     -> Color(0xFFFFCC00)
-        else      -> MaterialTheme.colorScheme.secondaryContainer
+        "amazon"                   -> Color(0xFFFF9900)
+        "ups"                      -> Color(0xFF351C15)
+        "fedex"                    -> Color(0xFF4D148C)
+        "usps"                     -> Color(0xFF004B87)
+        "dhl"                      -> Color(0xFFFFCC00)
+        "interrapidisimo-scraper"  -> Color(0xFFE30613)   // Rojo corporativo Inter
+        "coordinadora"             -> Color(0xFF003087)
+        "servientrega"             -> Color(0xFF009B48)
+        "envia-co"                 -> Color(0xFFFF6B00)
+        else                       -> MaterialTheme.colorScheme.secondaryContainer
     }
     val carrierTextColor = when (item.shipment.carrier.lowercase()) {
-        "dhl"  -> Color(0xFF333333)
-        else   -> Color.White
+        "dhl" -> Color(0xFF333333)
+        else  -> Color.White
     }
 
     // Último evento
