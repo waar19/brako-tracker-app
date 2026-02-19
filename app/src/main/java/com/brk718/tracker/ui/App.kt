@@ -124,7 +124,10 @@ fun App(
                 )
             }
             composable(Routes.ARCHIVED) {
-                ArchivedScreen(onBack = { navController.popBackStack() })
+                ArchivedScreen(
+                    onBack         = { navController.popBackStack() },
+                    onUpgradeClick = { navController.navigate(Routes.SETTINGS) }
+                )
             }
             composable(
                 route     = Routes.DETAIL,

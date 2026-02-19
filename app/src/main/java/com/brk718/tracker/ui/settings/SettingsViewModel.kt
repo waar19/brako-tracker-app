@@ -1,6 +1,7 @@
 package com.brk718.tracker.ui.settings
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
@@ -15,12 +16,17 @@ import com.brk718.tracker.data.billing.BillingState
 import com.brk718.tracker.data.local.AmazonSessionManager
 import com.brk718.tracker.data.local.UserPreferences
 import com.brk718.tracker.data.local.UserPreferencesRepository
+import com.brk718.tracker.data.repository.ShipmentRepository
+import com.brk718.tracker.util.CsvExporter
 import com.brk718.tracker.workers.SyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -43,8 +49,13 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val prefsRepo: UserPreferencesRepository,
     private val amazonSessionManager: AmazonSessionManager,
-    private val billingRepository: BillingRepository
+    private val billingRepository: BillingRepository,
+    private val shipmentRepository: ShipmentRepository
 ) : ViewModel() {
+
+    // Uri del CSV exportado (null = sin exportar, Unit = exportado, String = error)
+    private val _exportResult = MutableStateFlow<ExportResult>(ExportResult.Idle)
+    val exportResult: StateFlow<ExportResult> = _exportResult.asStateFlow()
 
     // Flow de WorkInfo para la tarea periódica "TrackerSync"
     private val syncWorkInfoFlow = WorkManager.getInstance(context)
@@ -144,6 +155,23 @@ class SettingsViewModel @Inject constructor(
         billingRepository.restorePurchases()
     }
 
+    // === Exportar CSV (solo premium) ===
+    fun exportCsv() = viewModelScope.launch {
+        _exportResult.value = ExportResult.Loading
+        try {
+            val active   = shipmentRepository.activeShipments.first()
+            val archived = shipmentRepository.archivedShipments.first()
+            val all      = active + archived
+            val uri = CsvExporter.exportToCsv(context, all)
+            _exportResult.value = if (uri != null) ExportResult.Success(uri)
+                                  else ExportResult.Error("No se pudo crear el archivo")
+        } catch (e: Exception) {
+            _exportResult.value = ExportResult.Error(e.message ?: "Error desconocido")
+        }
+    }
+
+    fun clearExportResult() { _exportResult.value = ExportResult.Idle }
+
     // === Caché de mapas ===
     fun clearMapCache() {
         try {
@@ -156,16 +184,30 @@ class SettingsViewModel @Inject constructor(
 
     // === Helpers ===
     private fun scheduleSyncWorker(intervalHours: Int, onlyWifi: Boolean) {
-        if (intervalHours == 0) return  // manual
+        if (intervalHours == 0) return  // manual — no programar
         val networkType = if (onlyWifi) NetworkType.UNMETERED else NetworkType.CONNECTED
         val constraints = Constraints.Builder().setRequiredNetworkType(networkType).build()
-        val request = PeriodicWorkRequestBuilder<SyncWorker>(intervalHours.toLong(), TimeUnit.HOURS)
-            .setConstraints(constraints)
-            .build()
+        // -1 = 30 minutos (premium). WorkManager requiere mínimo 15 min en modo periódico.
+        val request = if (intervalHours == -1) {
+            PeriodicWorkRequestBuilder<SyncWorker>(30L, TimeUnit.MINUTES)
+                .setConstraints(constraints)
+                .build()
+        } else {
+            PeriodicWorkRequestBuilder<SyncWorker>(intervalHours.toLong(), TimeUnit.HOURS)
+                .setConstraints(constraints)
+                .build()
+        }
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             "TrackerSync",
             ExistingPeriodicWorkPolicy.UPDATE,
             request
         )
     }
+}
+
+sealed class ExportResult {
+    object Idle    : ExportResult()
+    object Loading : ExportResult()
+    data class Success(val uri: Uri) : ExportResult()
+    data class Error(val message: String) : ExportResult()
 }
