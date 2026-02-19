@@ -146,6 +146,7 @@ fun GmailScreen(
                             DetectedShipmentCard(
                                 shipment = shipment,
                                 isImported = shipment.trackingNumber in uiState.importedIds,
+                                isImporting = shipment.trackingNumber in uiState.importingIds,
                                 onImport = { viewModel.importShipment(shipment) }
                             )
                         }
@@ -170,6 +171,7 @@ fun GmailScreen(
 fun DetectedShipmentCard(
     shipment: ParsedShipment,
     isImported: Boolean,
+    isImporting: Boolean,
     onImport: () -> Unit
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
@@ -194,16 +196,27 @@ fun DetectedShipmentCard(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-            if (isImported) {
-                AssistChip(
+            when {
+                isImported -> AssistChip(
                     onClick = {},
                     label = { Text("Importado") },
                     colors = AssistChipDefaults.assistChipColors(
                         labelColor = MaterialTheme.colorScheme.primary
                     )
                 )
-            } else {
-                FilledTonalButton(onClick = onImport) {
+                isImporting -> FilledTonalButton(
+                    onClick = {},
+                    enabled = false
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Importando...")
+                }
+                else -> FilledTonalButton(onClick = onImport) {
                     Text("Importar")
                 }
             }

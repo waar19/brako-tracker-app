@@ -3,8 +3,10 @@ package com.brk718.tracker.ui.detail
 import android.graphics.Paint
 import android.preference.PreferenceManager
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -14,7 +16,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.viewinterop.AndroidView
@@ -210,10 +215,14 @@ fun DetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        // Column simple en vez de LazyColumn (ya estamos en un verticalScroll)
-                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            events.forEach { event ->
-                                EventItem(event)
+                        // Timeline visual
+                        Column {
+                            events.forEachIndexed { index, event ->
+                                EventItem(
+                                    event = event,
+                                    isFirst = index == 0,
+                                    isLast = index == events.lastIndex
+                                )
                             }
                         }
                     }
@@ -224,24 +233,74 @@ fun DetailScreen(
 }
 
 @Composable
-fun EventItem(event: TrackingEventEntity) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        // Línea de tiempo simple (punto y línea vertical se podrían añadir aquí)
-        Column(modifier = Modifier.padding(start = 8.dp)) {
+fun EventItem(
+    event: TrackingEventEntity,
+    isFirst: Boolean,
+    isLast: Boolean
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val outlineColor = MaterialTheme.colorScheme.outlineVariant
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        // === Columna de la línea de tiempo (punto + línea) ===
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.width(32.dp)
+        ) {
+            // Línea superior (invisible para el primer elemento)
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .height(8.dp)
+                    .background(if (isFirst) androidx.compose.ui.graphics.Color.Transparent else outlineColor)
+            )
+            // Punto del evento (más grande y coloreado si es el más reciente)
+            Box(
+                modifier = Modifier
+                    .size(if (isFirst) 14.dp else 10.dp)
+                    .clip(CircleShape)
+                    .background(if (isFirst) primaryColor else outlineColor)
+            )
+            // Línea inferior (invisible para el último elemento)
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .weight(1f)
+                    .defaultMinSize(minHeight = 24.dp)
+                    .background(if (isLast) androidx.compose.ui.graphics.Color.Transparent else outlineColor)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // === Contenido del evento ===
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = if (isLast) 0.dp else 16.dp)
+        ) {
             Text(
                 text = event.description,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isFirst) FontWeight.Bold else FontWeight.Normal,
+                color = if (isFirst) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurfaceVariant
             )
-            event.location?.let {
+            if (!event.location.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = event.location,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm").format(java.util.Date(event.timestamp)),
+                text = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                    .format(java.util.Date(event.timestamp)),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )

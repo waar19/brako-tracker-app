@@ -22,6 +22,7 @@ data class GmailUiState(
     val hasScanned: Boolean = false,
     val foundShipments: List<ParsedShipment> = emptyList(),
     val importedIds: Set<String> = emptySet(),
+    val importingIds: Set<String> = emptySet(), // trackingNumbers que están siendo importados ahora
     val error: String? = null
 )
 
@@ -95,6 +96,10 @@ class GmailViewModel @Inject constructor(
 
     fun importShipment(shipment: ParsedShipment) {
         viewModelScope.launch {
+            // Marcar como "importando" para mostrar spinner en el botón
+            _uiState.update {
+                it.copy(importingIds = it.importingIds + shipment.trackingNumber, error = null)
+            }
             try {
                 repository.addShipment(
                     trackingNumber = shipment.trackingNumber,
@@ -102,11 +107,17 @@ class GmailViewModel @Inject constructor(
                     title = shipment.title ?: shipment.trackingNumber
                 )
                 _uiState.update {
-                    it.copy(importedIds = it.importedIds + shipment.trackingNumber)
+                    it.copy(
+                        importedIds = it.importedIds + shipment.trackingNumber,
+                        importingIds = it.importingIds - shipment.trackingNumber
+                    )
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(error = "Error importando: ${e.message}")
+                    it.copy(
+                        importingIds = it.importingIds - shipment.trackingNumber,
+                        error = "Error importando: ${e.message}"
+                    )
                 }
             }
         }
