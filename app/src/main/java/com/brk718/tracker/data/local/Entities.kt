@@ -29,7 +29,9 @@ data class ShipmentEntity(
     ],
     indices = [
         Index(value = ["shipmentId"]),
-        Index(value = ["shipmentId", "description", "timestamp"], unique = true)
+        // location incluida en el índice único: permite mismo mensaje en distintas ciudades
+        // y eventos sin ubicación con mismo mensaje pero diferente timestamp
+        Index(value = ["shipmentId", "description", "timestamp", "location"], unique = true)
     ]
 )
 data class TrackingEventEntity(

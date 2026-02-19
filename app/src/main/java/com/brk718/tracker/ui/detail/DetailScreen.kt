@@ -1,8 +1,11 @@
 package com.brk718.tracker.ui.detail
 
+import android.graphics.Paint
+import android.preference.PreferenceManager
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -15,15 +18,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.viewinterop.AndroidView
+import com.brk718.tracker.data.local.TrackingEventEntity
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
-import android.preference.PreferenceManager
-import android.graphics.Paint
-import com.brk718.tracker.data.local.TrackingEventEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,22 +35,32 @@ fun DetailScreen(
     viewModel: DetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Detalle de Envío") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, "Atrás")
+            Column {
+                TopAppBar(
+                    title = { Text("Detalle de Envío") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Filled.ArrowBack, "Atrás")
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { viewModel.refresh() },
+                            enabled = !isRefreshing
+                        ) {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Actualizar")
-                    }
+                )
+                // Barra de progreso debajo del TopAppBar mientras refresca (sin ocultar contenido)
+                if (isRefreshing) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
-            )
+            }
         }
     ) { padding ->
         when (val state = uiState) {
@@ -64,7 +76,8 @@ fun DetailScreen(
             }
             is DetailUiState.Success -> {
                 val shipment = state.shipment.shipment
-                val events = state.shipment.events
+                // Ordenar más reciente primero (Room @Relation no garantiza orden)
+                val events = state.shipment.events.sortedByDescending { it.timestamp }
 
                 Column(
                     modifier = Modifier
@@ -110,42 +123,78 @@ fun DetailScreen(
                     // Mapa
                     val eventsWithLoc = events.filter { it.latitude != null && it.longitude != null }
                     if (eventsWithLoc.isNotEmpty()) {
-                        Box(
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(250.dp)
-                                .padding(bottom = 16.dp)
+                                .height(180.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                         ) {
                             AndroidView(
+                                modifier = Modifier.fillMaxSize(),
                                 factory = { context ->
                                     Configuration.getInstance().load(context, PreferenceManager.getDefaultSharedPreferences(context))
                                     MapView(context).apply {
                                         setTileSource(TileSourceFactory.MAPNIK)
                                         setMultiTouchControls(true)
-                                        controller.setZoom(10.0)
+                                        controller.setZoom(5.0)
                                     }
                                 },
                                 update = { mapView ->
                                     mapView.overlays.clear()
-                                    
-                                    val points = eventsWithLoc.map { 
-                                        GeoPoint(it.latitude!!, it.longitude!!) 
+
+                                    // events ya viene ordenado DESC por timestamp (más reciente primero).
+                                    // eventsWithLoc hereda ese orden. Invertimos para orden cronológico ASC.
+                                    val ordered = eventsWithLoc.reversed() // más antiguo → más reciente
+
+                                    // Deduplicar puntos consecutivos con las mismas coordenadas
+                                    // (misma ciudad aparece varias veces → segmentos de longitud 0)
+                                    val uniqueOrdered = ordered.distinctBy {
+                                        Pair(it.latitude, it.longitude)
                                     }
-                                    
+                                    val points = uniqueOrdered.map { GeoPoint(it.latitude!!, it.longitude!!) }
+
+                                    // Polilínea que conecta todos los puntos en orden (línea abierta)
+                                    if (points.size >= 2) {
+                                        val polyline = Polyline(mapView).apply {
+                                            setPoints(points)
+                                            outlinePaint.color = android.graphics.Color.parseColor("#1976D2")
+                                            outlinePaint.strokeWidth = 6f
+                                            outlinePaint.strokeJoin = Paint.Join.ROUND
+                                            outlinePaint.strokeCap = Paint.Cap.ROUND
+                                            // Style.STROKE evita que se rellene y se cierre como polígono
+                                            outlinePaint.style = android.graphics.Paint.Style.STROKE
+                                        }
+                                        mapView.overlays.add(polyline)
+                                    }
+
+                                    // Marcadores para cada ciudad única
                                     points.forEachIndexed { index, point ->
-                                        val marker = Marker(mapView)
-                                        marker.position = point
-                                        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                        marker.title = eventsWithLoc[index].description
+                                        val marker = Marker(mapView).apply {
+                                            position = point
+                                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                            title = uniqueOrdered[index].description
+                                            snippet = uniqueOrdered[index].location
+                                        }
                                         mapView.overlays.add(marker)
                                     }
 
-                                    if (points.isNotEmpty()) {
-                                        mapView.controller.setCenter(points.first()) // Último evento primero
+                                    // Centrar y hacer zoom para encuadrar todos los puntos
+                                    if (points.size == 1) {
+                                        mapView.controller.setCenter(points.first())
+                                        mapView.controller.setZoom(10.0)
+                                    } else {
+                                        val boundingBox = BoundingBox.fromGeoPoints(points)
+                                        mapView.post {
+                                            mapView.zoomToBoundingBox(boundingBox, true, 60)
+                                        }
                                     }
+
+                                    mapView.invalidate()
                                 }
                             )
                         }
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
                     Text(
@@ -161,10 +210,9 @@ fun DetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(events) { event ->
+                        // Column simple en vez de LazyColumn (ya estamos en un verticalScroll)
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            events.forEach { event ->
                                 EventItem(event)
                             }
                         }

@@ -117,7 +117,9 @@ class AmazonScraper @Inject constructor(
         // ===== EVENTOS DE TRACKING =====
         val events = mutableListOf<ScrapedEvent>()
 
-        // Contenedor principal de eventos (está oculto con aok-hidden pero parseable)
+        // Contenedor principal de eventos. Amazon duplica este contenedor en el DOM:
+        // uno visible (#od-tracking-sheet-content-0) y otro oculto (aok-hidden).
+        // Usamos selectFirst para tomar SOLO el primero y evitar duplicados.
         val trackingContainer = doc.selectFirst(
             "#od-tracking-sheet-content-0, .od-tracking-events-bottomsheet-inner"
         )
@@ -147,7 +149,12 @@ class AmazonScraper @Inject constructor(
             //   - la fecha está en la primera .a-row.a-spacing-medium SIN od-vertical-line-wrapper
             //     dentro del mismo .a-row abuelo (el grupo de día)
 
-            val descCols = trackingContainer.select(".od-tracking-event-description-column")
+            // Usar el contenedor no oculto si existe, o el primero disponible
+            val activeContainer = doc.select("#od-tracking-sheet-content-0")
+                .firstOrNull { !it.hasClass("aok-hidden") }
+                ?: trackingContainer
+
+            val descCols = activeContainer.select(".od-tracking-event-description-column")
             Log.d(TAG, "Columnas de descripción encontradas en contenedor: ${descCols.size}")
 
             for (descCol in descCols) {
@@ -224,17 +231,28 @@ class AmazonScraper @Inject constructor(
             }
         }
 
-        Log.d(TAG, "Total eventos extraídos: ${events.size}")
+        Log.d(TAG, "Total eventos extraídos (antes de dedup): ${events.size}")
+
+        // ===== DEDUPLICACIÓN =====
+        // Amazon puede tener el mismo contenedor de tracking duplicado en el DOM
+        // (ej. una copia visible y otra oculta). Eliminamos duplicados exactos
+        // comparando mensaje + hora + ubicación.
+        val seen = mutableSetOf<String>()
+        val uniqueEvents = events.filter { ev ->
+            val key = "${ev.message.trim().lowercase()}|${ev.date?.trim() ?: ""}|${ev.location?.trim()?.lowercase() ?: ""}"
+            seen.add(key) // add() devuelve true si fue añadido (nuevo), false si ya existía
+        }
+        Log.d(TAG, "Total eventos únicos: ${uniqueEvents.size}")
 
         // ===== LOCATION PARA MAPA =====
-        val location = events.firstOrNull { !it.location.isNullOrBlank() }?.location
+        val location = uniqueEvents.firstOrNull { !it.location.isNullOrBlank() }?.location
 
         return ScrapedInfo(
             status = status,
             arrivalDate = arrivalDate?.ifBlank { null },
             location = location,
             progress = null,
-            events = events
+            events = uniqueEvents
         )
     }
 

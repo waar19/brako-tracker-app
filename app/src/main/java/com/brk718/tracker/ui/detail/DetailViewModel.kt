@@ -8,6 +8,7 @@ import com.brk718.tracker.data.repository.ShipmentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -20,6 +21,10 @@ class DetailViewModel @Inject constructor(
     private val shipmentId: String = checkNotNull(savedStateHandle["shipmentId"])
     private val _uiState = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
     val uiState: StateFlow<DetailUiState> = _uiState
+
+    // Flag independiente: true mientras se refresca, sin destruir el contenido visible
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     init {
         loadShipment()
@@ -39,12 +44,15 @@ class DetailViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            _uiState.value = DetailUiState.Loading
+            _isRefreshing.value = true
             try {
                 repository.refreshShipment(shipmentId)
-                // El flow se actualizará automáticamente
+                // El flow de loadShipment() se actualizará automáticamente desde la DB
             } catch (e: Exception) {
-                _uiState.value = DetailUiState.Error(e.message ?: "Error al actualizar")
+                // No destruir la pantalla con un error de red; solo loguear
+                android.util.Log.e("DetailViewModel", "Error al refrescar: ${e.message}")
+            } finally {
+                _isRefreshing.value = false
             }
         }
     }

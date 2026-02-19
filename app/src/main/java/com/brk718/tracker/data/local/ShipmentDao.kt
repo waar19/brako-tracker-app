@@ -17,6 +17,10 @@ interface ShipmentDao {
     @Query("SELECT * FROM shipments WHERE id = :id")
     fun getShipmentById(id: String): Flow<ShipmentWithEvents?>
 
+    // Eventos ordenados por timestamp descendente (más reciente primero) para un envío
+    @Query("SELECT * FROM tracking_events WHERE shipmentId = :shipmentId ORDER BY timestamp DESC")
+    fun getEventsByShipment(shipmentId: String): Flow<List<TrackingEventEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertShipment(shipment: ShipmentEntity)
 

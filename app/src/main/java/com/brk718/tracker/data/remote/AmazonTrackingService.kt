@@ -84,23 +84,31 @@ class AmazonTrackingService @Inject constructor(
                 
                 // Mapear info scrapeada a resultado
                 val events = mutableListOf<AmazonTrackingEvent>()
-                
+
                 // Si tenemos eventos scrapeados, usarlos
                 if (info.events.isNotEmpty()) {
-                    var latestLocationGeocoded = false
-                    
+                    // Cache de geocoding para no repetir llamadas por la misma ciudad
+                    val geocodeCache = mutableMapOf<String, Pair<Double?, Double?>>()
+
                     for (scrapedEvent in info.events) {
                         var lat: Double? = null
                         var lon: Double? = null
-                        
-                        // Geocodificar solo el evento más reciente que tenga ubicación (para el mapa)
-                        if (!latestLocationGeocoded && !scrapedEvent.location.isNullOrBlank()) {
-                            val coords = geocodingService.getCoordinates(scrapedEvent.location)
-                            lat = coords?.lat
-                            lon = coords?.lon
-                            latestLocationGeocoded = true
+
+                        // Geocodificar TODOS los eventos que tengan ubicación (para dibujar ruta completa)
+                        if (!scrapedEvent.location.isNullOrBlank()) {
+                            val cacheKey = scrapedEvent.location.trim().lowercase()
+                            if (geocodeCache.containsKey(cacheKey)) {
+                                val cached = geocodeCache[cacheKey]!!
+                                lat = cached.first
+                                lon = cached.second
+                            } else {
+                                val coords = geocodingService.getCoordinates(scrapedEvent.location)
+                                lat = coords?.lat
+                                lon = coords?.lon
+                                geocodeCache[cacheKey] = Pair(lat, lon)
+                            }
                         }
-                        
+
                         events.add(AmazonTrackingEvent(
                             timestamp = scrapedEvent.date ?: "", // Usar fecha parseada
                             description = scrapedEvent.message,

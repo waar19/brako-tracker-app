@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.repository.ShipmentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -23,12 +25,18 @@ class HomeViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     fun refreshAll() {
         viewModelScope.launch {
-            shipments.value.forEach { shipmentWithEvents ->
-                // Solo refrescar si no está entregado o si es reciente (opcional)
-                // Por ahora refrescamos todo para asegurar que el login se refleje
-                repository.refreshShipment(shipmentWithEvents.shipment.id)
+            _isRefreshing.value = true
+            try {
+                shipments.value.forEach { shipmentWithEvents ->
+                    repository.refreshShipment(shipmentWithEvents.shipment.id)
+                }
+            } finally {
+                _isRefreshing.value = false
             }
         }
     }
@@ -38,7 +46,7 @@ class HomeViewModel @Inject constructor(
             repository.deleteShipment(id)
         }
     }
-    
+
     fun archiveShipment(id: String) {
         viewModelScope.launch {
             repository.archiveShipment(id)

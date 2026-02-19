@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -35,6 +36,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val shipments by viewModel.shipments.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
@@ -51,14 +53,26 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Mis Envíos") },
-                actions = {
-                    IconButton(onClick = onGmailClick) {
-                        Icon(Icons.Default.Email, contentDescription = "Importar de Gmail")
+            Column {
+                CenterAlignedTopAppBar(
+                    title = { Text("Mis Envíos") },
+                    actions = {
+                        IconButton(
+                            onClick = { viewModel.refreshAll() },
+                            enabled = !isRefreshing
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Actualizar todos")
+                        }
+                        IconButton(onClick = onGmailClick) {
+                            Icon(Icons.Default.Email, contentDescription = "Importar de Gmail")
+                        }
                     }
+                )
+                // Barra de progreso animada debajo del TopAppBar mientras refresca
+                if (isRefreshing) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
-            )
+            }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddClick) {
@@ -124,14 +138,13 @@ fun ShipmentCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             // Estado + acciones
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Estado con color semántico
                 val status = item.shipment.status.lowercase()
                 val statusColor = when {
                     status == "entregado" -> MaterialTheme.colorScheme.primary
@@ -140,7 +153,7 @@ fun ShipmentCard(
                     status.contains("registrando") -> MaterialTheme.colorScheme.tertiary
                     else -> MaterialTheme.colorScheme.tertiary
                 }
-                
+
                 val needsAmazonLogin = item.shipment.status == "LOGIN_REQUIRED" ||
                     item.shipment.status == "Sign-In required" ||
                     (item.shipment.trackingNumber.startsWith("111-") && item.shipment.status == "No disponible")
@@ -163,7 +176,7 @@ fun ShipmentCard(
                         border = BorderStroke(1.dp, statusColor)
                     )
                 }
-                
+
                 Row {
                     IconButton(onClick = onArchive) {
                         Icon(Icons.Default.Archive, contentDescription = "Archivar",
