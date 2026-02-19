@@ -7,5 +7,7 @@ data class UserPreferences(
     val syncIntervalHours: Int = 2,   // 1, 2, 6, 12 | 0 = solo manual
     val syncOnlyOnWifi: Boolean = false,
     val theme: String = "system",      // "light", "dark", "system"
-    val isPremium: Boolean = false     // true = suscripción activa, sin ads, envíos ilimitados
+    val isPremium: Boolean = false,    // true = suscripción activa, sin ads, envíos ilimitados
+    val onboardingDone: Boolean = false, // true = ya mostró el onboarding
+    val deliveredCount: Int = 0        // contador de envíos entregados exitosamente
 )

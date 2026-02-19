@@ -36,13 +36,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- Deshabilitar inicialización automática de WorkManager para usar HiltWorkerFactory -->
-        <provider
-            android:name="androidx.work.impl.WorkManagerInitializer"
-            android:authorities="${applicationId}.workmanager-init"
-            android:exported="false"
-            tools:node="remove" />
-
         <!-- Widget Brako Tracker (Jetpack Glance) — solo premium -->
         <receiver
             android:name=".ui.widget.TrackerWidgetReceiver"

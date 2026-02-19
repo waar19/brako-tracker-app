@@ -40,18 +40,24 @@ class SyncWorker @AssistedInject constructor(
                     val newStatus = updated?.shipment?.status ?: return@forEach
 
                     // Notificar si el estado cambió y las notificaciones están habilitadas
-                    if (newStatus != oldStatus && prefs.notificationsEnabled) {
-                        val shouldNotify = if (prefs.onlyImportantEvents) {
-                            isImportantStatus(newStatus)
-                        } else {
-                            true
+                    if (newStatus != oldStatus) {
+                        // Contar entregas exitosas para el rating dialog
+                        if (newStatus.lowercase().contains("entregado")) {
+                            prefsRepository.incrementDeliveredCount()
                         }
-                        if (shouldNotify) {
-                            sendNotification(
-                                title = updated.shipment.title,
-                                newStatus = newStatus,
-                                shipmentId = updated.shipment.id
-                            )
+                        if (prefs.notificationsEnabled) {
+                            val shouldNotify = if (prefs.onlyImportantEvents) {
+                                isImportantStatus(newStatus)
+                            } else {
+                                true
+                            }
+                            if (shouldNotify) {
+                                sendNotification(
+                                    title = updated.shipment.title,
+                                    newStatus = newStatus,
+                                    shipmentId = updated.shipment.id
+                                )
+                            }
                         }
                     }
                 } catch (e: Exception) {

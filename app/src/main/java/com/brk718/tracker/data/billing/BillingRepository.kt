@@ -201,8 +201,8 @@ class BillingRepository @Inject constructor(
 }
 
 sealed class BillingState {
-    object Idle : BillingState()
-    object Loading : BillingState()
-    object PurchaseSuccess : BillingState()
+    data object Idle : BillingState()
+    data object Loading : BillingState()
+    data object PurchaseSuccess : BillingState()
     data class Error(val message: String) : BillingState()
 }

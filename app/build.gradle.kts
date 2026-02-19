@@ -70,6 +70,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation("androidx.compose.ui:ui-text-google-fonts")
     
     // Navigation & Icons
     implementation(libs.androidx.navigation.compose)
@@ -107,6 +108,9 @@ dependencies {
 
     // Google Play Billing
     implementation("com.android.billingclient:billing-ktx:7.0.0")
+
+    // In-App Review (rating dialog)
+    implementation("com.google.android.play:review-ktx:2.0.1")
 
     // Play Services Auth (Gmail)
     implementation(libs.play.services.auth)

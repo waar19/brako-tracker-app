@@ -2,8 +2,12 @@ package com.brk718.tracker.ui.home
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -49,13 +53,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.repository.ShipmentRepository
+import com.brk718.tracker.ui.add.FREE_SHIPMENT_LIMIT
 import com.brk718.tracker.ui.ads.AdManager
+import com.google.android.play.core.review.ReviewManagerFactory
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-private const val FREE_SHIPMENT_LIMIT = 5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,10 +78,25 @@ fun HomeScreen(
     val shipments by viewModel.shipments.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val shouldShowRating by viewModel.shouldShowRatingRequest.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val canAddMore = isPremium || shipments.size < FREE_SHIPMENT_LIMIT
+
+    // Rating: lanzar In-App Review cuando el usuario tenga >= 3 entregas exitosas
+    val activity = LocalContext.current as android.app.Activity
+    LaunchedEffect(shouldShowRating) {
+        if (shouldShowRating) {
+            val reviewManager = ReviewManagerFactory.create(activity)
+            reviewManager.requestReviewFlow().addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    reviewManager.launchReviewFlow(activity, task.result)
+                }
+                // Si falla, no pasa nada — Google Play lo gestiona silenciosamente
+            }
+        }
+    }
 
     // Estado de la barra de búsqueda
     var searchVisible by remember { mutableStateOf(false) }
@@ -99,7 +119,7 @@ fun HomeScreen(
             viewModel.clearSearch()
         } else {
             // Pequeño delay para que el campo esté renderizado antes de pedir foco
-            kotlinx.coroutines.delay(100)
+            delay(100)
             focusRequester.requestFocus()
         }
     }
@@ -146,7 +166,7 @@ fun HomeScreen(
                         // Ícono de búsqueda — toggle
                         IconButton(onClick = { searchVisible = !searchVisible }) {
                             Icon(
-                                if (searchVisible) Icons.Default.Search else Icons.Default.Search,
+                                Icons.Default.Search,
                                 contentDescription = "Buscar",
                                 tint = if (searchVisible) MaterialTheme.colorScheme.primary
                                        else MaterialTheme.colorScheme.onSurface
@@ -217,7 +237,7 @@ fun HomeScreen(
                     } else {
                         coroutineScope.launch {
                             snackbarHostState.showSnackbar(
-                                message = "Límite de $FREE_SHIPMENT_LIMIT envíos activos alcanzado",
+                                message = "Limite de $FREE_SHIPMENT_LIMIT envios activos alcanzado",
                                 actionLabel = "Ver Premium",
                                 duration = SnackbarDuration.Short
                             )
@@ -233,11 +253,12 @@ fun HomeScreen(
             )
         },
         bottomBar = {
-            // Banner AdMob (solo en tier gratuito)
             if (!isPremium && adManager != null) {
                 AndroidView(
                     factory = { adManager.createBannerAdView() },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
                 )
             }
         },
@@ -255,28 +276,69 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            if (searchQuery.isNotEmpty()) Icons.Default.Search else Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(56.dp),
-                            tint = MaterialTheme.colorScheme.outline
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            if (searchQuery.isNotEmpty())
-                                "No se encontraron envíos para \"$searchQuery\""
-                            else
-                                stringResource(R.string.home_empty_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (searchQuery.isEmpty()) {
-                            Text(
-                                stringResource(R.string.home_empty_subtitle),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.outline
+                    if (searchQuery.isNotEmpty()) {
+                        // Estado vacío para búsqueda sin resultados
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = null,
+                                modifier = Modifier.size(56.dp),
+                                tint = MaterialTheme.colorScheme.outline
                             )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                "No se encontraron envíos para \"$searchQuery\"",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        // Empty state real con CTAs
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                stringResource(R.string.home_empty_title),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Añade un número de seguimiento o importa\nautomáticamente desde Gmail",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Spacer(Modifier.height(28.dp))
+                            Button(
+                                onClick = onAddClick,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.home_new_shipment))
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = onGmailClick,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.home_import_gmail))
+                            }
                         }
                     }
                 }
@@ -287,16 +349,96 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(shipments, key = { it.shipment.id }) { item ->
-                        ShipmentCard(
-                            item = item,
-                            onClick = { onShipmentClick(item.shipment.id) },
-                            onArchive = { viewModel.archiveShipment(item.shipment.id) },
-                            onDelete = { viewModel.deleteShipment(item.shipment.id) },
-                            onAmazonAuthClick = onAmazonAuthClick
-                        )
+                        // M2: Animación de entrada al aparecer la card
+                        val visibleState = remember {
+                            MutableTransitionState(false).apply { targetState = true }
+                        }
+                        AnimatedVisibility(
+                            visibleState = visibleState,
+                            enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 },
+                            modifier = Modifier.animateItem()
+                        ) {
+                            // M3: Swipe para archivar (derecha) o eliminar (izquierda)
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { value ->
+                                    when (value) {
+                                        SwipeToDismissBoxValue.StartToEnd -> {
+                                            viewModel.archiveShipment(item.shipment.id)
+                                            true
+                                        }
+                                        SwipeToDismissBoxValue.EndToStart -> {
+                                            viewModel.deleteShipment(item.shipment.id)
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                },
+                                positionalThreshold = { it * 0.4f }
+                            )
+                            SwipeToDismissBox(
+                                state = dismissState,
+                                backgroundContent = {
+                                    SwipeBackground(dismissState)
+                                }
+                            ) {
+                                ShipmentCard(
+                                    item = item,
+                                    onClick = { onShipmentClick(item.shipment.id) },
+                                    onArchive = { viewModel.archiveShipment(item.shipment.id) },
+                                    onDelete = { viewModel.deleteShipment(item.shipment.id) },
+                                    onAmazonAuthClick = onAmazonAuthClick
+                                )
+                            }
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+/** Fondo que se muestra detrás de la card al hacer swipe */
+@Composable
+private fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
+    // targetValue refleja la dirección del swipe en progreso
+    val isStartToEnd = dismissState.targetValue == SwipeToDismissBoxValue.StartToEnd
+    val isEndToStart = dismissState.targetValue == SwipeToDismissBoxValue.EndToStart
+
+    val color = when {
+        isStartToEnd -> MaterialTheme.colorScheme.secondaryContainer   // archivar → verde/azul
+        isEndToStart -> MaterialTheme.colorScheme.errorContainer        // eliminar → rojo
+        else         -> Color.Transparent
+    }
+    val icon = when {
+        isStartToEnd -> Icons.Default.Archive
+        isEndToStart -> Icons.Default.Delete
+        else         -> null
+    }
+    val iconTint = when {
+        isStartToEnd -> MaterialTheme.colorScheme.onSecondaryContainer
+        isEndToStart -> MaterialTheme.colorScheme.onErrorContainer
+        else         -> Color.Transparent
+    }
+    val alignment = when {
+        isStartToEnd -> Alignment.CenterStart
+        else         -> Alignment.CenterEnd
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(16.dp))
+            .background(color)
+            .padding(horizontal = 20.dp),
+        contentAlignment = alignment
+    ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(28.dp)
+            )
         }
     }
 }

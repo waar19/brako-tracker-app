@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
+import com.brk718.tracker.ui.add.FREE_SHIPMENT_LIMIT
 
 // Detecta el transportista en base al formato del número de tracking
 private fun detectCarrier(tracking: String): String? {
@@ -104,6 +105,7 @@ private fun carrierHint(carrier: String): String = when (carrier.lowercase()) {
 fun AddScreen(
     onBack: () -> Unit,
     onSuccess: () -> Unit,
+    onUpgradeClick: () -> Unit = onBack,
     viewModel: AddShipmentViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -212,6 +214,43 @@ fun AddScreen(
                 },
                 supportingText = { Text(stringResource(R.string.add_carrier_supporting)) }
             )
+
+            // === Límite de envíos alcanzado (free tier) ===
+            if (uiState is AddUiState.LimitReached) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Límite de $FREE_SHIPMENT_LIMIT envíos activos",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = "Hazte Premium para envíos ilimitados",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                        TextButton(onClick = onUpgradeClick) {
+                            Text(
+                                "✦ Premium",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
 
             // === Error ===
             if (uiState is AddUiState.Error) {

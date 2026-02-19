@@ -36,6 +36,7 @@ import javax.inject.Inject
 
 data class SettingsUiState(
     val preferences: UserPreferences = UserPreferences(),
+    val preferencesLoaded: Boolean = false,
     val isAmazonConnected: Boolean = false,
     val appVersion: String = "",
     val cacheCleared: Boolean = false,
@@ -73,6 +74,7 @@ class SettingsViewModel @Inject constructor(
             ?: "Nunca"
         SettingsUiState(
             preferences = prefs,
+            preferencesLoaded = true,
             isAmazonConnected = amazonSessionManager.isLoggedIn(),
             appVersion = BuildConfig.VERSION_NAME,
             cacheCleared = false,
@@ -206,8 +208,8 @@ class SettingsViewModel @Inject constructor(
 }
 
 sealed class ExportResult {
-    object Idle    : ExportResult()
-    object Loading : ExportResult()
+    data object Idle    : ExportResult()
+    data object Loading : ExportResult()
     data class Success(val uri: Uri) : ExportResult()
     data class Error(val message: String) : ExportResult()
 }

@@ -274,6 +274,12 @@ class ShipmentRepository @Inject constructor(
                 lastUpdate = System.currentTimeMillis()
             ))
 
+            // Auto-archivar si el envío fue entregado
+            if (statusText == "Entregado") {
+                dao.archiveShipment(id)
+                android.util.Log.d("Tracking", "Auto-archivado envío entregado: $id")
+            }
+
             val events = tracking.checkpoints.mapIndexed { index, checkpoint ->
                 TrackingEventEntity(
                     id = 0L,
@@ -288,7 +294,7 @@ class ShipmentRepository @Inject constructor(
             dao.insertEvents(events)
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ShipmentRepository", "Error al refrescar envío AfterShip: ${e.message}", e)
         }
     }
 
@@ -332,6 +338,12 @@ class ShipmentRepository @Inject constructor(
                 status = status,
                 lastUpdate = System.currentTimeMillis()
             ))
+
+            // Auto-archivar si el envío fue entregado
+            if (status.lowercase().let { it.contains("entregado") || it.contains("delivered") }) {
+                dao.archiveShipment(id)
+                android.util.Log.d("Tracking", "Auto-archivado envío Amazon entregado: $id")
+            }
 
             // Guardar eventos
             if (result.events.isNotEmpty()) {
@@ -391,6 +403,12 @@ class ShipmentRepository @Inject constructor(
                 lastUpdate = System.currentTimeMillis()
             ))
 
+            // Auto-archivar si el envío fue entregado
+            if (displayStatus.lowercase().contains("entregado")) {
+                dao.archiveShipment(id)
+                android.util.Log.d("Tracking", "Auto-archivado envío Interrapidísimo entregado: $id")
+            }
+
             // Guardar eventos
             if (result.events.isNotEmpty()) {
                 val events = result.events.mapIndexed { index, event ->
@@ -438,6 +456,10 @@ class ShipmentRepository @Inject constructor(
         }
         android.util.Log.w("ShipmentRepository", "No se pudo parsear fecha Inter: $dateStr")
         return null
+    }
+
+    suspend fun updateTitle(id: String, newTitle: String) {
+        dao.updateTitle(id, newTitle)
     }
 
     suspend fun archiveShipment(id: String) {

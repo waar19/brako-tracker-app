@@ -1,13 +1,11 @@
 package com.brk718.tracker.data.local
 
-import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -25,6 +23,8 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_SYNC_ONLY_WIFI         = booleanPreferencesKey("sync_only_wifi")
         val KEY_THEME                  = stringPreferencesKey("theme")
         val KEY_IS_PREMIUM             = booleanPreferencesKey("is_premium")
+        val KEY_ONBOARDING_DONE        = booleanPreferencesKey("onboarding_done")
+        val KEY_DELIVERED_COUNT        = intPreferencesKey("delivered_count")
     }
 
     val preferences: Flow<UserPreferences> = dataStore.data.map { prefs ->
@@ -35,9 +35,14 @@ class UserPreferencesRepository @Inject constructor(
             syncIntervalHours    = prefs[KEY_SYNC_INTERVAL_HOURS] ?: 2,
             syncOnlyOnWifi       = prefs[KEY_SYNC_ONLY_WIFI] ?: false,
             theme                = prefs[KEY_THEME] ?: "system",
-            isPremium            = prefs[KEY_IS_PREMIUM] ?: false
+            isPremium            = prefs[KEY_IS_PREMIUM] ?: false,
+            onboardingDone       = prefs[KEY_ONBOARDING_DONE] ?: false,
+            deliveredCount       = prefs[KEY_DELIVERED_COUNT] ?: 0
         )
     }
+
+    /** Alias para compatibilidad con código que usa .userPreferencesFlow */
+    val userPreferencesFlow: Flow<UserPreferences> get() = preferences
 
     suspend fun setNotificationsEnabled(value: Boolean) {
         dataStore.edit { it[KEY_NOTIFICATIONS_ENABLED] = value }
@@ -65,5 +70,15 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setIsPremium(value: Boolean) {
         dataStore.edit { it[KEY_IS_PREMIUM] = value }
+    }
+
+    suspend fun setOnboardingDone(value: Boolean) {
+        dataStore.edit { it[KEY_ONBOARDING_DONE] = value }
+    }
+
+    suspend fun incrementDeliveredCount() {
+        dataStore.edit { prefs ->
+            prefs[KEY_DELIVERED_COUNT] = (prefs[KEY_DELIVERED_COUNT] ?: 0) + 1
+        }
     }
 }

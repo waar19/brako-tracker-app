@@ -3,6 +3,7 @@ package com.brk718.tracker.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brk718.tracker.data.local.ShipmentWithEvents
+import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,14 +11,28 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val RATING_TRIGGER_COUNT = 3
+
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: ShipmentRepository
+    private val repository: ShipmentRepository,
+    private val prefsRepository: UserPreferencesRepository
 ) : ViewModel() {
+
+    /** true cuando el usuario ha tenido >= RATING_TRIGGER_COUNT entregas exitosas */
+    val shouldShowRatingRequest: StateFlow<Boolean> = prefsRepository.preferences
+        .map { it.deliveredCount >= RATING_TRIGGER_COUNT }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
 
     // ── Búsqueda ──────────────────────────────────────────────────────────────
     private val _searchQuery = MutableStateFlow("")
@@ -59,9 +74,9 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
-                // Leer la lista directamente del repositorio para no depender
-                // del estado filtrado (que puede estar vacío si hay búsqueda activa)
-                repository.activeShipments.stateIn(this).value.forEach { shipmentWithEvents ->
+                // first() garantiza que esperamos la primera emisión del Flow antes de iterar,
+                // evitando la race condition de stateIn().value que puede ser lista vacía.
+                repository.activeShipments.first().forEach { shipmentWithEvents ->
                     repository.refreshShipment(shipmentWithEvents.shipment.id)
                 }
             } finally {
