@@ -1,0 +1,22 @@
+<svg width="512" height="512" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background layer -->
+    <rect width="108" height="108" fill="#D6E3FF" rx="20" />
+    <path d="M0,0 L108,108 V0 Z" fill="black" fill-opacity="0.12" />
+
+    <!-- Box Base -->
+    <path d="M30,35 L70,35 L70,75 L30,75 Z" fill="#005FB0" />
+
+    <!-- Perspective / Depth -->
+    <path d="M70,35 L80,25 L80,65 L70,75 Z" fill="black" fill-opacity="0.2" />
+    <path d="M30,35 L40,25 L80,25 L70,35 Z" fill="black" fill-opacity="0.1" />
+
+    <!-- The 'B' Detail -->
+    <path
+        d="M40,42 H45 V73 H40 Z M45,42 H56 C60,42 63,45 63,49 C63,53 60,56 56,56 H45 Z M45,57 H58 C62,57 65,60 65,65 C65,70 62,73 58,73 H45 Z"
+        fill="white" />
+
+    <!-- Location Pin -->
+    <path
+        d="M54,20 C57.3,20 60,22.7 60,26 C60,29.3 54,34 54,34 C54,34 48,29.3 48,26 C48,22.7 50.7,20 54,20 Z"
+        fill="#FFB400" />
+</svg>

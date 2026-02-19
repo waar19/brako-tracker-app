@@ -2,4 +2,15 @@
 <resources>
 
     <style name="Theme.Tracker" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Tema para la Splash Screen -->
+    <style name="Theme.Tracker.Splash" parent="Theme.SplashScreen">
+        <!-- Fondo con el color secundario del branding (azul claro #D6E3FF) -->
+        <item name="windowSplashScreenBackground">@color/brako_secondary</item>
+        <!-- Icono: el foreground del adaptive icon (caja Brako con pin amarillo) -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <!-- Tema al que transiciona al terminar la splash -->
+        <item name="postSplashScreenTheme">@style/Theme.Tracker</item>
+    </style>
+
 </resources>

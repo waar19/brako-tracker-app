@@ -7,4 +7,7 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="brako_primary">#005FB0</color>
+    <color name="brako_secondary">#D6E3FF</color>
+    <color name="brako_accent">#FFB400</color>
 </resources>

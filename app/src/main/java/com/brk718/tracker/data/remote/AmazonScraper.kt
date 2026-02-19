@@ -335,6 +335,8 @@ class AmazonScraper @Inject constructor(
                 wv.webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, pageUrl: String?) {
                         super.onPageFinished(view, pageUrl)
+                        // Guard: solo disparar extracción una vez
+                        if (isResumed) return
                         val currentUrl = pageUrl ?: ""
                         Log.d(TAG, "Page loaded: $currentUrl")
 
@@ -354,7 +356,7 @@ class AmazonScraper @Inject constructor(
                         // Esperamos a que React renderice y extraemos directo.
                         if (currentUrl.contains("order-details", ignoreCase = true)) {
                             handler.postDelayed({
-                                extractAndParse(wv) { info -> resumeOnce(info) }
+                                if (!isResumed) extractAndParse(wv) { info -> resumeOnce(info) }
                             }, JS_DELAY_MS)
                             return
                         }
@@ -362,7 +364,7 @@ class AmazonScraper @Inject constructor(
                         // Si llegamos a cualquier otra página inesperada, también extraemos
                         Log.d(TAG, "URL inesperada, intentando extraer: $currentUrl")
                         handler.postDelayed({
-                            extractAndParse(wv) { info -> resumeOnce(info) }
+                            if (!isResumed) extractAndParse(wv) { info -> resumeOnce(info) }
                         }, JS_DELAY_MS)
                     }
 
@@ -382,7 +384,7 @@ class AmazonScraper @Inject constructor(
 
                 // Timeout de seguridad: extraer lo que haya si tardamos demasiado
                 handler.postDelayed({
-                    if (!isResumed) {
+                    if (!isResumed && webView != null) {
                         Log.w(TAG, "Timeout alcanzado, extrayendo lo que hay")
                         extractAndParse(wv) { info -> resumeOnce(info) }
                     }
@@ -410,7 +412,11 @@ class AmazonScraper @Inject constructor(
      *
      * Separar los dos evita corrupción del JSON al empaquetar HTML con comillas dentro.
      */
-    private fun extractAndParse(webView: WebView, callback: (ScrapedInfo) -> Unit) {
+    private fun extractAndParse(webView: WebView?, callback: (ScrapedInfo) -> Unit) {
+        if (webView == null) {
+            Log.w(TAG, "extractAndParse omitido — WebView ya destruido")
+            return
+        }
         try {
             // Paso 1: info de debug (título, URL)
             webView.evaluateJavascript(debugScript) { debugResult ->
@@ -504,8 +510,8 @@ class AmazonScraper @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error en extractAndParse: ${e.message}")
-            callback(ScrapedInfo("Error al ejecutar JS", null, null, null))
+            Log.w(TAG, "evaluateJavascript skipped — WebView destroyed: ${e.message}")
+            // No llamar callback; isResumed ya fue seteado o lo hará el primer intento exitoso
         }
     }
 }

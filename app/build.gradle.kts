@@ -99,6 +99,9 @@ dependencies {
     // DataStore (preferencias de usuario)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Splash Screen API (compat Android 6+)
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
     // Play Services Auth (Gmail)
     implementation(libs.play.services.auth)
     implementation(libs.google.api.client.android)
