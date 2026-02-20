@@ -365,6 +365,59 @@ fun DetailScreen(
                                     }
                                 }
                             }
+
+                            // Sub-carrier row (ej. PASAREX + AMZPSR021419193)
+                            val subName = shipment.subCarrierName
+                            val subId   = shipment.subCarrierTrackingId
+                            if (!subName.isNullOrBlank() || !subId.isNullOrBlank()) {
+                                Spacer(Modifier.height(4.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = listOfNotNull(subName, subId).joinToString(" · "),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = headerContentColor.copy(alpha = 0.65f),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    // Copiar ID del sub-carrier
+                                    if (!subId.isNullOrBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                clipboardManager.setText(AnnotatedString(subId))
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.ContentCopy,
+                                                contentDescription = "Copiar guía $subName",
+                                                modifier = Modifier.size(14.dp),
+                                                tint = headerContentColor.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                        // Abrir en web del sub-carrier
+                                        val subUrl = ShipmentRepository.trackingUrl(
+                                            subName?.lowercase() ?: "",
+                                            subId
+                                        )
+                                        if (subUrl != null) {
+                                            IconButton(
+                                                onClick = { uriHandler.openUri(subUrl) },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.AutoMirrored.Filled.OpenInNew,
+                                                    contentDescription = "Abrir $subName en navegador",
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = headerContentColor.copy(alpha = 0.6f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             Spacer(Modifier.height(12.dp))
 
                             val needsLogin = shipment.status == "LOGIN_REQUIRED" ||

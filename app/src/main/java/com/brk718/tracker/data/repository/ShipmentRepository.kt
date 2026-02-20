@@ -390,7 +390,9 @@ class ShipmentRepository @Inject constructor(
                 carrier = "Amazon",
                 title = fixedTitle,
                 status = status,
-                lastUpdate = System.currentTimeMillis()
+                lastUpdate = System.currentTimeMillis(),
+                subCarrierName = result.subCarrierName ?: shipment.subCarrierName,
+                subCarrierTrackingId = result.subCarrierTrackingId ?: shipment.subCarrierTrackingId
             ))
 
             // Auto-archivar si el envío fue entregado

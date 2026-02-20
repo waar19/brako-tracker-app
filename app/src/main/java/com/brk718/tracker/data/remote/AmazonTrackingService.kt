@@ -36,7 +36,9 @@ class AmazonTrackingService @Inject constructor(
         val status: String?,
         val expectedDelivery: String?,
         val events: List<AmazonTrackingEvent>,
-        val error: String? = null
+        val error: String? = null,
+        val subCarrierName: String? = null,
+        val subCarrierTrackingId: String? = null
     )
 
     data class AmazonTrackingEvent(
@@ -142,7 +144,9 @@ class AmazonTrackingService @Inject constructor(
                 return AmazonTrackingResult(
                     status = info.status,
                     expectedDelivery = info.arrivalDate,
-                    events = events
+                    events = events,
+                    subCarrierName = info.subCarrierName,
+                    subCarrierTrackingId = info.subCarrierTrackingId
                 )
             } catch (e: Exception) {
                 // Si falla por auth, borrar sesión

@@ -46,7 +46,9 @@ class AmazonScraper @Inject constructor(
         val arrivalDate: String?,
         val location: String?,
         val progress: Int?,
-        val events: List<ScrapedEvent> = emptyList()
+        val events: List<ScrapedEvent> = emptyList(),
+        val subCarrierName: String? = null,       // Ej: "PASAREX"
+        val subCarrierTrackingId: String? = null  // Ej: "AMZPSR021419193"
     )
 
     // Scripts separados para evitar problemas de escape al empaquetar HTML en JSON
@@ -248,12 +250,65 @@ class AmazonScraper @Inject constructor(
         // ===== LOCATION PARA MAPA =====
         val location = uniqueEvents.firstOrNull { !it.location.isNullOrBlank() }?.location
 
+        // ===== SUB-CARRIER (ej. PASAREX + AMZPSR...) =====
+        // Amazon muestra el carrier de última milla en varios posibles elementos:
+        //   - .od-carrier-info, .od-carrier-name  (clase dedicada)
+        //   - Texto del estilo "Enviado con PASAREX | AMZPSR021419193"
+        //   - Texto "Shipped with PASAREX | AMZPSR021419193" (en inglés)
+        var subCarrierName: String? = null
+        var subCarrierTrackingId: String? = null
+
+        // Intento 1: selectores de clase conocidos
+        val carrierEl = doc.selectFirst(
+            ".od-carrier-name, .od-carrier-info, [class*=carrier-name], [class*=carrier-info]"
+        )
+        if (carrierEl != null) {
+            val txt = carrierEl.text().trim()
+            if (txt.isNotBlank()) subCarrierName = txt
+            Log.d(TAG, "Sub-carrier (clase): $txt")
+        }
+
+        // Intento 2: buscar texto "Enviado con X | Y" o "Shipped with X | Y" en todo el DOM
+        if (subCarrierName == null) {
+            val shippedPattern = Regex(
+                """(?:enviado con|shipped with)\s+([A-Z0-9 ]+?)(?:\s*[|\-–]\s*([A-Z0-9]+))?$""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)
+            )
+            val allText = doc.body()?.wholeText() ?: ""
+            val match = shippedPattern.find(allText)
+            if (match != null) {
+                subCarrierName = match.groupValues[1].trim().takeIf { it.isNotBlank() }
+                subCarrierTrackingId = match.groupValues[2].trim().takeIf { it.isNotBlank() }
+                Log.d(TAG, "Sub-carrier (texto): $subCarrierName | $subCarrierTrackingId")
+            }
+        }
+
+        // Intento 3: buscar el patrón AMZPSR/AMZL directamente en texto visible
+        if (subCarrierTrackingId == null) {
+            val amzIdPattern = Regex("""(AMZPSR[A-Z0-9]+|AMZL[A-Z0-9]+)""")
+            val allText = doc.body()?.wholeText() ?: ""
+            subCarrierTrackingId = amzIdPattern.find(allText)?.value
+            if (subCarrierTrackingId != null) {
+                Log.d(TAG, "Sub-carrier ID (patrón AMZPSR): $subCarrierTrackingId")
+                // Si encontramos el ID pero no el nombre, inferir el nombre del prefijo
+                if (subCarrierName == null) {
+                    subCarrierName = when {
+                        subCarrierTrackingId!!.startsWith("AMZPSR") -> "PASAREX"
+                        subCarrierTrackingId!!.startsWith("AMZL")   -> "Amazon Logistics"
+                        else -> null
+                    }
+                }
+            }
+        }
+
         return ScrapedInfo(
             status = status,
             arrivalDate = arrivalDate?.ifBlank { null },
             location = location,
             progress = null,
-            events = uniqueEvents
+            events = uniqueEvents,
+            subCarrierName = subCarrierName,
+            subCarrierTrackingId = subCarrierTrackingId
         )
     }
 

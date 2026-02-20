@@ -15,7 +15,9 @@ data class ShipmentEntity(
     val status: String, // "En tránsito", "Entregado", etc.
     val lastUpdate: Long, // Timestamp
     val isArchived: Boolean = false,
-    val estimatedDelivery: Long? = null // Timestamp de entrega estimada (null si no disponible)
+    val estimatedDelivery: Long? = null, // Timestamp de entrega estimada (null si no disponible)
+    val subCarrierName: String? = null,        // Carrier de última milla (ej. "PASAREX")
+    val subCarrierTrackingId: String? = null   // ID de rastreo del carrier (ej. "AMZPSR021419193")
 )
 
 @Entity(
