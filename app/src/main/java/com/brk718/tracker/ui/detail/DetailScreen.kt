@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -413,25 +415,22 @@ fun DetailScreen(
                                     }
                                 }
 
-                                // Leyenda compacta (solo puntos de colores) en esquina inferior derecha
-                                // — alejada del marcador de origen (inferior izquierda) y destino (variable)
+                                // Leyenda con etiquetas en esquina inferior derecha
                                 Surface(
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
                                         .padding(8.dp),
                                     shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                                     shadowElevation = 2.dp
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        // Solo puntos de colores, sin texto (más compacto)
-                                        Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF22C55E)))
-                                        Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF3B82F6)))
-                                        Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFEF4444)))
+                                        LegendDot(Color(0xFF22C55E), stringResource(R.string.detail_map_origin))
+                                        LegendDot(Color(0xFF3B82F6), stringResource(R.string.detail_map_transit))
+                                        LegendDot(Color(0xFFEF4444), stringResource(R.string.detail_map_current_location))
                                     }
                                 }
                             }
@@ -514,39 +513,32 @@ fun DetailScreen(
                                         }
                                     }
 
-                                    // Controles de zoom propios (inferior izquierda) —
-                                    // reemplazan los botones +/- nativos de OSMDroid que se desactivaron
+                                    // Controles de zoom propios (inferior izquierda)
                                     Column(
                                         modifier = Modifier
                                             .align(Alignment.BottomStart)
                                             .padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                                            shadowElevation = 4.dp
+                                        FilledTonalIconButton(
+                                            onClick = { expandedMapView?.controller?.zoomIn() },
+                                            modifier = Modifier.size(44.dp)
                                         ) {
-                                            Column {
-                                                IconButton(
-                                                    onClick = { expandedMapView?.controller?.zoomIn() },
-                                                    modifier = Modifier.size(40.dp)
-                                                ) {
-                                                    Text("+", style = MaterialTheme.typography.titleMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.onSurface)
-                                                }
-                                                HorizontalDivider(thickness = 0.5.dp,
-                                                    color = MaterialTheme.colorScheme.outlineVariant)
-                                                IconButton(
-                                                    onClick = { expandedMapView?.controller?.zoomOut() },
-                                                    modifier = Modifier.size(40.dp)
-                                                ) {
-                                                    Text("−", style = MaterialTheme.typography.titleMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.onSurface)
-                                                }
-                                            }
+                                            Icon(
+                                                Icons.Default.Add,
+                                                contentDescription = "Acercar",
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        FilledTonalIconButton(
+                                            onClick = { expandedMapView?.controller?.zoomOut() },
+                                            modifier = Modifier.size(44.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Remove,
+                                                contentDescription = "Alejar",
+                                                modifier = Modifier.size(20.dp)
+                                            )
                                         }
                                     }
                                 }

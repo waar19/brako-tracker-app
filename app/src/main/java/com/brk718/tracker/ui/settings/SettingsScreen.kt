@@ -8,6 +8,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.BuildConfig
@@ -79,6 +83,8 @@ fun SettingsScreen(
     // Dialogs
     var showThemeDialog by remember { mutableStateOf(false) }
     var showSyncIntervalDialog by remember { mutableStateOf(false) }
+    var showQuietHoursStartDialog by remember { mutableStateOf(false) }
+    var showQuietHoursEndDialog by remember { mutableStateOf(false) }
     var showDisconnectAmazonDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showPremiumSyncDialog by remember { mutableStateOf(false) }
@@ -262,6 +268,34 @@ fun SettingsScreen(
                     enabled = prefs.notificationsEnabled,
                     onCheckedChange = { viewModel.setOnlyImportantEvents(it) }
                 )
+            }
+            item {
+                SettingsSwitchItem(
+                    title = "Horas de silencio",
+                    subtitle = "No enviar notificaciones en el rango horario indicado",
+                    icon = Icons.Default.BedtimeOff,
+                    checked = prefs.quietHoursEnabled,
+                    enabled = prefs.notificationsEnabled,
+                    onCheckedChange = { viewModel.setQuietHoursEnabled(it) }
+                )
+            }
+            if (prefs.quietHoursEnabled && prefs.notificationsEnabled) {
+                item {
+                    SettingsNavigationItem(
+                        title = "Inicio del silencio",
+                        subtitle = "%02d:00".format(prefs.quietHoursStart),
+                        icon = Icons.Default.NightsStay,
+                        onClick = { showQuietHoursStartDialog = true }
+                    )
+                }
+                item {
+                    SettingsNavigationItem(
+                        title = "Fin del silencio",
+                        subtitle = "%02d:00".format(prefs.quietHoursEnd),
+                        icon = Icons.Default.WbSunny,
+                        onClick = { showQuietHoursEndDialog = true }
+                    )
+                }
             }
 
             item { SettingsDivider() }
@@ -531,6 +565,24 @@ fun SettingsScreen(
             current = prefs.theme,
             onSelect = { viewModel.setTheme(it); showThemeDialog = false },
             onDismiss = { showThemeDialog = false }
+        )
+    }
+
+    if (showQuietHoursStartDialog) {
+        HourPickerDialog(
+            title = "Inicio del silencio",
+            current = prefs.quietHoursStart,
+            onSelect = { viewModel.setQuietHoursStart(it); showQuietHoursStartDialog = false },
+            onDismiss = { showQuietHoursStartDialog = false }
+        )
+    }
+
+    if (showQuietHoursEndDialog) {
+        HourPickerDialog(
+            title = "Fin del silencio",
+            current = prefs.quietHoursEnd,
+            onSelect = { viewModel.setQuietHoursEnd(it); showQuietHoursEndDialog = false },
+            onDismiss = { showQuietHoursEndDialog = false }
         )
     }
 
@@ -930,6 +982,53 @@ private fun SyncIntervalDialog(
                                 )
                             }
                         }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_cancel)) }
+        }
+    )
+}
+
+@Composable
+private fun HourPickerDialog(
+    title: String,
+    current: Int,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val hours = (0..23).toList()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Schedule, null) },
+        title = { Text(title) },
+        text = {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4),
+                modifier = Modifier.height(240.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(hours) { hour ->
+                    val selected = hour == current
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.clickable { onSelect(hour) }
+                    ) {
+                        Text(
+                            text = "%02d:00".format(hour),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             }

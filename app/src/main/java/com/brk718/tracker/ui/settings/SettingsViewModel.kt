@@ -151,6 +151,18 @@ class SettingsViewModel @Inject constructor(
         prefsRepo.setOnlyImportantEvents(value)
     }
 
+    fun setQuietHoursEnabled(value: Boolean) = viewModelScope.launch {
+        prefsRepo.setQuietHoursEnabled(value)
+    }
+
+    fun setQuietHoursStart(hour: Int) = viewModelScope.launch {
+        prefsRepo.setQuietHoursStart(hour)
+    }
+
+    fun setQuietHoursEnd(hour: Int) = viewModelScope.launch {
+        prefsRepo.setQuietHoursEnd(hour)
+    }
+
     fun syncNow() {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)

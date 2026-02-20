@@ -3,6 +3,9 @@ package com.brk718.tracker.data.local
 data class UserPreferences(
     val notificationsEnabled: Boolean = true,
     val onlyImportantEvents: Boolean = false,
+    val quietHoursEnabled: Boolean = false,
+    val quietHoursStart: Int = 23,   // hora de inicio (0-23), por defecto 23:00
+    val quietHoursEnd: Int = 7,      // hora de fin (0-23), por defecto 07:00
     val autoSync: Boolean = true,
     val syncIntervalHours: Int = 2,
     val syncOnlyOnWifi: Boolean = false,

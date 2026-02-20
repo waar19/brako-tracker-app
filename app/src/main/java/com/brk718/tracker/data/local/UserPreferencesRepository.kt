@@ -18,6 +18,9 @@ class UserPreferencesRepository @Inject constructor(
     companion object {
         val KEY_NOTIFICATIONS_ENABLED  = booleanPreferencesKey("notifications_enabled")
         val KEY_ONLY_IMPORTANT_EVENTS  = booleanPreferencesKey("only_important_events")
+        val KEY_QUIET_HOURS_ENABLED    = booleanPreferencesKey("quiet_hours_enabled")
+        val KEY_QUIET_HOURS_START      = intPreferencesKey("quiet_hours_start")
+        val KEY_QUIET_HOURS_END        = intPreferencesKey("quiet_hours_end")
         val KEY_AUTO_SYNC              = booleanPreferencesKey("auto_sync")
         val KEY_SYNC_INTERVAL_HOURS    = intPreferencesKey("sync_interval_hours")
         val KEY_SYNC_ONLY_WIFI         = booleanPreferencesKey("sync_only_wifi")
@@ -32,6 +35,9 @@ class UserPreferencesRepository @Inject constructor(
         UserPreferences(
             notificationsEnabled = prefs[KEY_NOTIFICATIONS_ENABLED] ?: true,
             onlyImportantEvents  = prefs[KEY_ONLY_IMPORTANT_EVENTS] ?: false,
+            quietHoursEnabled    = prefs[KEY_QUIET_HOURS_ENABLED] ?: false,
+            quietHoursStart      = prefs[KEY_QUIET_HOURS_START] ?: 23,
+            quietHoursEnd        = prefs[KEY_QUIET_HOURS_END] ?: 7,
             autoSync             = prefs[KEY_AUTO_SYNC] ?: true,
             syncIntervalHours    = prefs[KEY_SYNC_INTERVAL_HOURS] ?: 2,
             syncOnlyOnWifi       = prefs[KEY_SYNC_ONLY_WIFI] ?: false,
@@ -52,6 +58,18 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setOnlyImportantEvents(value: Boolean) {
         dataStore.edit { it[KEY_ONLY_IMPORTANT_EVENTS] = value }
+    }
+
+    suspend fun setQuietHoursEnabled(value: Boolean) {
+        dataStore.edit { it[KEY_QUIET_HOURS_ENABLED] = value }
+    }
+
+    suspend fun setQuietHoursStart(hour: Int) {
+        dataStore.edit { it[KEY_QUIET_HOURS_START] = hour }
+    }
+
+    suspend fun setQuietHoursEnd(hour: Int) {
+        dataStore.edit { it[KEY_QUIET_HOURS_END] = hour }
     }
 
     suspend fun setAutoSync(value: Boolean) {
