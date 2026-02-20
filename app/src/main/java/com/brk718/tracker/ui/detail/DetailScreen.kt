@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
@@ -263,6 +264,7 @@ fun DetailScreen(
                 val shipment = state.shipment.shipment
                 val events = state.shipment.events.sortedByDescending { it.timestamp }
                 val historyLimited = state.historyLimited
+                val hiddenEventCount = state.hiddenEventCount
 
                 Column(
                     modifier = Modifier
@@ -468,14 +470,15 @@ fun DetailScreen(
                                     decorFitsSystemWindows = false
                                 )
                             ) {
+                                // Referencia al MapView para los botones de zoom propios
+                                var expandedMapView by remember { mutableStateOf<MapView?>(null) }
+
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .background(MaterialTheme.colorScheme.surface)
                                 ) {
-                                    // Referencia al MapView para los botones de zoom propios
-                                    var expandedMapView by remember { mutableStateOf<MapView?>(null) }
-
+                                    // Mapa edge-to-edge (sin padding — se extiende detrás de barras)
                                     AndroidView(
                                         modifier = Modifier.fillMaxSize(),
                                         factory = { ctx ->
@@ -485,7 +488,7 @@ fun DetailScreen(
                                             )
                                             MapView(ctx).apply {
                                                 setTileSource(CARTO_POSITRON)
-                                                setMultiTouchControls(true) // táctil habilitado
+                                                setMultiTouchControls(true)
                                                 controller.setZoom(5.0)
                                                 isTilesScaledToDpi = true
                                             }
@@ -496,75 +499,80 @@ fun DetailScreen(
                                         }
                                     )
 
-                                    // Botón cerrar (respeta barra de estado superior)
-                                    IconButton(
-                                        onClick = { showMapDialog = false },
+                                    // Capa de overlays: ocupa todo el espacio visible seguro.
+                                    // safeDrawingPadding() aplica statusBar + navigationBar + displayCutout
+                                    // de una vez, garantizando que los controles queden dentro del
+                                    // área visible independientemente del tipo de barra (gestos o botones).
+                                    Box(
                                         modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .statusBarsPadding()
-                                            .padding(8.dp)
-                                            .background(
-                                                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                                CircleShape
-                                            )
+                                            .fillMaxSize()
+                                            .safeDrawingPadding()
                                     ) {
-                                        Icon(
-                                            Icons.Default.Close,
-                                            contentDescription = stringResource(R.string.detail_map_close),
-                                            tint = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-
-                                    // Leyenda en pantalla completa (inferior derecha)
-                                    // navigationBarsPadding() evita que la barra de sistema la tape
-                                    Surface(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomEnd)
-                                            .navigationBarsPadding()
-                                            .padding(16.dp),
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                                        shadowElevation = 4.dp
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            LegendDot(Color(0xFF22C55E), stringResource(R.string.detail_map_origin))
-                                            LegendDot(Color(0xFF3B82F6), stringResource(R.string.detail_map_transit))
-                                            LegendDot(Color(0xFFEF4444), stringResource(R.string.detail_map_current_location))
-                                        }
-                                    }
-
-                                    // Controles de zoom (inferior izquierda)
-                                    // navigationBarsPadding() evita que la barra de sistema los tape
-                                    Column(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomStart)
-                                            .navigationBarsPadding()
-                                            .padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        FilledTonalIconButton(
-                                            onClick = { expandedMapView?.controller?.zoomIn() },
-                                            modifier = Modifier.size(44.dp)
+                                        // Botón cerrar (esquina superior derecha)
+                                        IconButton(
+                                            onClick = { showMapDialog = false },
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(8.dp)
+                                                .background(
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                                    CircleShape
+                                                )
                                         ) {
                                             Icon(
-                                                Icons.Default.Add,
-                                                contentDescription = "Acercar",
-                                                modifier = Modifier.size(20.dp)
+                                                Icons.Default.Close,
+                                                contentDescription = stringResource(R.string.detail_map_close),
+                                                tint = MaterialTheme.colorScheme.onSurface
                                             )
                                         }
-                                        FilledTonalIconButton(
-                                            onClick = { expandedMapView?.controller?.zoomOut() },
-                                            modifier = Modifier.size(44.dp)
+
+                                        // Leyenda (esquina inferior derecha)
+                                        Surface(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .padding(16.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                            shadowElevation = 4.dp
                                         ) {
-                                            Icon(
-                                                Icons.Default.Remove,
-                                                contentDescription = "Alejar",
-                                                modifier = Modifier.size(20.dp)
-                                            )
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                LegendDot(Color(0xFF22C55E), stringResource(R.string.detail_map_origin))
+                                                LegendDot(Color(0xFF3B82F6), stringResource(R.string.detail_map_transit))
+                                                LegendDot(Color(0xFFEF4444), stringResource(R.string.detail_map_current_location))
+                                            }
+                                        }
+
+                                        // Controles de zoom (esquina inferior izquierda)
+                                        Column(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomStart)
+                                                .padding(16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            FilledTonalIconButton(
+                                                onClick = { expandedMapView?.controller?.zoomIn() },
+                                                modifier = Modifier.size(44.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Add,
+                                                    contentDescription = "Acercar",
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                            FilledTonalIconButton(
+                                                onClick = { expandedMapView?.controller?.zoomOut() },
+                                                modifier = Modifier.size(44.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Remove,
+                                                    contentDescription = "Alejar",
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -725,13 +733,16 @@ fun DetailScreen(
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        "Historial de 30 dias",
+                                        if (hiddenEventCount > 0)
+                                            "$hiddenEventCount evento${if (hiddenEventCount == 1) "" else "s"} oculto${if (hiddenEventCount == 1) "" else "s"}"
+                                        else
+                                            "Historial de $FREE_HISTORY_DAYS días",
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                     Text(
-                                        "Premium desbloquea el historial completo",
+                                        "Solo ves los últimos $FREE_HISTORY_DAYS días — Premium muestra todo",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
                                     )

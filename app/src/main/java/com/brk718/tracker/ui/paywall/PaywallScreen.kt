@@ -97,7 +97,24 @@ fun PaywallScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(12.dp))
+
+            // Badge de prueba gratuita
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer
+            ) {
+                Text(
+                    "✓  7 días de prueba gratuita — cancela cuando quieras",
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
 
             // Beneficios
             val benefits = listOf(
@@ -170,8 +187,8 @@ fun PaywallScreen(
                             Icon(Icons.Default.WorkspacePremium, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                if (price == "—") "Suscribirse — anual"
-                                else "Suscribirse por $price / año",
+                                if (price == "—") "Empezar prueba gratis"
+                                else "Empezar prueba gratis — luego $price/año",
                                 fontWeight = FontWeight.Bold
                             )
                         }

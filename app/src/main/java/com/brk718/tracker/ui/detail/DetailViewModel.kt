@@ -40,12 +40,13 @@ class DetailViewModel @Inject constructor(
     ) { state, prefs ->
         if (!prefs.isPremium && state is DetailUiState.Success) {
             val cutoffMs = System.currentTimeMillis() - FREE_HISTORY_DAYS * 24 * 60 * 60 * 1000L
-            val filtered = state.shipment.copy(
-                events = state.shipment.events.filter { it.timestamp >= cutoffMs }
-            )
-            DetailUiState.Success(filtered, historyLimited = true)
+            val allEvents = state.shipment.events
+            val filteredEvents = allEvents.filter { it.timestamp >= cutoffMs }
+            val hidden = allEvents.size - filteredEvents.size
+            val filtered = state.shipment.copy(events = filteredEvents)
+            DetailUiState.Success(filtered, historyLimited = true, hiddenEventCount = hidden)
         } else if (state is DetailUiState.Success) {
-            state.copy(historyLimited = false)
+            state.copy(historyLimited = false, hiddenEventCount = 0)
         } else {
             state
         }
@@ -97,7 +98,8 @@ sealed class DetailUiState {
     data object Loading : DetailUiState()
     data class Success(
         val shipment: ShipmentWithEvents,
-        val historyLimited: Boolean = false
+        val historyLimited: Boolean = false,
+        val hiddenEventCount: Int = 0
     ) : DetailUiState()
     data class Error(val message: String) : DetailUiState()
 }

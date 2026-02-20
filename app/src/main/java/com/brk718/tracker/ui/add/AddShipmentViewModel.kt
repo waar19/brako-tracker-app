@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-const val FREE_SHIPMENT_LIMIT = 10
+const val FREE_SHIPMENT_LIMIT = 5
 
 @HiltViewModel
 class AddShipmentViewModel @Inject constructor(
