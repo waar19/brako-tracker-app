@@ -466,48 +466,42 @@ fun DetailScreen(
                                 properties = DialogProperties(
                                     usePlatformDefaultWidth = false,
                                     dismissOnBackPress = true,
-                                    dismissOnClickOutside = false,
-                                    decorFitsSystemWindows = false
+                                    dismissOnClickOutside = true
                                 )
                             ) {
-                                // Referencia al MapView para los botones de zoom propios
                                 var expandedMapView by remember { mutableStateOf<MapView?>(null) }
 
-                                Box(
+                                Surface(
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(MaterialTheme.colorScheme.surface)
+                                        .fillMaxWidth(0.95f)
+                                        .fillMaxHeight(0.75f),
+                                    shape = RoundedCornerShape(20.dp),
+                                    tonalElevation = 6.dp
                                 ) {
-                                    // Mapa edge-to-edge (sin padding — se extiende detrás de barras)
-                                    AndroidView(
-                                        modifier = Modifier.fillMaxSize(),
-                                        factory = { ctx ->
-                                            Configuration.getInstance().load(
-                                                ctx,
-                                                ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
-                                            )
-                                            MapView(ctx).apply {
-                                                setTileSource(CARTO_POSITRON)
-                                                setMultiTouchControls(true)
-                                                controller.setZoom(5.0)
-                                                isTilesScaledToDpi = true
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        // Mapa ocupa todo el card
+                                        AndroidView(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(RoundedCornerShape(20.dp)),
+                                            factory = { ctx ->
+                                                Configuration.getInstance().load(
+                                                    ctx,
+                                                    ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
+                                                )
+                                                MapView(ctx).apply {
+                                                    setTileSource(CARTO_POSITRON)
+                                                    setMultiTouchControls(true)
+                                                    controller.setZoom(5.0)
+                                                    isTilesScaledToDpi = true
+                                                }
+                                            },
+                                            update = { mapView ->
+                                                expandedMapView = mapView
+                                                setupMapOverlays(mapView, mapPoints, uniqueEvents)
                                             }
-                                        },
-                                        update = { mapView ->
-                                            expandedMapView = mapView
-                                            setupMapOverlays(mapView, mapPoints, uniqueEvents)
-                                        }
-                                    )
+                                        )
 
-                                    // Capa de overlays: ocupa todo el espacio visible seguro.
-                                    // safeDrawingPadding() aplica statusBar + navigationBar + displayCutout
-                                    // de una vez, garantizando que los controles queden dentro del
-                                    // área visible independientemente del tipo de barra (gestos o botones).
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .safeDrawingPadding()
-                                    ) {
                                         // Botón cerrar (esquina superior derecha)
                                         IconButton(
                                             onClick = { showMapDialog = false },
@@ -530,14 +524,14 @@ fun DetailScreen(
                                         Surface(
                                             modifier = Modifier
                                                 .align(Alignment.BottomEnd)
-                                                .padding(16.dp),
-                                            shape = RoundedCornerShape(12.dp),
+                                                .padding(12.dp),
+                                            shape = RoundedCornerShape(10.dp),
                                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                                             shadowElevation = 4.dp
                                         ) {
                                             Row(
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 LegendDot(Color(0xFF22C55E), stringResource(R.string.detail_map_origin))
@@ -550,27 +544,27 @@ fun DetailScreen(
                                         Column(
                                             modifier = Modifier
                                                 .align(Alignment.BottomStart)
-                                                .padding(16.dp),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                .padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             FilledTonalIconButton(
                                                 onClick = { expandedMapView?.controller?.zoomIn() },
-                                                modifier = Modifier.size(44.dp)
+                                                modifier = Modifier.size(40.dp)
                                             ) {
                                                 Icon(
                                                     Icons.Default.Add,
                                                     contentDescription = "Acercar",
-                                                    modifier = Modifier.size(20.dp)
+                                                    modifier = Modifier.size(18.dp)
                                                 )
                                             }
                                             FilledTonalIconButton(
                                                 onClick = { expandedMapView?.controller?.zoomOut() },
-                                                modifier = Modifier.size(44.dp)
+                                                modifier = Modifier.size(40.dp)
                                             ) {
                                                 Icon(
                                                     Icons.Default.Remove,
                                                     contentDescription = "Alejar",
-                                                    modifier = Modifier.size(20.dp)
+                                                    modifier = Modifier.size(18.dp)
                                                 )
                                             }
                                         }
