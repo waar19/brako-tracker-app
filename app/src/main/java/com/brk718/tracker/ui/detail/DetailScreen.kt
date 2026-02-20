@@ -55,6 +55,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
 import androidx.compose.ui.viewinterop.AndroidView
@@ -444,7 +446,8 @@ fun DetailScreen(
                                 properties = DialogProperties(
                                     usePlatformDefaultWidth = false,
                                     dismissOnBackPress = true,
-                                    dismissOnClickOutside = false
+                                    dismissOnClickOutside = false,
+                                    decorFitsSystemWindows = false
                                 )
                             ) {
                                 Box(
@@ -475,12 +478,13 @@ fun DetailScreen(
                                         }
                                     )
 
-                                    // Botón cerrar
+                                    // Botón cerrar (respeta barra de estado superior)
                                     IconButton(
                                         onClick = { showMapDialog = false },
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
-                                            .padding(12.dp)
+                                            .statusBarsPadding()
+                                            .padding(8.dp)
                                             .background(
                                                 MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                                                 CircleShape
@@ -494,9 +498,11 @@ fun DetailScreen(
                                     }
 
                                     // Leyenda en pantalla completa (inferior derecha)
+                                    // navigationBarsPadding() evita que la barra de sistema la tape
                                     Surface(
                                         modifier = Modifier
                                             .align(Alignment.BottomEnd)
+                                            .navigationBarsPadding()
                                             .padding(16.dp),
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
@@ -513,10 +519,12 @@ fun DetailScreen(
                                         }
                                     }
 
-                                    // Controles de zoom propios (inferior izquierda)
+                                    // Controles de zoom (inferior izquierda)
+                                    // navigationBarsPadding() evita que la barra de sistema los tape
                                     Column(
                                         modifier = Modifier
                                             .align(Alignment.BottomStart)
+                                            .navigationBarsPadding()
                                             .padding(16.dp),
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
