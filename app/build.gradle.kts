@@ -24,7 +24,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Leer API key desde local.properties
+        // Leer API keys y signing config desde local.properties
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
         if (localPropertiesFile.exists()) {
@@ -34,13 +34,29 @@ android {
         buildConfigField("String", "GMAIL_CLIENT_ID", "\"${localProperties["GMAIL_CLIENT_ID"] ?: ""}\"")
     }
 
+    signingConfigs {
+        create("release") {
+            val localProperties = Properties()
+            val localPropertiesFile = rootProject.file("local.properties")
+            if (localPropertiesFile.exists()) {
+                localProperties.load(localPropertiesFile.inputStream())
+            }
+            storeFile     = file(localProperties["RELEASE_STORE_FILE"]     ?: "brako-release.jks")
+            storePassword = localProperties["RELEASE_STORE_PASSWORD"]      as String? ?: ""
+            keyAlias      = localProperties["RELEASE_KEY_ALIAS"]           as String? ?: ""
+            keyPassword   = localProperties["RELEASE_KEY_PASSWORD"]        as String? ?: ""
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

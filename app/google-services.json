@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "tracker-placeholder",
-    "storage_bucket": "tracker-placeholder.appspot.com"
+    "project_number": "341458724659",
+    "project_id": "brako-tracker",
+    "storage_bucket": "brako-tracker.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "mobilesdk_app_id": "1:341458724659:android:442c4a0527339110bd4046",
         "android_client_info": {
           "package_name": "com.brk718.tracker"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "REPLACE_WITH_REAL_API_KEY"
+          "current_key": "AIzaSyAU5e2hlWGmWf_HAyTWVu3z1VCZBofGz70"
         }
       ],
       "services": {

@@ -34,10 +34,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,7 +78,6 @@ fun HomeScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val shouldShowRating by viewModel.shouldShowRatingRequest.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
-    val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val canAddMore = isPremium || shipments.size < FREE_SHIPMENT_LIMIT
@@ -105,15 +101,9 @@ fun HomeScreen(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshAll()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+    // No llamar refreshAll() en ON_RESUME — la lista se actualiza reactivamente
+    // desde Room (Flow) y WorkManager sincroniza en background.
+    // refreshAll() solo se llama cuando el usuario toca el botón de actualizar.
 
     // Al cerrar búsqueda limpiar query
     LaunchedEffect(searchVisible) {
