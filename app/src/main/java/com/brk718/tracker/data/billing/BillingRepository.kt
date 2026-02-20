@@ -187,14 +187,15 @@ class BillingRepository @Inject constructor(
         }
     }
 
-    /** Precio formateado del plan anual, ej: "$2.99" */
+    /** Precio formateado del plan anual, ej: "$2.99"
+     *  Omite la fase de prueba gratuita (priceAmountMicros == 0) y devuelve el precio real. */
     fun getPriceText(): String {
         return _productDetails.value
             ?.subscriptionOfferDetails
             ?.firstOrNull()
             ?.pricingPhases
             ?.pricingPhaseList
-            ?.firstOrNull()
+            ?.firstOrNull { it.priceAmountMicros > 0 }
             ?.formattedPrice
             ?: "—"
     }

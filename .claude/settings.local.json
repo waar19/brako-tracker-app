@@ -81,7 +81,10 @@
       "Bash(ls:*)",
       "Bash(\"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\gradlew.bat\" assembleDebug)",
       "Bash(git -C \"C:/Users/waar1/AndroidStudioProjects/Tracker\" add app/src/main/AndroidManifest.xml app/src/main/java/com/brk718/tracker/ui/detail/DetailScreen.kt app/src/main/java/com/brk718/tracker/ui/home/HomeScreen.kt app/src/main/java/com/brk718/tracker/util/ShareCardGenerator.kt app/src/main/res/xml/file_provider_paths.xml app/src/main/java/com/brk718/tracker/ui/stats/StatsScreen.kt)",
-      "Bash(git -C:*)"
+      "Bash(git -C:*)",
+      "Bash(\"C:/Users/waar1/AndroidStudioProjects/Tracker/gradlew.bat\" assembleDebug)",
+      "Bash(gradlew assembleDebug:*)",
+      "Bash(./gradlew.bat assembleDebug:*)"
     ]
   }
 }

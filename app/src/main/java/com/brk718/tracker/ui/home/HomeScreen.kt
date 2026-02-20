@@ -11,6 +11,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -263,6 +264,65 @@ fun HomeScreen(
                     }
                 }
 
+                // Chip de límite de envíos — aparece cuando el usuario free alcanza ≥60% del límite
+                val shipmentLimitThreshold = (FREE_SHIPMENT_LIMIT * 0.6f).toInt()
+                AnimatedVisibility(
+                    visible = !isPremium && !isSelectionMode && shipments.size >= shipmentLimitThreshold,
+                    enter = expandVertically(),
+                    exit = shrinkVertically()
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onUpgradeClick() },
+                        color = if (shipments.size >= FREE_SHIPMENT_LIMIT)
+                            MaterialTheme.colorScheme.errorContainer
+                        else
+                            MaterialTheme.colorScheme.tertiaryContainer
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.WorkspacePremium,
+                                    contentDescription = null,
+                                    tint = if (shipments.size >= FREE_SHIPMENT_LIMIT)
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                    else
+                                        MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    "${shipments.size} / $FREE_SHIPMENT_LIMIT envíos activos",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (shipments.size >= FREE_SHIPMENT_LIMIT)
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                    else
+                                        MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                            Text(
+                                "Ampliar →",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (shipments.size >= FREE_SHIPMENT_LIMIT)
+                                    MaterialTheme.colorScheme.onErrorContainer
+                                else
+                                    MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+
                 // Barra de búsqueda colapsable
                 AnimatedVisibility(
                     visible = searchVisible,
@@ -311,13 +371,7 @@ fun HomeScreen(
                     if (canAddMore) {
                         onAddClick()
                     } else {
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar(
-                                message = "Limite de $FREE_SHIPMENT_LIMIT envios activos alcanzado",
-                                actionLabel = "Ver Premium",
-                                duration = SnackbarDuration.Short
-                            )
-                        }
+                        onUpgradeClick()
                     }
                 },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
