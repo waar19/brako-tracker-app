@@ -51,4 +51,18 @@ interface ShipmentDao {
 
     @Query("SELECT COUNT(*) FROM shipments WHERE status = 'Entregado'")
     suspend fun countDeliveredShipments(): Int
+
+    // ── Stats queries ──────────────────────────────────────────────────────
+
+    /** Todos los envíos (activos + archivados) con sus eventos, para calcular estadísticas. */
+    @Transaction
+    @Query("SELECT * FROM shipments ORDER BY lastUpdate DESC")
+    fun getAllShipmentsWithEvents(): Flow<List<ShipmentWithEvents>>
+
+    /** Conteo de envíos agrupados por transportista (todos los envíos). */
+    @Query("SELECT carrier, COUNT(*) as count FROM shipments GROUP BY carrier ORDER BY count DESC")
+    suspend fun getCarrierCounts(): List<CarrierCount>
 }
+
+/** Resultado de la query de conteo por transportista. */
+data class CarrierCount(val carrier: String, val count: Int)

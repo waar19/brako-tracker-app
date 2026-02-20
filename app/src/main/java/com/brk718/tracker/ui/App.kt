@@ -29,6 +29,7 @@ import com.brk718.tracker.ui.paywall.PaywallScreen
 import com.brk718.tracker.ui.settings.ArchivedScreen
 import com.brk718.tracker.ui.settings.SettingsScreen
 import com.brk718.tracker.ui.settings.SettingsViewModel
+import com.brk718.tracker.ui.stats.StatsScreen
 import com.brk718.tracker.ui.theme.TrackerTheme
 
 object Routes {
@@ -42,6 +43,7 @@ object Routes {
     const val ARCHIVED    = "archived"
     const val PAYWALL     = "paywall"
     const val BARCODE_SCANNER = "barcode_scanner"
+    const val STATS           = "stats"
     fun detail(id: String) = "detail/$id"
 }
 
@@ -180,8 +182,12 @@ fun App(
                     onBack            = { navController.popBackStack() },
                     onGmailClick      = { navController.navigate(Routes.GMAIL) },
                     onAmazonAuthClick = { navController.navigate(Routes.AMAZON_AUTH) },
-                    onArchivedClick   = { navController.navigate(Routes.ARCHIVED) }
+                    onArchivedClick   = { navController.navigate(Routes.ARCHIVED) },
+                    onStatsClick      = { navController.navigate(Routes.STATS) }
                 )
+            }
+            composable(Routes.STATS) {
+                StatsScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.ARCHIVED) {
                 ArchivedScreen(

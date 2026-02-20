@@ -39,6 +39,7 @@ fun SettingsScreen(
     onGmailClick: () -> Unit,
     onAmazonAuthClick: () -> Unit,
     onArchivedClick: () -> Unit,
+    onStatsClick: () -> Unit = {},
     onExportCsvClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -454,58 +455,19 @@ fun SettingsScreen(
 
             item { SettingsDivider() }
 
-            item { SettingsDivider() }
-
             // ──────────────────────────────────────────────
             // ESTADÍSTICAS
             // ──────────────────────────────────────────────
             item {
-                SettingsSectionHeader(title = "Mis estadisticas", icon = Icons.Default.BarChart)
+                SettingsSectionHeader(title = "Mis estadísticas", icon = Icons.Default.BarChart)
             }
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        StatItem(
-                            value = prefs.totalTracked.toString(),
-                            label = "Rastreados",
-                            icon = Icons.Default.Inventory2
-                        )
-                        VerticalDivider(
-                            modifier = Modifier.height(48.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-                        StatItem(
-                            value = prefs.deliveredCount.toString(),
-                            label = "Entregados",
-                            icon = Icons.Default.CheckCircle
-                        )
-                        VerticalDivider(
-                            modifier = Modifier.height(48.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-                        val successRate = if (prefs.totalTracked > 0)
-                            "${(prefs.deliveredCount * 100 / prefs.totalTracked)}%"
-                        else "—"
-                        StatItem(
-                            value = successRate,
-                            label = "Exito",
-                            icon = Icons.Default.TrendingUp
-                        )
-                    }
-                }
+                SettingsNavigationItem(
+                    title = "Ver estadísticas",
+                    subtitle = "Gráficas de envíos, transportistas y más",
+                    icon = Icons.Default.BarChart,
+                    onClick = onStatsClick
+                )
             }
 
             item { SettingsDivider() }
@@ -1040,28 +1002,3 @@ private fun HourPickerDialog(
     )
 }
 
-@Composable
-private fun StatItem(value: String, label: String, icon: ImageVector) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}

@@ -124,6 +124,8 @@ class ShipmentRepository @Inject constructor(
 
     val activeShipments: Flow<List<ShipmentWithEvents>> = dao.getAllActiveShipments()
     val archivedShipments: Flow<List<ShipmentWithEvents>> = dao.getAllArchivedShipments()
+    /** Todos los envíos (activos + archivados) — usado por StatsViewModel. */
+    val allShipments: Flow<List<ShipmentWithEvents>> = dao.getAllShipmentsWithEvents()
 
     fun getShipment(id: String): Flow<ShipmentWithEvents?> = dao.getShipmentById(id)
 
