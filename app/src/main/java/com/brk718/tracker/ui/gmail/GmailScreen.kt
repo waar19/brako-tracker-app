@@ -18,9 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Lock
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
 import com.brk718.tracker.domain.ParsedShipment
+import com.brk718.tracker.ui.add.FREE_SHIPMENT_LIMIT
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,6 +143,43 @@ fun GmailScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // Banner de límite alcanzado (tier free)
+                    val anyLimitReached = uiState.limitReachedIds.isNotEmpty()
+                    if (anyLimitReached) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Límite de $FREE_SHIPMENT_LIMIT envíos activos alcanzado",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                    Text(
+                                        "Hazte Premium para importar sin límites",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -149,6 +188,7 @@ fun GmailScreen(
                                 shipment = shipment,
                                 isImported = shipment.trackingNumber in uiState.importedIds,
                                 isImporting = shipment.trackingNumber in uiState.importingIds,
+                                isLimitReached = shipment.trackingNumber in uiState.limitReachedIds,
                                 onImport = { viewModel.importShipment(shipment) }
                             )
                         }
@@ -174,6 +214,7 @@ fun DetectedShipmentCard(
     shipment: ParsedShipment,
     isImported: Boolean,
     isImporting: Boolean,
+    isLimitReached: Boolean,
     onImport: () -> Unit
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
@@ -218,6 +259,23 @@ fun DetectedShipmentCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(stringResource(R.string.gmail_importing_button))
                 }
+                isLimitReached -> AssistChip(
+                    onClick = {},
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Lock,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Premium")
+                        }
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        labelColor = MaterialTheme.colorScheme.error
+                    )
+                )
                 else -> FilledTonalButton(onClick = onImport) {
                     Text(stringResource(R.string.gmail_import_button))
                 }

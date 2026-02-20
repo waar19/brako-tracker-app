@@ -3,11 +3,12 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.serialization)
+    id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -23,7 +24,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Leer API key desde local.properties
+        // Leer API keys y signing config desde local.properties
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
         if (localPropertiesFile.exists()) {
@@ -33,13 +34,29 @@ android {
         buildConfigField("String", "GMAIL_CLIENT_ID", "\"${localProperties["GMAIL_CLIENT_ID"] ?: ""}\"")
     }
 
+    signingConfigs {
+        create("release") {
+            val localProperties = Properties()
+            val localPropertiesFile = rootProject.file("local.properties")
+            if (localPropertiesFile.exists()) {
+                localProperties.load(localPropertiesFile.inputStream())
+            }
+            storeFile     = file(localProperties["RELEASE_STORE_FILE"]     ?: "brako-release.jks")
+            storePassword = localProperties["RELEASE_STORE_PASSWORD"]      as String? ?: ""
+            keyAlias      = localProperties["RELEASE_KEY_ALIAS"]           as String? ?: ""
+            keyPassword   = localProperties["RELEASE_KEY_PASSWORD"]        as String? ?: ""
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -70,6 +87,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation("androidx.compose.ui:ui-text-google-fonts")
     
     // Navigation & Icons
     implementation(libs.androidx.navigation.compose)
@@ -102,6 +120,18 @@ dependencies {
     // Splash Screen API (compat Android 6+)
     implementation("androidx.core:core-splashscreen:1.0.1")
 
+    // Google Mobile Ads (AdMob)
+    implementation("com.google.android.gms:play-services-ads:23.3.0")
+
+    // Google Play Billing
+    implementation("com.android.billingclient:billing-ktx:7.0.0")
+
+    // In-App Review (rating dialog)
+    implementation("com.google.android.play:review-ktx:2.0.1")
+
+    // Confetti animation
+    implementation("nl.dionsegijn:konfetti-compose:2.0.4")
+
     // Play Services Auth (Gmail)
     implementation(libs.play.services.auth)
     implementation(libs.google.api.client.android)
@@ -115,6 +145,15 @@ dependencies {
 
     // Maps (OpenStreetMap)
     implementation(libs.osmdroid.android)
+
+    // Jetpack Glance (Widget — solo premium)
+    implementation("androidx.glance:glance-appwidget:1.1.0")
+    implementation("androidx.glance:glance-material3:1.1.0")
+
+    // Firebase (Crashlytics + Analytics)
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-crashlytics-ktx")
+    implementation("com.google.firebase:firebase-analytics-ktx")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

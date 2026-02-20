@@ -1,6 +1,7 @@
 package com.brk718.tracker.ui.settings
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
@@ -10,15 +11,22 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.brk718.tracker.BuildConfig
+import com.brk718.tracker.data.billing.BillingRepository
+import com.brk718.tracker.data.billing.BillingState
 import com.brk718.tracker.data.local.AmazonSessionManager
 import com.brk718.tracker.data.local.UserPreferences
 import com.brk718.tracker.data.local.UserPreferencesRepository
+import com.brk718.tracker.data.repository.ShipmentRepository
+import com.brk718.tracker.util.CsvExporter
 import com.brk718.tracker.workers.SyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -28,18 +36,27 @@ import javax.inject.Inject
 
 data class SettingsUiState(
     val preferences: UserPreferences = UserPreferences(),
+    val preferencesLoaded: Boolean = false,
     val isAmazonConnected: Boolean = false,
     val appVersion: String = "",
     val cacheCleared: Boolean = false,
-    val lastSyncText: String = "Nunca"
+    val lastSyncText: String = "Nunca",
+    val subscriptionPriceText: String = "—",
+    val billingState: BillingState = BillingState.Idle
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val prefsRepo: UserPreferencesRepository,
-    private val amazonSessionManager: AmazonSessionManager
+    private val amazonSessionManager: AmazonSessionManager,
+    private val billingRepository: BillingRepository,
+    private val shipmentRepository: ShipmentRepository
 ) : ViewModel() {
+
+    // Uri del CSV exportado (null = sin exportar, Unit = exportado, String = error)
+    private val _exportResult = MutableStateFlow<ExportResult>(ExportResult.Idle)
+    val exportResult: StateFlow<ExportResult> = _exportResult.asStateFlow()
 
     // Flow de WorkInfo para la tarea periódica "TrackerSync"
     private val syncWorkInfoFlow = WorkManager.getInstance(context)
@@ -47,18 +64,23 @@ class SettingsViewModel @Inject constructor(
 
     val uiState: StateFlow<SettingsUiState> = combine(
         prefsRepo.preferences,
-        syncWorkInfoFlow
-    ) { prefs, workInfoList ->
+        syncWorkInfoFlow,
+        billingRepository.productDetails,
+        billingRepository.billingState
+    ) { prefs, workInfoList, productDetails, billingState ->
         val lastSyncText = workInfoList
             .firstOrNull()
             ?.let { formatLastSync(it) }
             ?: "Nunca"
         SettingsUiState(
             preferences = prefs,
+            preferencesLoaded = true,
             isAmazonConnected = amazonSessionManager.isLoggedIn(),
             appVersion = BuildConfig.VERSION_NAME,
             cacheCleared = false,
-            lastSyncText = lastSyncText
+            lastSyncText = lastSyncText,
+            subscriptionPriceText = billingRepository.getPriceText(),
+            billingState = billingState
         )
     }.stateIn(
         scope = viewModelScope,
@@ -126,6 +148,32 @@ class SettingsViewModel @Inject constructor(
         amazonSessionManager.clearSession()
     }
 
+    // === Suscripción Premium ===
+    fun purchaseSubscription(activity: android.app.Activity) {
+        billingRepository.purchaseSubscription(activity)
+    }
+
+    fun restorePurchases() {
+        billingRepository.restorePurchases()
+    }
+
+    // === Exportar CSV (solo premium) ===
+    fun exportCsv() = viewModelScope.launch {
+        _exportResult.value = ExportResult.Loading
+        try {
+            val active   = shipmentRepository.activeShipments.first()
+            val archived = shipmentRepository.archivedShipments.first()
+            val all      = active + archived
+            val uri = CsvExporter.exportToCsv(context, all)
+            _exportResult.value = if (uri != null) ExportResult.Success(uri)
+                                  else ExportResult.Error("No se pudo crear el archivo")
+        } catch (e: Exception) {
+            _exportResult.value = ExportResult.Error(e.message ?: "Error desconocido")
+        }
+    }
+
+    fun clearExportResult() { _exportResult.value = ExportResult.Idle }
+
     // === Caché de mapas ===
     fun clearMapCache() {
         try {
@@ -136,18 +184,37 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // === Debug (solo visible en builds DEBUG) ===
+    fun setIsPremiumDebug(value: Boolean) = viewModelScope.launch {
+        prefsRepo.setIsPremium(value)
+    }
+
     // === Helpers ===
     private fun scheduleSyncWorker(intervalHours: Int, onlyWifi: Boolean) {
-        if (intervalHours == 0) return  // manual
+        if (intervalHours == 0) return  // manual — no programar
         val networkType = if (onlyWifi) NetworkType.UNMETERED else NetworkType.CONNECTED
         val constraints = Constraints.Builder().setRequiredNetworkType(networkType).build()
-        val request = PeriodicWorkRequestBuilder<SyncWorker>(intervalHours.toLong(), TimeUnit.HOURS)
-            .setConstraints(constraints)
-            .build()
+        // -1 = 30 minutos (premium). WorkManager requiere mínimo 15 min en modo periódico.
+        val request = if (intervalHours == -1) {
+            PeriodicWorkRequestBuilder<SyncWorker>(30L, TimeUnit.MINUTES)
+                .setConstraints(constraints)
+                .build()
+        } else {
+            PeriodicWorkRequestBuilder<SyncWorker>(intervalHours.toLong(), TimeUnit.HOURS)
+                .setConstraints(constraints)
+                .build()
+        }
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             "TrackerSync",
             ExistingPeriodicWorkPolicy.UPDATE,
             request
         )
     }
+}
+
+sealed class ExportResult {
+    data object Idle    : ExportResult()
+    data object Loading : ExportResult()
+    data class Success(val uri: Uri) : ExportResult()
+    data class Error(val message: String) : ExportResult()
 }

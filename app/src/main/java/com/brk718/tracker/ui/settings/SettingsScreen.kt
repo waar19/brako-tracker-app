@@ -1,6 +1,7 @@
 package com.brk718.tracker.ui.settings
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,16 +12,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brk718.tracker.BuildConfig
 import com.brk718.tracker.R
+import com.brk718.tracker.data.billing.BillingState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,10 +35,38 @@ fun SettingsScreen(
     onGmailClick: () -> Unit,
     onAmazonAuthClick: () -> Unit,
     onArchivedClick: () -> Unit,
+    onExportCsvClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val prefs = state.preferences
+    val context = LocalContext.current
+    val activity = context as android.app.Activity
+    val exportResult by viewModel.exportResult.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Reaccionar al resultado de exportación
+    LaunchedEffect(exportResult) {
+        when (val result = exportResult) {
+            is ExportResult.Success -> {
+                viewModel.clearExportResult()
+                // Abrir share sheet para que el usuario guarde / comparta el CSV
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_STREAM, result.uri)
+                    putExtra(Intent.EXTRA_SUBJECT, "Mis envíos — Tracker")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "Guardar o compartir CSV"))
+            }
+            is ExportResult.Error -> {
+                viewModel.clearExportResult()
+                // LaunchedEffect ya es una corrutina — llamamos showSnackbar directamente
+                snackbarHostState.showSnackbar("Error al exportar: ${result.message}")
+            }
+            else -> Unit
+        }
+    }
 
     // Launcher para solicitar permiso POST_NOTIFICATIONS (Android 13+)
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -47,9 +81,12 @@ fun SettingsScreen(
     var showSyncIntervalDialog by remember { mutableStateOf(false) }
     var showDisconnectAmazonDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
+    var showPremiumSyncDialog by remember { mutableStateOf(false) }
     var cacheCleared by remember { mutableStateOf(false) }
+    val isPremium = prefs.isPremium
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
@@ -71,6 +108,128 @@ fun SettingsScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
+
+            // ──────────────────────────────────────────────
+            // PREMIUM
+            // ──────────────────────────────────────────────
+            item {
+                SettingsSectionHeader(
+                    title = "Premium",
+                    icon = Icons.Default.WorkspacePremium
+                )
+            }
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (prefs.isPremium)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        if (prefs.isPremium) {
+                            // Estado premium activo
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Plan Premium activo",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "✓ Sin anuncios  ✓ Envíos ilimitados  ✓ Historial completo  ✓ Sync cada 30 min  ✓ Exportar CSV",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = { viewModel.restorePurchases() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Restaurar compra")
+                            }
+                        } else {
+                            // Oferta premium
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.WorkspacePremium,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFB400),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Hazte Premium",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "✓ Sin anuncios  ✓ Envíos ilimitados\n✓ Historial completo  ✓ Sync cada 30 min  ✓ Exportar CSV",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            // Feedback de error si aplica
+                            if (state.billingState is BillingState.Error) {
+                                Text(
+                                    (state.billingState as BillingState.Error).message,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+                            Button(
+                                onClick = { viewModel.purchaseSubscription(activity) },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = state.billingState !is BillingState.Loading
+                            ) {
+                                if (state.billingState is BillingState.Loading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    val price = state.subscriptionPriceText
+                                    Text(
+                                        if (price == "—") "Suscribirse — anual"
+                                        else "Suscribirse — $price / año"
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(
+                                onClick = { viewModel.restorePurchases() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    "Restaurar compra anterior",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item { SettingsDivider() }
 
             // ──────────────────────────────────────────────
             // NOTIFICACIONES
@@ -124,6 +283,7 @@ fun SettingsScreen(
             }
             item {
                 val intervalLabel = when (prefs.syncIntervalHours) {
+                    -1   -> "Cada 30 min ✦"
                     0    -> stringResource(R.string.settings_sync_manual)
                     1    -> stringResource(R.string.settings_sync_1h)
                     2    -> stringResource(R.string.settings_sync_2h)
@@ -171,6 +331,22 @@ fun SettingsScreen(
                     subtitle = stringResource(R.string.settings_archived_subtitle),
                     icon = Icons.Default.Archive,
                     onClick = onArchivedClick
+                )
+            }
+            item {
+                SettingsNavigationItem(
+                    title = "Exportar envíos a CSV",
+                    subtitle = when {
+                        !isPremium               -> "✦ Solo Premium"
+                        exportResult is ExportResult.Loading -> "Exportando..."
+                        else                     -> "Descarga un archivo con todos tus envíos"
+                    },
+                    icon = Icons.Default.FileDownload,
+                    enabled = isPremium && exportResult !is ExportResult.Loading,
+                    onClick = {
+                        if (isPremium) viewModel.exportCsv()
+                        else showPremiumSyncDialog = true
+                    }
                 )
             }
 
@@ -236,6 +412,62 @@ fun SettingsScreen(
 
             item { SettingsDivider() }
 
+            item { SettingsDivider() }
+
+            // ──────────────────────────────────────────────
+            // ESTADÍSTICAS
+            // ──────────────────────────────────────────────
+            item {
+                SettingsSectionHeader(title = "Mis estadisticas", icon = Icons.Default.BarChart)
+            }
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatItem(
+                            value = prefs.totalTracked.toString(),
+                            label = "Rastreados",
+                            icon = Icons.Default.Inventory2
+                        )
+                        VerticalDivider(
+                            modifier = Modifier.height(48.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        StatItem(
+                            value = prefs.deliveredCount.toString(),
+                            label = "Entregados",
+                            icon = Icons.Default.CheckCircle
+                        )
+                        VerticalDivider(
+                            modifier = Modifier.height(48.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        val successRate = if (prefs.totalTracked > 0)
+                            "${(prefs.deliveredCount * 100 / prefs.totalTracked)}%"
+                        else "—"
+                        StatItem(
+                            value = successRate,
+                            label = "Exito",
+                            icon = Icons.Default.TrendingUp
+                        )
+                    }
+                }
+            }
+
+            item { SettingsDivider() }
+
             // ──────────────────────────────────────────────
             // ACERCA DE
             // ──────────────────────────────────────────────
@@ -258,6 +490,28 @@ fun SettingsScreen(
                 )
             }
 
+            // ──────────────────────────────────────────────
+            // DEVELOPER (solo en builds DEBUG)
+            // ──────────────────────────────────────────────
+            if (BuildConfig.DEBUG) {
+                item { SettingsDivider() }
+                item {
+                    SettingsSectionHeader(
+                        title = "Developer",
+                        icon = Icons.Default.BugReport
+                    )
+                }
+                item {
+                    SettingsSwitchItem(
+                        title = "Simular Premium",
+                        subtitle = if (prefs.isPremium) "Modo Premium activo" else "Modo Free activo",
+                        icon = Icons.Default.AdminPanelSettings,
+                        checked = prefs.isPremium,
+                        onCheckedChange = { viewModel.setIsPremiumDebug(it) }
+                    )
+                }
+            }
+
             item { Spacer(Modifier.height(32.dp)) }
         }
     }
@@ -274,9 +528,11 @@ fun SettingsScreen(
 
     if (showSyncIntervalDialog) {
         SyncIntervalDialog(
-            current = prefs.syncIntervalHours,
-            onSelect = { viewModel.setSyncIntervalHours(it); showSyncIntervalDialog = false },
-            onDismiss = { showSyncIntervalDialog = false }
+            current       = prefs.syncIntervalHours,
+            isPremium     = isPremium,
+            onSelect      = { viewModel.setSyncIntervalHours(it); showSyncIntervalDialog = false },
+            onUpgradeClick = { showPremiumSyncDialog = true },
+            onDismiss     = { showSyncIntervalDialog = false }
         )
     }
 
@@ -316,6 +572,34 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearCacheDialog = false }) { Text(stringResource(R.string.dialog_cancel)) }
+            }
+        )
+    }
+
+    // Dialog: función exclusiva premium
+    if (showPremiumSyncDialog) {
+        AlertDialog(
+            onDismissRequest = { showPremiumSyncDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.WorkspacePremium,
+                    contentDescription = null,
+                    tint = Color(0xFFFFB400),
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = { Text("Función Premium") },
+            text = { Text("Esta función está disponible solo para suscriptores Premium.\n\n✓ Sin anuncios\n✓ Envíos ilimitados\n✓ Historial completo\n✓ Sync cada 30 min\n✓ Exportar CSV") },
+            confirmButton = {
+                Button(onClick = {
+                    showPremiumSyncDialog = false
+                    viewModel.purchaseSubscription(activity)
+                }) { Text("Hazte Premium") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPremiumSyncDialog = false }) {
+                    Text(stringResource(R.string.dialog_cancel))
+                }
             }
         )
     }
@@ -576,15 +860,20 @@ private fun ThemePickerDialog(
 @Composable
 private fun SyncIntervalDialog(
     current: Int,
+    isPremium: Boolean,
     onSelect: (Int) -> Unit,
+    onUpgradeClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    // 30 min = valor -1 (usamos -1 internamente para "30 min", WorkManager acepta 15 min como mínimo)
+    data class SyncOption(val value: Int, val label: String, val premiumOnly: Boolean = false)
     val options = listOf(
-        1  to stringResource(R.string.settings_sync_1h),
-        2  to stringResource(R.string.settings_sync_2h),
-        6  to stringResource(R.string.settings_sync_6h),
-        12 to stringResource(R.string.settings_sync_12h),
-        0  to stringResource(R.string.settings_sync_manual)
+        SyncOption(-1, "Cada 30 min", premiumOnly = true),
+        SyncOption(1,  stringResource(R.string.settings_sync_1h)),
+        SyncOption(2,  stringResource(R.string.settings_sync_2h)),
+        SyncOption(6,  stringResource(R.string.settings_sync_6h)),
+        SyncOption(12, stringResource(R.string.settings_sync_12h)),
+        SyncOption(0,  stringResource(R.string.settings_sync_manual))
     )
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -592,20 +881,47 @@ private fun SyncIntervalDialog(
         title = { Text(stringResource(R.string.settings_sync_interval_title)) },
         text = {
             Column {
-                options.forEach { (value, label) ->
+                options.forEach { opt ->
+                    val enabled = !opt.premiumOnly || isPremium
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSelect(value) }
+                            .clickable {
+                                if (enabled) onSelect(opt.value)
+                                else { onDismiss(); onUpgradeClick() }
+                            }
                             .padding(vertical = 8.dp)
                     ) {
                         RadioButton(
-                            selected = current == value,
-                            onClick = { onSelect(value) }
+                            selected = current == opt.value,
+                            onClick = {
+                                if (enabled) onSelect(opt.value)
+                                else { onDismiss(); onUpgradeClick() }
+                            },
+                            enabled = enabled
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            opt.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (enabled) MaterialTheme.colorScheme.onSurface
+                                    else MaterialTheme.colorScheme.outline
+                        )
+                        if (opt.premiumOnly && !isPremium) {
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFFFFB400).copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    "✦ Premium",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFB8860B),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -615,4 +931,30 @@ private fun SyncIntervalDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_cancel)) }
         }
     )
+}
+
+@Composable
+private fun StatItem(value: String, label: String, icon: ImageVector) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }

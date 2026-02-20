@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Notificaciones push (requerido en Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Escritura en almacenamiento externo para exportar CSV (solo Android 9 y anteriores; Android 10+ usa MediaStore) -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
         android:name=".TrackerApp"
@@ -16,6 +20,17 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Tracker">
+
+        <!-- AdMob App ID -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-5629360571814219~7841400640"/>
+
+        <!-- Resolver conflicto de manifest merger entre play-services-ads y play-services-measurement -->
+        <property
+            android:name="android.adservices.AD_SERVICES_CONFIG"
+            android:resource="@xml/gma_ad_services_config"
+            tools:replace="android:resource" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -27,12 +42,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- Deshabilitar inicialización automática de WorkManager para usar HiltWorkerFactory -->
-        <provider
-            android:name="androidx.work.impl.WorkManagerInitializer"
-            android:authorities="${applicationId}.workmanager-init"
-            android:exported="false"
-            tools:node="remove" />
+        <!-- Widget Brako Tracker (Jetpack Glance) — solo premium -->
+        <receiver
+            android:name=".ui.widget.TrackerWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/tracker_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.google.android.gms.ads.MobileAds
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -22,6 +23,7 @@ class TrackerApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        MobileAds.initialize(this)
         createNotificationChannels()
     }
 

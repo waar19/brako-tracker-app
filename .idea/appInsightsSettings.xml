@@ -22,10 +22,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.brk718.tracker" />
+                  <option name="mobileSdkAppId" value="1:341458724659:android:442c4a0527339110bd4046" />
+                  <option name="projectId" value="brako-tracker" />
+                  <option name="projectNumber" value="341458724659" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

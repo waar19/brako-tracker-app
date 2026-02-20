@@ -42,4 +42,7 @@ interface ShipmentDao {
     
     @Query("DELETE FROM shipments WHERE id = :id")
     suspend fun deleteShipment(id: String)
+
+    @Query("UPDATE shipments SET title = :newTitle WHERE id = :id")
+    suspend fun updateTitle(id: String, newTitle: String)
 }

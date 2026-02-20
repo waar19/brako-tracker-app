@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
+import com.brk718.tracker.ui.add.FREE_SHIPMENT_LIMIT
 
 // Detecta el transportista en base al formato del número de tracking
 private fun detectCarrier(tracking: String): String? {
@@ -40,7 +41,7 @@ private fun detectCarrier(tracking: String): String? {
         t.startsWith("JD", ignoreCase = true) && t.length >= 10 -> "DHL"
         t.matches(Regex("\\d{10}")) -> "DHL"
         // Carriers colombianos — guías numéricas típicas
-        // Interrapidísimo: 12 dígitos que comienzan con 2400, 2401, 2402, 2403
+        // Interrapidísimo: 12 dígitos que comienzan con 24
         t.matches(Regex("24\\d{10}")) -> "Interrapidísimo"
         // Coordinadora: 10 dígitos que comienzan con 5, 6, 7 u 8
         t.matches(Regex("[5-8]\\d{9}")) -> "Coordinadora"
@@ -48,6 +49,27 @@ private fun detectCarrier(tracking: String): String? {
         t.matches(Regex("9\\d{9,10}")) -> "Servientrega"
         // Envía / Colvanes: 12-13 dígitos que comienzan con 1
         t.matches(Regex("1\\d{11,12}")) -> "Envía"
+        // Listo: empieza con L + 8-12 dígitos
+        t.matches(Regex("L\\d{8,12}", RegexOption.IGNORE_CASE)) -> "Listo"
+        // Treda: empieza con T + 9 dígitos
+        t.matches(Regex("T\\d{9}", RegexOption.IGNORE_CASE)) -> "Treda"
+        // Speed Colombia: empieza con S + 10 dígitos
+        t.matches(Regex("S\\d{10}", RegexOption.IGNORE_CASE)) -> "Speed"
+        // Castores: empieza con C + 9-10 dígitos
+        t.matches(Regex("C\\d{9,10}", RegexOption.IGNORE_CASE)) -> "Castores"
+        // Avianca Cargo: 11 dígitos que comienzan con 134
+        t.matches(Regex("134\\d{8}")) -> "Avianca Cargo"
+        // TCC: 10-12 dígitos que comienzan con 7
+        t.matches(Regex("7\\d{9,11}")) -> "TCC"
+        // Saferbo: 9-10 dígitos que comienzan con 3
+        t.matches(Regex("3\\d{8,9}")) -> "Saferbo"
+        // Deprisa: empieza con "DEP" o dígitos que comienzan con 20
+        t.startsWith("DEP", ignoreCase = true) -> "Deprisa"
+        t.matches(Regex("20\\d{6,7}")) -> "Deprisa"
+        // Picap: empieza con "PIC" o "PKP"
+        t.startsWith("PIC", ignoreCase = true) || t.startsWith("PKP", ignoreCase = true) -> "Picap"
+        // Mensajeros Urbanos: empieza con "MU" + dígitos
+        t.matches(Regex("MU\\d{6,10}", RegexOption.IGNORE_CASE)) -> "Mensajeros Urbanos"
         else -> null
     }
 }
@@ -62,7 +84,17 @@ private fun carrierColor(carrier: String): Color = when (carrier.lowercase()) {
     "coordinadora"    -> Color(0xFF003087) // azul Coordinadora
     "servientrega"    -> Color(0xFF009B48) // verde Servientrega
     "envía"           -> Color(0xFFFF6B00) // naranja Envía
-    else              -> Color(0xFF535D7E)
+    "listo"           -> Color(0xFF00B4D8) // azul claro Listo
+    "treda"           -> Color(0xFF7209B7) // morado Treda
+    "speed"           -> Color(0xFFE63946) // rojo Speed
+    "castores"           -> Color(0xFF2D6A4F) // verde oscuro Castores
+    "avianca cargo"      -> Color(0xFFD62828) // rojo Avianca
+    "tcc"                -> Color(0xFF1565C0) // azul TCC
+    "saferbo"            -> Color(0xFF4A148C) // morado Saferbo
+    "deprisa"            -> Color(0xFFE65100) // naranja Deprisa
+    "picap"              -> Color(0xFF00897B) // verde azulado Picap
+    "mensajeros urbanos" -> Color(0xFF37474F) // gris oscuro Mensajeros Urbanos
+    else                 -> Color(0xFF535D7E)
 }
 
 private fun carrierTextColor(carrier: String): Color = when (carrier.lowercase()) {
@@ -72,16 +104,26 @@ private fun carrierTextColor(carrier: String): Color = when (carrier.lowercase()
 
 @Composable
 private fun carrierHint(carrier: String): String = when (carrier.lowercase()) {
-    "amazon"          -> stringResource(R.string.add_hint_amazon)
-    "ups"             -> stringResource(R.string.add_hint_ups)
-    "fedex"           -> stringResource(R.string.add_hint_fedex)
-    "usps"            -> stringResource(R.string.add_hint_usps)
-    "dhl"             -> stringResource(R.string.add_hint_dhl)
-    "interrapidísimo" -> stringResource(R.string.add_hint_interrapidisimo)
-    "coordinadora"    -> stringResource(R.string.add_hint_coordinadora)
-    "servientrega"    -> stringResource(R.string.add_hint_servientrega)
-    "envía"           -> stringResource(R.string.add_hint_envia)
-    else              -> ""
+    "amazon"             -> stringResource(R.string.add_hint_amazon)
+    "ups"                -> stringResource(R.string.add_hint_ups)
+    "fedex"              -> stringResource(R.string.add_hint_fedex)
+    "usps"               -> stringResource(R.string.add_hint_usps)
+    "dhl"                -> stringResource(R.string.add_hint_dhl)
+    "interrapidísimo"    -> stringResource(R.string.add_hint_interrapidisimo)
+    "coordinadora"       -> stringResource(R.string.add_hint_coordinadora)
+    "servientrega"       -> stringResource(R.string.add_hint_servientrega)
+    "envía"              -> stringResource(R.string.add_hint_envia)
+    "listo"              -> stringResource(R.string.add_hint_listo)
+    "treda"              -> stringResource(R.string.add_hint_treda)
+    "speed"              -> stringResource(R.string.add_hint_speed)
+    "castores"           -> stringResource(R.string.add_hint_castores)
+    "avianca cargo"      -> stringResource(R.string.add_hint_avianca_cargo)
+    "tcc"                -> stringResource(R.string.add_hint_tcc)
+    "saferbo"            -> stringResource(R.string.add_hint_saferbo)
+    "deprisa"            -> stringResource(R.string.add_hint_deprisa)
+    "picap"              -> stringResource(R.string.add_hint_picap)
+    "mensajeros urbanos" -> stringResource(R.string.add_hint_mensajeros_urbanos)
+    else                 -> ""
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,6 +131,7 @@ private fun carrierHint(carrier: String): String = when (carrier.lowercase()) {
 fun AddScreen(
     onBack: () -> Unit,
     onSuccess: () -> Unit,
+    onUpgradeClick: () -> Unit = onBack,
     viewModel: AddShipmentViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -197,6 +240,43 @@ fun AddScreen(
                 },
                 supportingText = { Text(stringResource(R.string.add_carrier_supporting)) }
             )
+
+            // === Límite de envíos alcanzado (free tier) ===
+            if (uiState is AddUiState.LimitReached) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Límite de $FREE_SHIPMENT_LIMIT envíos activos",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = "Hazte Premium para envíos ilimitados",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                        TextButton(onClick = onUpgradeClick) {
+                            Text(
+                                "✦ Premium",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
 
             // === Error ===
             if (uiState is AddUiState.Error) {

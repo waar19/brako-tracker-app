@@ -1,13 +1,16 @@
 package com.brk718.tracker.ui
 
+import android.app.Activity
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -15,16 +18,20 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.brk718.tracker.ui.add.AddScreen
+import com.brk718.tracker.ui.ads.AdManager
 import com.brk718.tracker.ui.auth.AmazonAuthScreen
 import com.brk718.tracker.ui.detail.DetailScreen
 import com.brk718.tracker.ui.gmail.GmailScreen
 import com.brk718.tracker.ui.home.HomeScreen
+import com.brk718.tracker.ui.onboarding.OnboardingScreen
+import com.brk718.tracker.ui.paywall.PaywallScreen
 import com.brk718.tracker.ui.settings.ArchivedScreen
 import com.brk718.tracker.ui.settings.SettingsScreen
 import com.brk718.tracker.ui.settings.SettingsViewModel
 import com.brk718.tracker.ui.theme.TrackerTheme
 
 object Routes {
+    const val ONBOARDING  = "onboarding"
     const val LIST        = "list"
     const val ADD         = "add"
     const val DETAIL      = "detail/{shipmentId}"
@@ -32,17 +39,25 @@ object Routes {
     const val AMAZON_AUTH = "amazon_auth"
     const val SETTINGS    = "settings"
     const val ARCHIVED    = "archived"
+    const val PAYWALL     = "paywall"
     fun detail(id: String) = "detail/$id"
 }
 
 private const val TRANSITION_DURATION = 300
 
 @Composable
-fun App() {
+fun App(
+    adManager: AdManager? = null,
+    initialShipmentId: String? = null
+) {
     val navController = rememberNavController()
+    val context = LocalContext.current
 
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val settingsState by settingsViewModel.uiState.collectAsState()
+    val isPremium = settingsState.preferences.isPremium
+    val onboardingDone = settingsState.preferences.onboardingDone
+    val preferencesLoaded = settingsState.preferencesLoaded
     val darkTheme = when (settingsState.preferences.theme) {
         "light" -> false
         "dark"  -> true
@@ -50,6 +65,20 @@ fun App() {
     }
 
     TrackerTheme(darkTheme = darkTheme) {
+        // Solo redirigir a onboarding cuando las preferencias ya cargaron de DataStore
+        // (evitar falso negativo con el valor inicial por defecto false)
+        LaunchedEffect(preferencesLoaded, onboardingDone) {
+            if (preferencesLoaded && !onboardingDone) {
+                navController.navigate(Routes.ONBOARDING) {
+                    popUpTo(Routes.LIST) { inclusive = true }
+                }
+            }
+        }
+        // Navegar al detalle directamente si llegamos desde una notificación
+        LaunchedEffect(initialShipmentId) {
+            initialShipmentId?.let { navController.navigate(Routes.detail(it)) }
+        }
+
         NavHost(
             navController    = navController,
             startDestination = Routes.LIST,
@@ -86,14 +115,36 @@ fun App() {
                     onShipmentClick   = { id -> navController.navigate(Routes.detail(id)) },
                     onGmailClick      = { navController.navigate(Routes.GMAIL) },
                     onAmazonAuthClick = { navController.navigate(Routes.AMAZON_AUTH) },
-                    onSettingsClick   = { navController.navigate(Routes.SETTINGS) }
+                    onSettingsClick   = { navController.navigate(Routes.SETTINGS) },
+                    onUpgradeClick    = { navController.navigate(Routes.PAYWALL) },
+                    isPremium         = isPremium,
+                    adManager         = adManager
+                )
+            }
+            composable(
+                route = Routes.ONBOARDING,
+                enterTransition  = { fadeIn(tween(TRANSITION_DURATION)) },
+                exitTransition   = { fadeOut(tween(TRANSITION_DURATION)) },
+                popEnterTransition = { fadeIn(tween(TRANSITION_DURATION)) },
+                popExitTransition  = { fadeOut(tween(TRANSITION_DURATION)) }
+            ) {
+                OnboardingScreen(
+                    onFinish = {
+                        navController.navigate(Routes.LIST) {
+                            popUpTo(Routes.ONBOARDING) { inclusive = true }
+                        }
+                    }
                 )
             }
             composable(Routes.ADD) {
                 AddScreen(
-                    onBack    = { navController.popBackStack() },
-                    onSuccess = { navController.popBackStack() }
+                    onBack        = { navController.popBackStack() },
+                    onSuccess     = { navController.popBackStack() },
+                    onUpgradeClick = { navController.navigate(Routes.PAYWALL) }
                 )
+            }
+            composable(Routes.PAYWALL) {
+                PaywallScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.GMAIL) {
                 GmailScreen(onBack = { navController.popBackStack() })
@@ -113,15 +164,23 @@ fun App() {
                 )
             }
             composable(Routes.ARCHIVED) {
-                ArchivedScreen(onBack = { navController.popBackStack() })
+                ArchivedScreen(
+                    onBack         = { navController.popBackStack() },
+                    onUpgradeClick = { navController.navigate(Routes.SETTINGS) }
+                )
             }
             composable(
                 route     = Routes.DETAIL,
                 arguments = listOf(navArgument("shipmentId") { type = NavType.StringType })
             ) {
+                // Mostrar interstitial al abrir detalle (máx cada 3 veces, solo free)
+                LaunchedEffect(Unit) {
+                    adManager?.onDetailScreenOpened(context as Activity, isPremium)
+                }
                 DetailScreen(
                     onBack            = { navController.popBackStack() },
-                    onAmazonAuthClick = { navController.navigate(Routes.AMAZON_AUTH) }
+                    onAmazonAuthClick = { navController.navigate(Routes.AMAZON_AUTH) },
+                    onUpgradeClick    = { navController.navigate(Routes.PAYWALL) }
                 )
             }
         }

@@ -3,8 +3,15 @@ package com.brk718.tracker.ui.detail
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint as AndroidPaint
-import android.preference.PreferenceManager
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
+import nl.dionsegijn.konfetti.compose.KonfettiView
+import nl.dionsegijn.konfetti.compose.OnParticleSystemUpdateListener
+import nl.dionsegijn.konfetti.core.Party
+import nl.dionsegijn.konfetti.core.PartySystem
+import nl.dionsegijn.konfetti.core.Position
+import nl.dionsegijn.konfetti.core.emitter.Emitter
+import java.util.concurrent.TimeUnit
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,10 +26,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -31,6 +42,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -134,11 +147,12 @@ private fun setupMapOverlays(
             makeCircleMarker(markerColor, sizePx)
         )
 
+        val event = events.getOrNull(index)
         val marker = Marker(mapView).apply {
             position = point
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            title = events[index].description
-            snippet = events[index].location ?: ""
+            title = event?.description ?: ""
+            snippet = event?.location ?: ""
             icon = bitmapDrawable
         }
         mapView.overlays.add(marker)
@@ -162,13 +176,25 @@ private fun setupMapOverlays(
 fun DetailScreen(
     onBack: () -> Unit,
     onAmazonAuthClick: (() -> Unit)? = null,
+    onUpgradeClick: (() -> Unit)? = null,
     viewModel: DetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val clipboardManager = LocalClipboardManager.current
 
     // Estado para el diálogo del mapa
     var showMapDialog by remember { mutableStateOf(false) }
+
+    // Estado para el diálogo de editar título
+    var showEditTitleDialog by remember { mutableStateOf(false) }
+    var editTitleText by remember { mutableStateOf("") }
+
+    // Confetti: mostrar una vez cuando el estado es "entregado"
+    var confettiShown by remember { mutableStateOf(false) }
+    val isDelivered = (uiState as? DetailUiState.Success)
+        ?.shipment?.shipment?.status?.lowercase()?.contains("entregado") == true
+    val showConfetti = isDelivered && !confettiShown
 
     Scaffold(
         topBar = {
@@ -199,6 +225,7 @@ fun DetailScreen(
         },
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
         when (val state = uiState) {
             is DetailUiState.Loading -> {
                 // La barra de progreso ya se muestra en el TopAppBar — nada más aquí
@@ -211,6 +238,7 @@ fun DetailScreen(
             is DetailUiState.Success -> {
                 val shipment = state.shipment.shipment
                 val events = state.shipment.events.sortedByDescending { it.timestamp }
+                val historyLimited = state.historyLimited
 
                 Column(
                     modifier = Modifier
@@ -236,18 +264,59 @@ fun DetailScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
-                            Text(
-                                text = shipment.title,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = headerContentColor
-                            )
+                            // Título + ícono de editar
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = shipment.title,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = headerContentColor,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = {
+                                        editTitleText = shipment.title
+                                        showEditTitleDialog = true
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Editar título",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = headerContentColor.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
                             Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "${ShipmentRepository.displayName(shipment.carrier)} • ${shipment.trackingNumber}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = headerContentColor.copy(alpha = 0.75f)
-                            )
+                            // Carrier + tracking number + ícono de copiar
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "${ShipmentRepository.displayName(shipment.carrier)} - ${shipment.trackingNumber}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = headerContentColor.copy(alpha = 0.75f),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(shipment.trackingNumber))
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.ContentCopy,
+                                        contentDescription = "Copiar número de tracking",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = headerContentColor.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
                             Spacer(Modifier.height(12.dp))
 
                             val needsLogin = shipment.status == "LOGIN_REQUIRED" ||
@@ -298,7 +367,7 @@ fun DetailScreen(
                                     factory = { ctx ->
                                         Configuration.getInstance().load(
                                             ctx,
-                                            PreferenceManager.getDefaultSharedPreferences(ctx)
+                                            ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
                                         )
                                         MapView(ctx).apply {
                                             setTileSource(CARTO_POSITRON)
@@ -385,7 +454,7 @@ fun DetailScreen(
                                         factory = { ctx ->
                                             Configuration.getInstance().load(
                                                 ctx,
-                                                PreferenceManager.getDefaultSharedPreferences(ctx)
+                                                ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
                                             )
                                             MapView(ctx).apply {
                                                 setTileSource(CARTO_POSITRON)
@@ -480,11 +549,32 @@ fun DetailScreen(
                             }
 
                             if (events.isEmpty()) {
-                                Text(
-                                    text = stringResource(R.string.detail_no_events),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(36.dp),
+                                        tint = MaterialTheme.colorScheme.outlineVariant
+                                    )
+                                    Text(
+                                        text = "Aun no hay eventos",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "El transportista aun no registro movimientos. Vuelve a revisar en un rato.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
                             } else {
                                 // Primeros N eventos siempre visibles
                                 Column {
@@ -550,10 +640,114 @@ fun DetailScreen(
                         }
                     }
 
+                    // Banner historial limitado (solo free)
+                    if (historyLimited) {
+                        Spacer(Modifier.height(8.dp))
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Historial de 30 dias",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                    Text(
+                                        "Premium desbloquea el historial completo",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                    )
+                                }
+                                if (onUpgradeClick != null) {
+                                    FilledTonalButton(
+                                        onClick = onUpgradeClick,
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                        modifier = Modifier.height(34.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.WorkspacePremium,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Premium", style = MaterialTheme.typography.labelMedium)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(24.dp))
+                }
+
+                // ===== DIÁLOGO EDITAR TÍTULO =====
+                if (showEditTitleDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showEditTitleDialog = false },
+                        title = { Text("Editar nombre") },
+                        text = {
+                            OutlinedTextField(
+                                value = editTitleText,
+                                onValueChange = { editTitleText = it },
+                                label = { Text("Nombre del envio") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    viewModel.updateTitle(editTitleText)
+                                    showEditTitleDialog = false
+                                },
+                                enabled = editTitleText.isNotBlank()
+                            ) {
+                                Text("Guardar")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showEditTitleDialog = false }) {
+                                Text("Cancelar")
+                            }
+                        }
+                    )
                 }
             }
         }
+        // Confetti superpuesto al contenido (solo cuando entregado, una vez)
+        if (showConfetti) {
+            KonfettiView(
+                modifier = Modifier.fillMaxSize(),
+                parties = listOf(
+                    Party(
+                        emitter = Emitter(duration = 3, TimeUnit.SECONDS).perSecond(80),
+                        position = Position.Relative(0.5, 0.0)
+                    )
+                ),
+                updateListener = object : OnParticleSystemUpdateListener {
+                    override fun onParticleSystemEnded(system: PartySystem, activeSystems: Int) {
+                        if (activeSystems == 0) confettiShown = true
+                    }
+                }
+            )
+        }
+        } // cierre Box
     }
 }
 

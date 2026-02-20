@@ -57,6 +57,19 @@ class ShipmentRepository @Inject constructor(
             // PASAREX = Amazon last-mile Colombia → se trackea vía Amazon
             "pasarex" to "amazon",
             "amazon / pasarex" to "amazon",
+            // Carriers colombianos adicionales
+            "listo" to "listo",
+            "treda" to "treda",
+            "speed" to "speed-co",
+            "speed-co" to "speed-co",
+            "castores" to "castores",
+            "avianca cargo" to "avianca-cargo",
+            "avianca-cargo" to "avianca-cargo",
+            "la 14" to "la-14",
+            "la14" to "la-14",
+            "picap" to "picap",
+            "mensajeros urbanos" to "mensajerosurbanos",
+            "mensajerosurbanos" to "mensajerosurbanos",
             // Internacionales
             "fedex" to "fedex",
             "ups" to "ups",
@@ -80,21 +93,31 @@ class ShipmentRepository @Inject constructor(
          */
         fun displayName(carrier: String): String = when (carrier.lowercase().trim()) {
             "interrapidisimo-scraper", "inter-rapidisimo" -> "Interrapidísimo"
-            "coordinadora"   -> "Coordinadora"
-            "servientrega"   -> "Servientrega"
-            "envia-co"       -> "Envía"
-            "tcc-co"         -> "TCC"
-            "472-co"         -> "472"
-            "logysto"        -> "Logysto"
-            "saferbo"        -> "Saferbo"
-            "deprisa"        -> "Deprisa"
-            "amazon"         -> "Amazon"
-            "fedex"          -> "FedEx"
-            "ups"            -> "UPS"
-            "usps"           -> "USPS"
-            "dhl"            -> "DHL"
-            "manual"         -> "Manual"
-            else             -> carrier.replaceFirstChar { it.uppercaseChar() }
+            "coordinadora"        -> "Coordinadora"
+            "servientrega"        -> "Servientrega"
+            "envia-co"            -> "Envía"
+            "tcc-co"              -> "TCC"
+            "472-co"              -> "472"
+            "logysto"             -> "Logysto"
+            "saferbo"             -> "Saferbo"
+            "deprisa"             -> "Deprisa"
+            // Carriers adicionales colombianos
+            "listo"               -> "Listo"
+            "treda"               -> "Treda"
+            "speed-co"            -> "Speed"
+            "castores"            -> "Castores"
+            "avianca-cargo"       -> "Avianca Cargo"
+            "la-14"               -> "La 14"
+            "picap"               -> "Picap"
+            "mensajerosurbanos"   -> "Mensajeros Urbanos"
+            // Internacionales
+            "amazon"              -> "Amazon"
+            "fedex"               -> "FedEx"
+            "ups"                 -> "UPS"
+            "usps"                -> "USPS"
+            "dhl"                 -> "DHL"
+            "manual"              -> "Manual"
+            else                  -> carrier.replaceFirstChar { it.uppercaseChar() }
         }
     }
 
@@ -251,6 +274,12 @@ class ShipmentRepository @Inject constructor(
                 lastUpdate = System.currentTimeMillis()
             ))
 
+            // Auto-archivar si el envío fue entregado
+            if (statusText == "Entregado") {
+                dao.archiveShipment(id)
+                android.util.Log.d("Tracking", "Auto-archivado envío entregado: $id")
+            }
+
             val events = tracking.checkpoints.mapIndexed { index, checkpoint ->
                 TrackingEventEntity(
                     id = 0L,
@@ -265,7 +294,7 @@ class ShipmentRepository @Inject constructor(
             dao.insertEvents(events)
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ShipmentRepository", "Error al refrescar envío AfterShip: ${e.message}", e)
         }
     }
 
@@ -309,6 +338,12 @@ class ShipmentRepository @Inject constructor(
                 status = status,
                 lastUpdate = System.currentTimeMillis()
             ))
+
+            // Auto-archivar si el envío fue entregado
+            if (status.lowercase().let { it.contains("entregado") || it.contains("delivered") }) {
+                dao.archiveShipment(id)
+                android.util.Log.d("Tracking", "Auto-archivado envío Amazon entregado: $id")
+            }
 
             // Guardar eventos
             if (result.events.isNotEmpty()) {
@@ -368,6 +403,12 @@ class ShipmentRepository @Inject constructor(
                 lastUpdate = System.currentTimeMillis()
             ))
 
+            // Auto-archivar si el envío fue entregado
+            if (displayStatus.lowercase().contains("entregado")) {
+                dao.archiveShipment(id)
+                android.util.Log.d("Tracking", "Auto-archivado envío Interrapidísimo entregado: $id")
+            }
+
             // Guardar eventos
             if (result.events.isNotEmpty()) {
                 val events = result.events.mapIndexed { index, event ->
@@ -415,6 +456,10 @@ class ShipmentRepository @Inject constructor(
         }
         android.util.Log.w("ShipmentRepository", "No se pudo parsear fecha Inter: $dateStr")
         return null
+    }
+
+    suspend fun updateTitle(id: String, newTitle: String) {
+        dao.updateTitle(id, newTitle)
     }
 
     suspend fun archiveShipment(id: String) {
