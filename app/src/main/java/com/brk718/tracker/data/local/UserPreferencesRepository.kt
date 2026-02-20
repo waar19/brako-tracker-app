@@ -89,4 +89,18 @@ class UserPreferencesRepository @Inject constructor(
             prefs[KEY_TOTAL_TRACKED] = (prefs[KEY_TOTAL_TRACKED] ?: 0) + 1
         }
     }
+
+    /** Backfills stats from Room if both counters are still 0 (first launch after feature addition). */
+    suspend fun syncStatsFromRoom(totalInRoom: Int, deliveredInRoom: Int) {
+        dataStore.edit { prefs ->
+            val currentTotal = prefs[KEY_TOTAL_TRACKED] ?: 0
+            val currentDelivered = prefs[KEY_DELIVERED_COUNT] ?: 0
+            if (currentTotal == 0 && totalInRoom > 0) {
+                prefs[KEY_TOTAL_TRACKED] = totalInRoom
+            }
+            if (currentDelivered == 0 && deliveredInRoom > 0) {
+                prefs[KEY_DELIVERED_COUNT] = deliveredInRoom
+            }
+        }
+    }
 }

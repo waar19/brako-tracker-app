@@ -6,7 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -53,6 +55,14 @@ class SettingsViewModel @Inject constructor(
     private val billingRepository: BillingRepository,
     private val shipmentRepository: ShipmentRepository
 ) : ViewModel() {
+
+    init {
+        viewModelScope.launch {
+            val total = shipmentRepository.countAllShipments()
+            val delivered = shipmentRepository.countDeliveredShipments()
+            prefsRepo.syncStatsFromRoom(total, delivered)
+        }
+    }
 
     // Uri del CSV exportado (null = sin exportar, Unit = exportado, String = error)
     private val _exportResult = MutableStateFlow<ExportResult>(ExportResult.Idle)
@@ -112,6 +122,21 @@ class SettingsViewModel @Inject constructor(
 
     fun setOnlyImportantEvents(value: Boolean) = viewModelScope.launch {
         prefsRepo.setOnlyImportantEvents(value)
+    }
+
+    fun syncNow() {
+        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "TrackerSyncNow",
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
     }
 
     // === Sincronización ===

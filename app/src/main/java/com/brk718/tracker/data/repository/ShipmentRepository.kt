@@ -474,6 +474,9 @@ class ShipmentRepository @Inject constructor(
         dao.deleteShipment(id)
     }
 
+    suspend fun countAllShipments(): Int = withContext(Dispatchers.IO) { dao.countAllShipments() }
+    suspend fun countDeliveredShipments(): Int = withContext(Dispatchers.IO) { dao.countDeliveredShipments() }
+
     private fun parseAmazonDate(dateStr: String): Long? {
         if (dateStr.isBlank()) return null
         

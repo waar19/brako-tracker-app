@@ -310,10 +310,18 @@ fun SettingsScreen(
                 )
             }
             item {
-                SettingsInfoItem(
+                val syncFailed = state.lastSyncText == "Falló la última sincronización"
+                SettingsCustomTrailingItem(
                     title = stringResource(R.string.settings_sync_status_title),
                     subtitle = state.lastSyncText,
-                    icon = Icons.Default.CloudDone
+                    icon = if (syncFailed) Icons.Default.CloudOff else Icons.Default.CloudDone,
+                    trailingContent = {
+                        if (syncFailed) {
+                            TextButton(onClick = { viewModel.syncNow() }) {
+                                Text("Reintentar")
+                            }
+                        }
+                    }
                 )
             }
 
