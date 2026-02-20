@@ -68,20 +68,30 @@ class SettingsViewModel @Inject constructor(
     private val _exportResult = MutableStateFlow<ExportResult>(ExportResult.Idle)
     val exportResult: StateFlow<ExportResult> = _exportResult.asStateFlow()
 
-    // Flow de WorkInfo para la tarea periódica "TrackerSync"
-    private val syncWorkInfoFlow = WorkManager.getInstance(context)
-        .getWorkInfosForUniqueWorkFlow("TrackerSync")
+    // Combina el trabajo periódico ("TrackerSync") y el manual ("TrackerSyncNow")
+    // para mostrar el estado más reciente/relevante en Settings.
+    private val workManager = WorkManager.getInstance(context)
+    private val periodicSyncFlow = workManager.getWorkInfosForUniqueWorkFlow("TrackerSync")
+    private val oneTimeSyncFlow  = workManager.getWorkInfosForUniqueWorkFlow("TrackerSyncNow")
+
+    // Emite el WorkInfo más representativo: prefiere RUNNING > ENQUEUED > el más reciente entre ambos
+    private val syncWorkInfoFlow = combine(periodicSyncFlow, oneTimeSyncFlow) { periodic, oneTime ->
+        val all = (periodic + oneTime).filter { it.state != WorkInfo.State.CANCELLED }
+        // RUNNING tiene prioridad (muestra "Sincronizando ahora...")
+        all.firstOrNull { it.state == WorkInfo.State.RUNNING }
+            ?: all.firstOrNull { it.state == WorkInfo.State.ENQUEUED }
+            ?: all.firstOrNull { it.state == WorkInfo.State.SUCCEEDED }
+            ?: all.firstOrNull { it.state == WorkInfo.State.FAILED }
+            ?: all.firstOrNull()
+    }
 
     val uiState: StateFlow<SettingsUiState> = combine(
         prefsRepo.preferences,
         syncWorkInfoFlow,
         billingRepository.productDetails,
         billingRepository.billingState
-    ) { prefs, workInfoList, productDetails, billingState ->
-        val lastSyncText = workInfoList
-            .firstOrNull()
-            ?.let { formatLastSync(it) }
-            ?: "Nunca"
+    ) { prefs, workInfo, productDetails, billingState ->
+        val lastSyncText = workInfo?.let { formatLastSync(it) } ?: "Nunca"
         SettingsUiState(
             preferences = prefs,
             preferencesLoaded = true,
@@ -125,18 +135,25 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun syncNow() {
-        val request = OneTimeWorkRequestBuilder<SyncWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
+
+        // OneTime work para sincronización inmediata (visible en syncWorkInfoFlow)
+        val oneTimeRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .build()
+        workManager.enqueueUniqueWork(
             "TrackerSyncNow",
             ExistingWorkPolicy.REPLACE,
-            request
+            oneTimeRequest
         )
+
+        // Re-encolar el trabajo periódico con UPDATE para resetear su estado FAILED
+        val prefs = uiState.value.preferences
+        if (prefs.autoSync) {
+            scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi)
+        }
     }
 
     // === Sincronización ===
@@ -145,7 +162,7 @@ class SettingsViewModel @Inject constructor(
         if (value) {
             scheduleSyncWorker(uiState.value.preferences.syncIntervalHours, uiState.value.preferences.syncOnlyOnWifi)
         } else {
-            WorkManager.getInstance(context).cancelUniqueWork("TrackerSync")
+            workManager.cancelUniqueWork("TrackerSync")
         }
     }
 
@@ -229,7 +246,7 @@ class SettingsViewModel @Inject constructor(
                 .setConstraints(constraints)
                 .build()
         }
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        workManager.enqueueUniquePeriodicWork(
             "TrackerSync",
             ExistingPeriodicWorkPolicy.UPDATE,
             request
