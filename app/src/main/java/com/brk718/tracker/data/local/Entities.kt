@@ -14,7 +14,8 @@ data class ShipmentEntity(
     val title: String,
     val status: String, // "En tránsito", "Entregado", etc.
     val lastUpdate: Long, // Timestamp
-    val isArchived: Boolean = false
+    val isArchived: Boolean = false,
+    val estimatedDelivery: Long? = null // Timestamp de entrega estimada (null si no disponible)
 )
 
 @Entity(

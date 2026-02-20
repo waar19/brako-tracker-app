@@ -274,9 +274,15 @@ class ShipmentRepository @Inject constructor(
                 tagTranslation
             }
 
+            // Parsear fecha estimada de entrega si AfterShip la devuelve
+            val estimatedDeliveryMs = tracking.expected_delivery
+                ?.takeIf { it.isNotBlank() }
+                ?.let { parseIso8601Date(it) }
+
             dao.insertShipment(shipment.copy(
                 status = statusText,
-                lastUpdate = System.currentTimeMillis()
+                lastUpdate = System.currentTimeMillis(),
+                estimatedDelivery = estimatedDeliveryMs ?: shipment.estimatedDelivery
             ))
 
             // Auto-archivar si el envío fue entregado
@@ -484,6 +490,23 @@ class ShipmentRepository @Inject constructor(
 
     suspend fun countAllShipments(): Int = withContext(Dispatchers.IO) { dao.countAllShipments() }
     suspend fun countDeliveredShipments(): Int = withContext(Dispatchers.IO) { dao.countDeliveredShipments() }
+
+    /** Parsea un string ISO 8601 (ej. "2025-02-28T00:00:00") a timestamp en milisegundos. */
+    private fun parseIso8601Date(dateStr: String): Long? {
+        return try {
+            val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+            fmt.timeZone = TimeZone.getTimeZone("UTC")
+            fmt.parse(dateStr.take(19))?.time
+        } catch (e: Exception) {
+            try {
+                val fmtDate = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                fmtDate.timeZone = TimeZone.getTimeZone("UTC")
+                fmtDate.parse(dateStr.take(10))?.time
+            } catch (e2: Exception) {
+                null
+            }
+        }
+    }
 
     private fun parseAmazonDate(dateStr: String): Long? {
         if (dateStr.isBlank()) return null

@@ -49,6 +49,16 @@
     <string name="add_hint_coordinadora">Format: 10 digits (e.g. 5XXXXXXXXX)</string>
     <string name="add_hint_servientrega">Format: 10-11 digits (e.g. 9XXXXXXXXX)</string>
     <string name="add_hint_envia">Format: 12-13 digits (e.g. 1XXXXXXXXXXXX)</string>
+    <string name="add_hint_listo">Format: L + 8-12 digits (e.g. L123456789)</string>
+    <string name="add_hint_treda">Format: T + 9 digits (e.g. T123456789)</string>
+    <string name="add_hint_speed">Format: S + 10 digits (e.g. S1234567890)</string>
+    <string name="add_hint_castores">Format: C + 9-10 digits (e.g. C123456789)</string>
+    <string name="add_hint_avianca_cargo">Format: 134 + 8 digits (e.g. 13412345678)</string>
+    <string name="add_hint_tcc">Format: 7 + 9-11 digits (e.g. 7123456789)</string>
+    <string name="add_hint_saferbo">Format: 3 + 8-9 digits (e.g. 312345678)</string>
+    <string name="add_hint_deprisa">Format: DEP… or 20 + 6-7 digits</string>
+    <string name="add_hint_picap">Format: PIC… or PKP…</string>
+    <string name="add_hint_mensajeros_urbanos">Format: MU + 6-10 digits (e.g. MU123456)</string>
     <string name="add_title_label">Title (optional)</string>
     <string name="add_title_placeholder">Ex: Nike shoes, Amazon order…</string>
     <string name="add_carrier_label">Carrier (optional)</string>
@@ -151,6 +161,16 @@
     <string name="amazon_auth_title">Connect Amazon</string>
     <string name="amazon_auth_back">Back</string>
     <string name="amazon_auth_done">Done</string>
+
+    <!-- WIDGET -->
+    <string name="widget_description">Shows the status of your latest shipment on the home screen</string>
+    <string name="widget_title">Brako Tracker</string>
+    <string name="widget_no_shipments">No active shipments</string>
+    <string name="widget_open_app">Open app</string>
+    <string name="widget_premium_required">Premium users only</string>
+    <string name="widget_premium_upgrade">Go Premium</string>
+    <string name="widget_updated_prefix">Upd: </string>
+    <string name="widget_refresh">Refresh</string>
 
     <!-- SHIPMENT STATUSES -->
     <string name="status_delivered">Delivered</string>
