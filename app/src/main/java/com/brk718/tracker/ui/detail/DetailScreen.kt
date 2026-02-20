@@ -369,6 +369,10 @@ fun DetailScreen(
                             // Sub-carrier row (ej. PASAREX + AMZPSR021419193)
                             val subName = shipment.subCarrierName
                             val subId   = shipment.subCarrierTrackingId
+                            // URL del sitio del sub-carrier (no necesita el ID para existir)
+                            val subUrl  = ShipmentRepository.trackingUrl(
+                                subName?.lowercase() ?: "", subId ?: ""
+                            )
                             if (!subName.isNullOrBlank() || !subId.isNullOrBlank()) {
                                 Spacer(Modifier.height(4.dp))
                                 Row(
@@ -381,7 +385,7 @@ fun DetailScreen(
                                         color = headerContentColor.copy(alpha = 0.65f),
                                         modifier = Modifier.weight(1f)
                                     )
-                                    // Copiar ID del sub-carrier
+                                    // Copiar ID del sub-carrier (solo si hay ID)
                                     if (!subId.isNullOrBlank()) {
                                         IconButton(
                                             onClick = {
@@ -396,23 +400,19 @@ fun DetailScreen(
                                                 tint = headerContentColor.copy(alpha = 0.6f)
                                             )
                                         }
-                                        // Abrir en web del sub-carrier
-                                        val subUrl = ShipmentRepository.trackingUrl(
-                                            subName?.lowercase() ?: "",
-                                            subId
-                                        )
-                                        if (subUrl != null) {
-                                            IconButton(
-                                                onClick = { uriHandler.openUri(subUrl) },
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.AutoMirrored.Filled.OpenInNew,
-                                                    contentDescription = "Abrir $subName en navegador",
-                                                    modifier = Modifier.size(14.dp),
-                                                    tint = headerContentColor.copy(alpha = 0.6f)
-                                                )
-                                            }
+                                    }
+                                    // Abrir web del carrier (siempre que haya URL, con o sin ID)
+                                    if (subUrl != null) {
+                                        IconButton(
+                                            onClick = { uriHandler.openUri(subUrl) },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.OpenInNew,
+                                                contentDescription = "Abrir $subName en navegador",
+                                                modifier = Modifier.size(14.dp),
+                                                tint = headerContentColor.copy(alpha = 0.6f)
+                                            )
                                         }
                                     }
                                 }

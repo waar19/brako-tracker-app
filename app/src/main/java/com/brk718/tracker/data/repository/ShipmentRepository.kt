@@ -115,6 +115,7 @@ class ShipmentRepository @Inject constructor(
                 "avianca-cargo"       -> "https://www.aviancacargo.com/rastreo?guia=$encoded"
                 "picap"               -> "https://www.picap.app/rastreo?guia=$encoded"
                 "mensajerosurbanos"   -> "https://www.mensajerosurbanos.com/rastreo?guia=$encoded"
+                "pasarex"             -> "https://pasarex.com/co/"
                 else                  -> null
             }
         }
