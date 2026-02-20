@@ -86,7 +86,8 @@
       "Bash(gradlew assembleDebug:*)",
       "Bash(./gradlew.bat assembleDebug:*)",
       "Bash(./gradlew.bat clean)",
-      "Bash(./gradlew.bat assembleRelease:*)"
+      "Bash(./gradlew.bat assembleRelease:*)",
+      "Bash(./gradlew.bat:*)"
     ]
   }
 }
