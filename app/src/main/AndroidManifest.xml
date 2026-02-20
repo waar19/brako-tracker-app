@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Notificaciones push (requerido en Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Cámara para escanear códigos de barras en la pantalla Añadir -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <!-- Escritura en almacenamiento externo para exportar CSV (solo Android 9 y anteriores; Android 10+ usa MediaStore) -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -53,6 +55,21 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/tracker_widget_info" />
         </receiver>
+
+        <!-- Desactivar el inicializador automático de WorkManager para que
+             Configuration.Provider de TrackerApp (con HiltWorkerFactory) tome efecto.
+             Sin esto, WorkManager se auto-inicializa con DefaultWorkerFactory y
+             SyncWorker falla con NoSuchMethodException. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 
 </manifest>

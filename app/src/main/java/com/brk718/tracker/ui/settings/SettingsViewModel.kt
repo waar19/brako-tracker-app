@@ -6,7 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -26,6 +28,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -54,24 +58,57 @@ class SettingsViewModel @Inject constructor(
     private val shipmentRepository: ShipmentRepository
 ) : ViewModel() {
 
+    init {
+        // Backfill de estadísticas desde Room si los contadores de DataStore están en 0
+        viewModelScope.launch {
+            val total = shipmentRepository.countAllShipments()
+            val delivered = shipmentRepository.countDeliveredShipments()
+            prefsRepo.syncStatsFromRoom(total, delivered)
+        }
+
+        // Al perder premium, re-programar el worker con el intervalo free (ya reseteado a 2h)
+        viewModelScope.launch {
+            prefsRepo.preferences
+                .map { it.isPremium }
+                .distinctUntilChanged()
+                .drop(1)   // ignorar el valor inicial al arrancar la app
+                .collect { isPremium ->
+                    if (!isPremium) {
+                        val prefs = prefsRepo.preferences.first()
+                        if (prefs.autoSync) scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi)
+                    }
+                }
+        }
+    }
+
     // Uri del CSV exportado (null = sin exportar, Unit = exportado, String = error)
     private val _exportResult = MutableStateFlow<ExportResult>(ExportResult.Idle)
     val exportResult: StateFlow<ExportResult> = _exportResult.asStateFlow()
 
-    // Flow de WorkInfo para la tarea periódica "TrackerSync"
-    private val syncWorkInfoFlow = WorkManager.getInstance(context)
-        .getWorkInfosForUniqueWorkFlow("TrackerSync")
+    // Combina el trabajo periódico ("TrackerSync") y el manual ("TrackerSyncNow")
+    // para mostrar el estado más reciente/relevante en Settings.
+    private val workManager = WorkManager.getInstance(context)
+    private val periodicSyncFlow = workManager.getWorkInfosForUniqueWorkFlow("TrackerSync")
+    private val oneTimeSyncFlow  = workManager.getWorkInfosForUniqueWorkFlow("TrackerSyncNow")
+
+    // Emite el WorkInfo más representativo: prefiere RUNNING > ENQUEUED > el más reciente entre ambos
+    private val syncWorkInfoFlow = combine(periodicSyncFlow, oneTimeSyncFlow) { periodic, oneTime ->
+        val all = (periodic + oneTime).filter { it.state != WorkInfo.State.CANCELLED }
+        // RUNNING tiene prioridad (muestra "Sincronizando ahora...")
+        all.firstOrNull { it.state == WorkInfo.State.RUNNING }
+            ?: all.firstOrNull { it.state == WorkInfo.State.ENQUEUED }
+            ?: all.firstOrNull { it.state == WorkInfo.State.SUCCEEDED }
+            ?: all.firstOrNull { it.state == WorkInfo.State.FAILED }
+            ?: all.firstOrNull()
+    }
 
     val uiState: StateFlow<SettingsUiState> = combine(
         prefsRepo.preferences,
         syncWorkInfoFlow,
         billingRepository.productDetails,
         billingRepository.billingState
-    ) { prefs, workInfoList, productDetails, billingState ->
-        val lastSyncText = workInfoList
-            .firstOrNull()
-            ?.let { formatLastSync(it) }
-            ?: "Nunca"
+    ) { prefs, workInfo, productDetails, billingState ->
+        val lastSyncText = workInfo?.let { formatLastSync(it) } ?: "Nunca"
         SettingsUiState(
             preferences = prefs,
             preferencesLoaded = true,
@@ -114,13 +151,35 @@ class SettingsViewModel @Inject constructor(
         prefsRepo.setOnlyImportantEvents(value)
     }
 
+    fun syncNow() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // OneTime work para sincronización inmediata (visible en syncWorkInfoFlow)
+        val oneTimeRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .build()
+        workManager.enqueueUniqueWork(
+            "TrackerSyncNow",
+            ExistingWorkPolicy.REPLACE,
+            oneTimeRequest
+        )
+
+        // Re-encolar el trabajo periódico con UPDATE para resetear su estado FAILED
+        val prefs = uiState.value.preferences
+        if (prefs.autoSync) {
+            scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi)
+        }
+    }
+
     // === Sincronización ===
     fun setAutoSync(value: Boolean) = viewModelScope.launch {
         prefsRepo.setAutoSync(value)
         if (value) {
             scheduleSyncWorker(uiState.value.preferences.syncIntervalHours, uiState.value.preferences.syncOnlyOnWifi)
         } else {
-            WorkManager.getInstance(context).cancelUniqueWork("TrackerSync")
+            workManager.cancelUniqueWork("TrackerSync")
         }
     }
 
@@ -191,20 +250,23 @@ class SettingsViewModel @Inject constructor(
 
     // === Helpers ===
     private fun scheduleSyncWorker(intervalHours: Int, onlyWifi: Boolean) {
-        if (intervalHours == 0) return  // manual — no programar
+        // Guard defensivo: si el usuario no es premium, nunca encolar worker de 30 min
+        val isPremium = uiState.value.preferences.isPremium
+        val effectiveInterval = if (intervalHours == -1 && !isPremium) 2 else intervalHours
+        if (effectiveInterval == 0) return  // manual — no programar
         val networkType = if (onlyWifi) NetworkType.UNMETERED else NetworkType.CONNECTED
         val constraints = Constraints.Builder().setRequiredNetworkType(networkType).build()
         // -1 = 30 minutos (premium). WorkManager requiere mínimo 15 min en modo periódico.
-        val request = if (intervalHours == -1) {
+        val request = if (effectiveInterval == -1) {
             PeriodicWorkRequestBuilder<SyncWorker>(30L, TimeUnit.MINUTES)
                 .setConstraints(constraints)
                 .build()
         } else {
-            PeriodicWorkRequestBuilder<SyncWorker>(intervalHours.toLong(), TimeUnit.HOURS)
+            PeriodicWorkRequestBuilder<SyncWorker>(effectiveInterval.toLong(), TimeUnit.HOURS)
                 .setConstraints(constraints)
                 .build()
         }
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        workManager.enqueueUniquePeriodicWork(
             "TrackerSync",
             ExistingPeriodicWorkPolicy.UPDATE,
             request

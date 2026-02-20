@@ -71,7 +71,13 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     suspend fun setIsPremium(value: Boolean) {
-        dataStore.edit { it[KEY_IS_PREMIUM] = value }
+        dataStore.edit { prefs ->
+            prefs[KEY_IS_PREMIUM] = value
+            // Al perder premium, resetear configuraciones exclusivas de forma atómica
+            if (!value && (prefs[KEY_SYNC_INTERVAL_HOURS] ?: 2) == -1) {
+                prefs[KEY_SYNC_INTERVAL_HOURS] = 2  // volver a 2h (default free)
+            }
+        }
     }
 
     suspend fun setOnboardingDone(value: Boolean) {
@@ -87,6 +93,20 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun incrementTotalTracked() {
         dataStore.edit { prefs ->
             prefs[KEY_TOTAL_TRACKED] = (prefs[KEY_TOTAL_TRACKED] ?: 0) + 1
+        }
+    }
+
+    /** Backfills stats from Room if both counters are still 0 (first launch after feature addition). */
+    suspend fun syncStatsFromRoom(totalInRoom: Int, deliveredInRoom: Int) {
+        dataStore.edit { prefs ->
+            val currentTotal = prefs[KEY_TOTAL_TRACKED] ?: 0
+            val currentDelivered = prefs[KEY_DELIVERED_COUNT] ?: 0
+            if (currentTotal == 0 && totalInRoom > 0) {
+                prefs[KEY_TOTAL_TRACKED] = totalInRoom
+            }
+            if (currentDelivered == 0 && deliveredInRoom > 0) {
+                prefs[KEY_DELIVERED_COUNT] = deliveredInRoom
+            }
         }
     }
 }

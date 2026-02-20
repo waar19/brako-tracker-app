@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -132,12 +133,21 @@ fun AddScreen(
     onBack: () -> Unit,
     onSuccess: () -> Unit,
     onUpgradeClick: () -> Unit = onBack,
+    onScanClick: () -> Unit = {},
+    scannedBarcode: String? = null,
     viewModel: AddShipmentViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var trackingNumber by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     var carrier by remember { mutableStateOf("") }
+
+    // Cuando llegue un valor escaneado desde la pantalla de scanner, aplicarlo al campo
+    LaunchedEffect(scannedBarcode) {
+        if (!scannedBarcode.isNullOrBlank()) {
+            trackingNumber = scannedBarcode
+        }
+    }
 
     // Detección automática del transportista al escribir
     val detectedCarrier by remember(trackingNumber) {
@@ -164,6 +174,15 @@ fun AddScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.add_back))
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onScanClick) {
+                        Icon(
+                            Icons.Filled.QrCodeScanner,
+                            contentDescription = "Escanear código de barras",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             )
