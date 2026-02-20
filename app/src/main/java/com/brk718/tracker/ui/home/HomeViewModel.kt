@@ -105,4 +105,44 @@ class HomeViewModel @Inject constructor(
             repository.archiveShipment(id)
         }
     }
+
+    // ── Selección múltiple (bulk) ─────────────────────────────────────────────
+    private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
+    val selectedIds: StateFlow<Set<String>> = _selectedIds.asStateFlow()
+
+    val isSelectionMode: StateFlow<Boolean> = _selectedIds
+        .map { it.isNotEmpty() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
+    fun toggleSelection(id: String) {
+        _selectedIds.value = _selectedIds.value.toMutableSet().apply {
+            if (contains(id)) remove(id) else add(id)
+        }
+    }
+
+    fun selectAll() {
+        _selectedIds.value = shipments.value.map { it.shipment.id }.toSet()
+    }
+
+    fun clearSelection() {
+        _selectedIds.value = emptySet()
+    }
+
+    fun archiveSelected() {
+        viewModelScope.launch {
+            _selectedIds.value.forEach { repository.archiveShipment(it) }
+            _selectedIds.value = emptySet()
+        }
+    }
+
+    fun deleteSelected() {
+        viewModelScope.launch {
+            _selectedIds.value.forEach { repository.deleteShipment(it) }
+            _selectedIds.value = emptySet()
+        }
+    }
 }

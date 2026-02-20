@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import java.util.Calendar
 import androidx.core.app.NotificationCompat
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.hilt.work.HiltWorker
@@ -48,7 +49,7 @@ class SyncWorker @AssistedInject constructor(
                         if (newStatus.lowercase().contains("entregado")) {
                             prefsRepository.incrementDeliveredCount()
                         }
-                        if (prefs.notificationsEnabled) {
+                        if (prefs.notificationsEnabled && !isInQuietHours(prefs.quietHoursEnabled, prefs.quietHoursStart, prefs.quietHoursEnd)) {
                             val shouldNotify = if (prefs.onlyImportantEvents) {
                                 isImportantStatus(newStatus)
                             } else {
@@ -88,6 +89,22 @@ class SyncWorker @AssistedInject constructor(
         } catch (e: Exception) {
             // El widget puede no estar instalado — ignorar silenciosamente
             android.util.Log.d("SyncWorker", "Widget no instalado o error al actualizar: ${e.message}")
+        }
+    }
+
+    /**
+     * Devuelve true si la hora actual está dentro del rango de silencio.
+     * Maneja rangos que cruzan medianoche (ej. 23:00 → 07:00).
+     */
+    private fun isInQuietHours(enabled: Boolean, startHour: Int, endHour: Int): Boolean {
+        if (!enabled) return false
+        val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return if (startHour <= endHour) {
+            // Rango dentro del mismo día (ej. 02:00 → 08:00)
+            currentHour in startHour until endHour
+        } else {
+            // Rango cruzando medianoche (ej. 23:00 → 07:00)
+            currentHour >= startHour || currentHour < endHour
         }
     }
 

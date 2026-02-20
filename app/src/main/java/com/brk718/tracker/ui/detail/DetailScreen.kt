@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -42,8 +44,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import com.brk718.tracker.util.ShareCardGenerator
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -53,6 +58,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
 import androidx.compose.ui.viewinterop.AndroidView
@@ -184,6 +191,7 @@ fun DetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
 
     // Estado para el diálogo del mapa
     var showMapDialog by remember { mutableStateOf(false) }
@@ -209,6 +217,20 @@ fun DetailScreen(
                         }
                     },
                     actions = {
+                        // Botón de compartir — solo visible cuando hay datos cargados
+                        if (uiState is DetailUiState.Success) {
+                            IconButton(onClick = {
+                                ShareCardGenerator.shareShipmentAsImage(
+                                    context,
+                                    (uiState as DetailUiState.Success).shipment
+                                )
+                            }) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = "Compartir estado del envío"
+                                )
+                            }
+                        }
                         IconButton(
                             onClick = { viewModel.refresh() },
                             enabled = !isRefreshing
@@ -413,25 +435,22 @@ fun DetailScreen(
                                     }
                                 }
 
-                                // Leyenda compacta (solo puntos de colores) en esquina inferior derecha
-                                // — alejada del marcador de origen (inferior izquierda) y destino (variable)
+                                // Leyenda con etiquetas en esquina inferior derecha
                                 Surface(
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
                                         .padding(8.dp),
                                     shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                                     shadowElevation = 2.dp
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        // Solo puntos de colores, sin texto (más compacto)
-                                        Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF22C55E)))
-                                        Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF3B82F6)))
-                                        Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFEF4444)))
+                                        LegendDot(Color(0xFF22C55E), stringResource(R.string.detail_map_origin))
+                                        LegendDot(Color(0xFF3B82F6), stringResource(R.string.detail_map_transit))
+                                        LegendDot(Color(0xFFEF4444), stringResource(R.string.detail_map_current_location))
                                     }
                                 }
                             }
@@ -445,7 +464,8 @@ fun DetailScreen(
                                 properties = DialogProperties(
                                     usePlatformDefaultWidth = false,
                                     dismissOnBackPress = true,
-                                    dismissOnClickOutside = false
+                                    dismissOnClickOutside = false,
+                                    decorFitsSystemWindows = false
                                 )
                             ) {
                                 Box(
@@ -476,12 +496,13 @@ fun DetailScreen(
                                         }
                                     )
 
-                                    // Botón cerrar
+                                    // Botón cerrar (respeta barra de estado superior)
                                     IconButton(
                                         onClick = { showMapDialog = false },
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
-                                            .padding(12.dp)
+                                            .statusBarsPadding()
+                                            .padding(8.dp)
                                             .background(
                                                 MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                                                 CircleShape
@@ -495,9 +516,11 @@ fun DetailScreen(
                                     }
 
                                     // Leyenda en pantalla completa (inferior derecha)
+                                    // navigationBarsPadding() evita que la barra de sistema la tape
                                     Surface(
                                         modifier = Modifier
                                             .align(Alignment.BottomEnd)
+                                            .navigationBarsPadding()
                                             .padding(16.dp),
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
@@ -514,39 +537,34 @@ fun DetailScreen(
                                         }
                                     }
 
-                                    // Controles de zoom propios (inferior izquierda) —
-                                    // reemplazan los botones +/- nativos de OSMDroid que se desactivaron
+                                    // Controles de zoom (inferior izquierda)
+                                    // navigationBarsPadding() evita que la barra de sistema los tape
                                     Column(
                                         modifier = Modifier
                                             .align(Alignment.BottomStart)
+                                            .navigationBarsPadding()
                                             .padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                                            shadowElevation = 4.dp
+                                        FilledTonalIconButton(
+                                            onClick = { expandedMapView?.controller?.zoomIn() },
+                                            modifier = Modifier.size(44.dp)
                                         ) {
-                                            Column {
-                                                IconButton(
-                                                    onClick = { expandedMapView?.controller?.zoomIn() },
-                                                    modifier = Modifier.size(40.dp)
-                                                ) {
-                                                    Text("+", style = MaterialTheme.typography.titleMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.onSurface)
-                                                }
-                                                HorizontalDivider(thickness = 0.5.dp,
-                                                    color = MaterialTheme.colorScheme.outlineVariant)
-                                                IconButton(
-                                                    onClick = { expandedMapView?.controller?.zoomOut() },
-                                                    modifier = Modifier.size(40.dp)
-                                                ) {
-                                                    Text("−", style = MaterialTheme.typography.titleMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.onSurface)
-                                                }
-                                            }
+                                            Icon(
+                                                Icons.Default.Add,
+                                                contentDescription = "Acercar",
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        FilledTonalIconButton(
+                                            onClick = { expandedMapView?.controller?.zoomOut() },
+                                            modifier = Modifier.size(44.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Remove,
+                                                contentDescription = "Alejar",
+                                                modifier = Modifier.size(20.dp)
+                                            )
                                         }
                                     }
                                 }

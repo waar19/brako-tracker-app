@@ -8,6 +8,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.BuildConfig
@@ -35,6 +39,7 @@ fun SettingsScreen(
     onGmailClick: () -> Unit,
     onAmazonAuthClick: () -> Unit,
     onArchivedClick: () -> Unit,
+    onStatsClick: () -> Unit = {},
     onExportCsvClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -79,6 +84,8 @@ fun SettingsScreen(
     // Dialogs
     var showThemeDialog by remember { mutableStateOf(false) }
     var showSyncIntervalDialog by remember { mutableStateOf(false) }
+    var showQuietHoursStartDialog by remember { mutableStateOf(false) }
+    var showQuietHoursEndDialog by remember { mutableStateOf(false) }
     var showDisconnectAmazonDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showPremiumSyncDialog by remember { mutableStateOf(false) }
@@ -263,6 +270,34 @@ fun SettingsScreen(
                     onCheckedChange = { viewModel.setOnlyImportantEvents(it) }
                 )
             }
+            item {
+                SettingsSwitchItem(
+                    title = "Horas de silencio",
+                    subtitle = "No enviar notificaciones en el rango horario indicado",
+                    icon = Icons.Default.BedtimeOff,
+                    checked = prefs.quietHoursEnabled,
+                    enabled = prefs.notificationsEnabled,
+                    onCheckedChange = { viewModel.setQuietHoursEnabled(it) }
+                )
+            }
+            if (prefs.quietHoursEnabled && prefs.notificationsEnabled) {
+                item {
+                    SettingsNavigationItem(
+                        title = "Inicio del silencio",
+                        subtitle = "%02d:00".format(prefs.quietHoursStart),
+                        icon = Icons.Default.NightsStay,
+                        onClick = { showQuietHoursStartDialog = true }
+                    )
+                }
+                item {
+                    SettingsNavigationItem(
+                        title = "Fin del silencio",
+                        subtitle = "%02d:00".format(prefs.quietHoursEnd),
+                        icon = Icons.Default.WbSunny,
+                        onClick = { showQuietHoursEndDialog = true }
+                    )
+                }
+            }
 
             item { SettingsDivider() }
 
@@ -420,58 +455,19 @@ fun SettingsScreen(
 
             item { SettingsDivider() }
 
-            item { SettingsDivider() }
-
             // ──────────────────────────────────────────────
             // ESTADÍSTICAS
             // ──────────────────────────────────────────────
             item {
-                SettingsSectionHeader(title = "Mis estadisticas", icon = Icons.Default.BarChart)
+                SettingsSectionHeader(title = "Mis estadísticas", icon = Icons.Default.BarChart)
             }
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        StatItem(
-                            value = prefs.totalTracked.toString(),
-                            label = "Rastreados",
-                            icon = Icons.Default.Inventory2
-                        )
-                        VerticalDivider(
-                            modifier = Modifier.height(48.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-                        StatItem(
-                            value = prefs.deliveredCount.toString(),
-                            label = "Entregados",
-                            icon = Icons.Default.CheckCircle
-                        )
-                        VerticalDivider(
-                            modifier = Modifier.height(48.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-                        val successRate = if (prefs.totalTracked > 0)
-                            "${(prefs.deliveredCount * 100 / prefs.totalTracked)}%"
-                        else "—"
-                        StatItem(
-                            value = successRate,
-                            label = "Exito",
-                            icon = Icons.Default.TrendingUp
-                        )
-                    }
-                }
+                SettingsNavigationItem(
+                    title = "Ver estadísticas",
+                    subtitle = "Gráficas de envíos, transportistas y más",
+                    icon = Icons.Default.BarChart,
+                    onClick = onStatsClick
+                )
             }
 
             item { SettingsDivider() }
@@ -531,6 +527,24 @@ fun SettingsScreen(
             current = prefs.theme,
             onSelect = { viewModel.setTheme(it); showThemeDialog = false },
             onDismiss = { showThemeDialog = false }
+        )
+    }
+
+    if (showQuietHoursStartDialog) {
+        HourPickerDialog(
+            title = "Inicio del silencio",
+            current = prefs.quietHoursStart,
+            onSelect = { viewModel.setQuietHoursStart(it); showQuietHoursStartDialog = false },
+            onDismiss = { showQuietHoursStartDialog = false }
+        )
+    }
+
+    if (showQuietHoursEndDialog) {
+        HourPickerDialog(
+            title = "Fin del silencio",
+            current = prefs.quietHoursEnd,
+            onSelect = { viewModel.setQuietHoursEnd(it); showQuietHoursEndDialog = false },
+            onDismiss = { showQuietHoursEndDialog = false }
         )
     }
 
@@ -942,27 +956,49 @@ private fun SyncIntervalDialog(
 }
 
 @Composable
-private fun StatItem(value: String, label: String, icon: ImageVector) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+private fun HourPickerDialog(
+    title: String,
+    current: Int,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val hours = (0..23).toList()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Schedule, null) },
+        title = { Text(title) },
+        text = {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4),
+                modifier = Modifier.height(240.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(hours) { hour ->
+                    val selected = hour == current
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.clickable { onSelect(hour) }
+                    ) {
+                        Text(
+                            text = "%02d:00".format(hour),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_cancel)) }
+        }
+    )
 }
+

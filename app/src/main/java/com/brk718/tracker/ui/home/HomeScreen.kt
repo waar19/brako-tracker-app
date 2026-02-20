@@ -1,6 +1,7 @@
 package com.brk718.tracker.ui.home
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -8,7 +9,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,12 +23,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WifiOff
@@ -78,9 +83,19 @@ fun HomeScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val shouldShowRating by viewModel.shouldShowRatingRequest.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
+    val selectedIds by viewModel.selectedIds.collectAsState()
+    val isSelectionMode by viewModel.isSelectionMode.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val canAddMore = isPremium || shipments.size < FREE_SHIPMENT_LIMIT
+
+    // Diálogo de confirmación para eliminar seleccionados
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
+    // BackHandler: salir del modo selección al pulsar atrás
+    BackHandler(enabled = isSelectionMode) {
+        viewModel.clearSelection()
+    }
 
     // Rating: lanzar In-App Review cuando el usuario tenga >= 3 entregas exitosas
     val activity = LocalContext.current as android.app.Activity
@@ -120,64 +135,104 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            stringResource(R.string.home_title),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    navigationIcon = {
-                        // Al activar búsqueda mostramos "X" en la izquierda
-                        if (searchVisible) {
-                            IconButton(onClick = {
-                                searchVisible = false
-                                keyboardController?.hide()
-                            }) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Cerrar búsqueda"
-                                )
-                            }
-                        }
-                    },
-                    actions = {
-                        if (!isPremium) {
-                            IconButton(onClick = onUpgradeClick) {
-                                Icon(
-                                    Icons.Default.WorkspacePremium,
-                                    contentDescription = "Premium",
-                                    tint = Color(0xFFFFB400)
-                                )
-                            }
-                        }
-                        // Ícono de búsqueda — toggle
-                        IconButton(onClick = { searchVisible = !searchVisible }) {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Buscar",
-                                tint = if (searchVisible) MaterialTheme.colorScheme.primary
-                                       else MaterialTheme.colorScheme.onSurface
+                if (isSelectionMode) {
+                    // ── Barra contextual de selección ─────────────────────
+                    TopAppBar(
+                        title = {
+                            Text(
+                                "${selectedIds.size} seleccionado${if (selectedIds.size == 1) "" else "s"}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
                             )
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        navigationIcon = {
+                            IconButton(onClick = { viewModel.clearSelection() }) {
+                                Icon(Icons.Default.Close, contentDescription = "Cancelar selección")
+                            }
+                        },
+                        actions = {
+                            // Seleccionar todos
+                            IconButton(onClick = { viewModel.selectAll() }) {
+                                Icon(Icons.Default.SelectAll, contentDescription = "Seleccionar todos")
+                            }
+                            // Archivar seleccionados
+                            IconButton(onClick = { viewModel.archiveSelected() }) {
+                                Icon(Icons.Default.Archive, contentDescription = "Archivar seleccionados")
+                            }
+                            // Eliminar seleccionados (con confirmación)
+                            IconButton(onClick = { showDeleteConfirmDialog = true }) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Eliminar seleccionados",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
-                        IconButton(
-                            onClick = { viewModel.refreshAll() },
-                            enabled = !isRefreshing
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.home_refresh_all))
+                    )
+                } else {
+                    // ── Barra normal ──────────────────────────────────────
+                    CenterAlignedTopAppBar(
+                        title = {
+                            Text(
+                                stringResource(R.string.home_title),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        navigationIcon = {
+                            // Al activar búsqueda mostramos "X" en la izquierda
+                            if (searchVisible) {
+                                IconButton(onClick = {
+                                    searchVisible = false
+                                    keyboardController?.hide()
+                                }) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Cerrar búsqueda"
+                                    )
+                                }
+                            }
+                        },
+                        actions = {
+                            if (!isPremium) {
+                                IconButton(onClick = onUpgradeClick) {
+                                    Icon(
+                                        Icons.Default.WorkspacePremium,
+                                        contentDescription = "Premium",
+                                        tint = Color(0xFFFFB400)
+                                    )
+                                }
+                            }
+                            // Ícono de búsqueda — toggle
+                            IconButton(onClick = { searchVisible = !searchVisible }) {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = "Buscar",
+                                    tint = if (searchVisible) MaterialTheme.colorScheme.primary
+                                           else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            IconButton(
+                                onClick = { viewModel.refreshAll() },
+                                enabled = !isRefreshing
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.home_refresh_all))
+                            }
+                            IconButton(onClick = onGmailClick) {
+                                Icon(Icons.Default.Email, contentDescription = stringResource(R.string.home_import_gmail))
+                            }
+                            IconButton(onClick = onSettingsClick) {
+                                Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
+                            }
                         }
-                        IconButton(onClick = onGmailClick) {
-                            Icon(Icons.Default.Email, contentDescription = stringResource(R.string.home_import_gmail))
-                        }
-                        IconButton(onClick = onSettingsClick) {
-                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
-                        }
-                    }
-                )
+                    )
+                }
 
                 // Banner sin conexión
                 AnimatedVisibility(
@@ -370,6 +425,7 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(shipments, key = { it.shipment.id }) { item ->
+                        val isSelected = selectedIds.contains(item.shipment.id)
                         // M2: Animación de entrada al aparecer la card
                         val visibleState = remember {
                             MutableTransitionState(false).apply { targetState = true }
@@ -379,42 +435,75 @@ fun HomeScreen(
                             enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 },
                             modifier = Modifier.animateItem()
                         ) {
-                            // M3: Swipe para archivar (derecha) o eliminar (izquierda)
-                            val dismissState = rememberSwipeToDismissBoxState(
-                                confirmValueChange = { value ->
-                                    when (value) {
-                                        SwipeToDismissBoxValue.StartToEnd -> {
-                                            viewModel.archiveShipment(item.shipment.id)
-                                            true
-                                        }
-                                        SwipeToDismissBoxValue.EndToStart -> {
-                                            viewModel.deleteShipment(item.shipment.id)
-                                            true
-                                        }
-                                        else -> false
-                                    }
-                                },
-                                positionalThreshold = { it * 0.4f }
-                            )
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                backgroundContent = {
-                                    SwipeBackground(dismissState)
-                                }
-                            ) {
-                                ShipmentCard(
+                            if (isSelectionMode) {
+                                // En modo selección: tap = toggle, no swipe
+                                SelectableShipmentCard(
                                     item = item,
-                                    onClick = { onShipmentClick(item.shipment.id) },
-                                    onArchive = { viewModel.archiveShipment(item.shipment.id) },
-                                    onDelete = { viewModel.deleteShipment(item.shipment.id) },
-                                    onAmazonAuthClick = onAmazonAuthClick
+                                    isSelected = isSelected,
+                                    onToggle = { viewModel.toggleSelection(item.shipment.id) }
                                 )
+                            } else {
+                                // Modo normal: swipe + long-press para entrar en selección
+                                val dismissState = rememberSwipeToDismissBoxState(
+                                    confirmValueChange = { value ->
+                                        when (value) {
+                                            SwipeToDismissBoxValue.StartToEnd -> {
+                                                viewModel.archiveShipment(item.shipment.id)
+                                                true
+                                            }
+                                            SwipeToDismissBoxValue.EndToStart -> {
+                                                viewModel.deleteShipment(item.shipment.id)
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    },
+                                    positionalThreshold = { it * 0.4f }
+                                )
+                                SwipeToDismissBox(
+                                    state = dismissState,
+                                    backgroundContent = { SwipeBackground(dismissState) }
+                                ) {
+                                    ShipmentCard(
+                                        item = item,
+                                        onClick = { onShipmentClick(item.shipment.id) },
+                                        onLongClick = { viewModel.toggleSelection(item.shipment.id) },
+                                        onArchive = { viewModel.archiveShipment(item.shipment.id) },
+                                        onDelete = { viewModel.deleteShipment(item.shipment.id) },
+                                        onAmazonAuthClick = onAmazonAuthClick
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    // ── Diálogo confirmar eliminación en bloque ───────────────────────────────
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Eliminar ${selectedIds.size} envío${if (selectedIds.size == 1) "" else "s"}") },
+            text = { Text("Esta acción no se puede deshacer. ¿Confirmas la eliminación?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteSelected()
+                        showDeleteConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) { Text("Eliminar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
     }
 }
 
@@ -464,10 +553,12 @@ private fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ShipmentCard(
     item: ShipmentWithEvents,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     onArchive: () -> Unit,
     onDelete: () -> Unit,
     onAmazonAuthClick: () -> Unit
@@ -527,8 +618,12 @@ fun ShipmentCard(
         (item.shipment.trackingNumber.startsWith("111-") && status == "No disponible")
 
     ElevatedCard(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.elevatedCardColors(
@@ -696,6 +791,74 @@ fun ShipmentCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Card con checkbox de selección para el modo bulk */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SelectableShipmentCard(
+    item: ShipmentWithEvents,
+    isSelected: Boolean,
+    onToggle: () -> Unit
+) {
+    val containerColor = if (isSelected)
+        MaterialTheme.colorScheme.primaryContainer
+    else
+        MaterialTheme.colorScheme.surface
+
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onToggle, onLongClick = onToggle),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isSelected) 4.dp else 1.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = containerColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Checkbox visual
+            if (isSelected) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Seleccionado",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            CircleShape
+                        )
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.shipment.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "${ShipmentRepository.displayName(item.shipment.carrier)} • ${item.shipment.status}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
