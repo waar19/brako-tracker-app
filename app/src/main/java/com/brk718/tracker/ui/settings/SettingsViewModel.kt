@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -57,10 +59,25 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     init {
+        // Backfill de estadísticas desde Room si los contadores de DataStore están en 0
         viewModelScope.launch {
             val total = shipmentRepository.countAllShipments()
             val delivered = shipmentRepository.countDeliveredShipments()
             prefsRepo.syncStatsFromRoom(total, delivered)
+        }
+
+        // Al perder premium, re-programar el worker con el intervalo free (ya reseteado a 2h)
+        viewModelScope.launch {
+            prefsRepo.preferences
+                .map { it.isPremium }
+                .distinctUntilChanged()
+                .drop(1)   // ignorar el valor inicial al arrancar la app
+                .collect { isPremium ->
+                    if (!isPremium) {
+                        val prefs = prefsRepo.preferences.first()
+                        if (prefs.autoSync) scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi)
+                    }
+                }
         }
     }
 
@@ -233,16 +250,19 @@ class SettingsViewModel @Inject constructor(
 
     // === Helpers ===
     private fun scheduleSyncWorker(intervalHours: Int, onlyWifi: Boolean) {
-        if (intervalHours == 0) return  // manual — no programar
+        // Guard defensivo: si el usuario no es premium, nunca encolar worker de 30 min
+        val isPremium = uiState.value.preferences.isPremium
+        val effectiveInterval = if (intervalHours == -1 && !isPremium) 2 else intervalHours
+        if (effectiveInterval == 0) return  // manual — no programar
         val networkType = if (onlyWifi) NetworkType.UNMETERED else NetworkType.CONNECTED
         val constraints = Constraints.Builder().setRequiredNetworkType(networkType).build()
         // -1 = 30 minutos (premium). WorkManager requiere mínimo 15 min en modo periódico.
-        val request = if (intervalHours == -1) {
+        val request = if (effectiveInterval == -1) {
             PeriodicWorkRequestBuilder<SyncWorker>(30L, TimeUnit.MINUTES)
                 .setConstraints(constraints)
                 .build()
         } else {
-            PeriodicWorkRequestBuilder<SyncWorker>(intervalHours.toLong(), TimeUnit.HOURS)
+            PeriodicWorkRequestBuilder<SyncWorker>(effectiveInterval.toLong(), TimeUnit.HOURS)
                 .setConstraints(constraints)
                 .build()
         }

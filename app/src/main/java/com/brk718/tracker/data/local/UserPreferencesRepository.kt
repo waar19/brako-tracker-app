@@ -71,7 +71,13 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     suspend fun setIsPremium(value: Boolean) {
-        dataStore.edit { it[KEY_IS_PREMIUM] = value }
+        dataStore.edit { prefs ->
+            prefs[KEY_IS_PREMIUM] = value
+            // Al perder premium, resetear configuraciones exclusivas de forma atómica
+            if (!value && (prefs[KEY_SYNC_INTERVAL_HOURS] ?: 2) == -1) {
+                prefs[KEY_SYNC_INTERVAL_HOURS] = 2  // volver a 2h (default free)
+            }
+        }
     }
 
     suspend fun setOnboardingDone(value: Boolean) {
