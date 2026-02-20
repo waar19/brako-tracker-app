@@ -115,6 +115,9 @@ private fun setupMapOverlays(
 ) {
     mapView.overlays.clear()
 
+    // Desactivar controles de zoom built-in de OSMDroid (los botones +/-)
+    mapView.setBuiltInZoomControls(false)
+
     // Polilínea
     if (points.size >= 2) {
         val polyline = Polyline(mapView).apply {
@@ -130,13 +133,13 @@ private fun setupMapOverlays(
     }
 
     // Marcadores: verde=origen, azul=intermedios, rojo=destino actual
-    val colorOrigin      = android.graphics.Color.parseColor("#22C55E")  // verde
-    val colorIntermediate = android.graphics.Color.parseColor("#3B82F6") // azul
-    val colorDestination = android.graphics.Color.parseColor("#EF4444")  // rojo
+    val colorOrigin       = android.graphics.Color.parseColor("#22C55E")  // verde
+    val colorIntermediate = android.graphics.Color.parseColor("#3B82F6")  // azul
+    val colorDestination  = android.graphics.Color.parseColor("#EF4444")  // rojo
 
     points.forEachIndexed { index, point ->
         val markerColor = when (index) {
-            0               -> colorOrigin
+            0                -> colorOrigin
             points.lastIndex -> colorDestination
             else             -> colorIntermediate
         }
@@ -147,13 +150,12 @@ private fun setupMapOverlays(
             makeCircleMarker(markerColor, sizePx)
         )
 
-        val event = events.getOrNull(index)
         val marker = Marker(mapView).apply {
             position = point
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            title = event?.description ?: ""
-            snippet = event?.location ?: ""
             icon = bitmapDrawable
+            // Desactivar el InfoWindow de OSMDroid (evita el popup con +/- al hacer click)
+            infoWindow = null
         }
         mapView.overlays.add(marker)
     }
@@ -165,7 +167,7 @@ private fun setupMapOverlays(
     } else {
         val boundingBox = BoundingBox.fromGeoPoints(points)
         mapView.post {
-            mapView.zoomToBoundingBox(boundingBox, true, 80)
+            mapView.zoomToBoundingBox(boundingBox, true, 100)
         }
     }
     mapView.invalidate()
@@ -411,23 +413,25 @@ fun DetailScreen(
                                     }
                                 }
 
-                                // Leyenda de colores en la esquina inferior izquierda
+                                // Leyenda compacta (solo puntos de colores) en esquina inferior derecha
+                                // — alejada del marcador de origen (inferior izquierda) y destino (variable)
                                 Surface(
                                     modifier = Modifier
-                                        .align(Alignment.BottomStart)
+                                        .align(Alignment.BottomEnd)
                                         .padding(8.dp),
                                     shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                                     shadowElevation = 2.dp
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        LegendDot(Color(0xFF22C55E), stringResource(R.string.detail_map_origin))
-                                        LegendDot(Color(0xFF3B82F6), stringResource(R.string.detail_map_transit))
-                                        LegendDot(Color(0xFFEF4444), stringResource(R.string.detail_map_current))
+                                        // Solo puntos de colores, sin texto (más compacto)
+                                        Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF22C55E)))
+                                        Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF3B82F6)))
+                                        Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFEF4444)))
                                     }
                                 }
                             }
@@ -449,6 +453,9 @@ fun DetailScreen(
                                         .fillMaxSize()
                                         .background(MaterialTheme.colorScheme.surface)
                                 ) {
+                                    // Referencia al MapView para los botones de zoom propios
+                                    var expandedMapView by remember { mutableStateOf<MapView?>(null) }
+
                                     AndroidView(
                                         modifier = Modifier.fillMaxSize(),
                                         factory = { ctx ->
@@ -464,6 +471,7 @@ fun DetailScreen(
                                             }
                                         },
                                         update = { mapView ->
+                                            expandedMapView = mapView
                                             setupMapOverlays(mapView, mapPoints, uniqueEvents)
                                         }
                                     )
@@ -486,10 +494,10 @@ fun DetailScreen(
                                         )
                                     }
 
-                                    // Leyenda en pantalla completa
+                                    // Leyenda en pantalla completa (inferior derecha)
                                     Surface(
                                         modifier = Modifier
-                                            .align(Alignment.BottomStart)
+                                            .align(Alignment.BottomEnd)
                                             .padding(16.dp),
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
@@ -503,6 +511,42 @@ fun DetailScreen(
                                             LegendDot(Color(0xFF22C55E), stringResource(R.string.detail_map_origin))
                                             LegendDot(Color(0xFF3B82F6), stringResource(R.string.detail_map_transit))
                                             LegendDot(Color(0xFFEF4444), stringResource(R.string.detail_map_current_location))
+                                        }
+                                    }
+
+                                    // Controles de zoom propios (inferior izquierda) —
+                                    // reemplazan los botones +/- nativos de OSMDroid que se desactivaron
+                                    Column(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomStart)
+                                            .padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                            shadowElevation = 4.dp
+                                        ) {
+                                            Column {
+                                                IconButton(
+                                                    onClick = { expandedMapView?.controller?.zoomIn() },
+                                                    modifier = Modifier.size(40.dp)
+                                                ) {
+                                                    Text("+", style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface)
+                                                }
+                                                HorizontalDivider(thickness = 0.5.dp,
+                                                    color = MaterialTheme.colorScheme.outlineVariant)
+                                                IconButton(
+                                                    onClick = { expandedMapView?.controller?.zoomOut() },
+                                                    modifier = Modifier.size(40.dp)
+                                                ) {
+                                                    Text("−", style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface)
+                                                }
+                                            }
                                         }
                                     }
                                 }
