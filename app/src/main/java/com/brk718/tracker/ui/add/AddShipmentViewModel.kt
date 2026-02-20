@@ -45,6 +45,7 @@ class AddShipmentViewModel @Inject constructor(
 
             try {
                 repository.addShipment(trackingNumber, carrier, title.ifBlank { trackingNumber })
+                prefsRepository.incrementTotalTracked()
                 _uiState.value = AddUiState.Success
             } catch (e: Exception) {
                 _uiState.value = AddUiState.Error(e.message ?: "Error desconocido")

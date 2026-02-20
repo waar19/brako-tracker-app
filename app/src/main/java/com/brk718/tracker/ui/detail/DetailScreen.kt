@@ -5,6 +5,13 @@ import android.graphics.Canvas
 import android.graphics.Paint as AndroidPaint
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
+import nl.dionsegijn.konfetti.compose.KonfettiView
+import nl.dionsegijn.konfetti.compose.OnParticleSystemUpdateListener
+import nl.dionsegijn.konfetti.core.Party
+import nl.dionsegijn.konfetti.core.PartySystem
+import nl.dionsegijn.konfetti.core.Position
+import nl.dionsegijn.konfetti.core.emitter.Emitter
+import java.util.concurrent.TimeUnit
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -183,6 +190,12 @@ fun DetailScreen(
     var showEditTitleDialog by remember { mutableStateOf(false) }
     var editTitleText by remember { mutableStateOf("") }
 
+    // Confetti: mostrar una vez cuando el estado es "entregado"
+    var confettiShown by remember { mutableStateOf(false) }
+    val isDelivered = (uiState as? DetailUiState.Success)
+        ?.shipment?.shipment?.status?.lowercase()?.contains("entregado") == true
+    val showConfetti = isDelivered && !confettiShown
+
     Scaffold(
         topBar = {
             Column {
@@ -212,6 +225,7 @@ fun DetailScreen(
         },
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
         when (val state = uiState) {
             is DetailUiState.Loading -> {
                 // La barra de progreso ya se muestra en el TopAppBar — nada más aquí
@@ -535,11 +549,32 @@ fun DetailScreen(
                             }
 
                             if (events.isEmpty()) {
-                                Text(
-                                    text = stringResource(R.string.detail_no_events),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(36.dp),
+                                        tint = MaterialTheme.colorScheme.outlineVariant
+                                    )
+                                    Text(
+                                        text = "Aun no hay eventos",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "El transportista aun no registro movimientos. Vuelve a revisar en un rato.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
                             } else {
                                 // Primeros N eventos siempre visibles
                                 Column {
@@ -695,6 +730,24 @@ fun DetailScreen(
                 }
             }
         }
+        // Confetti superpuesto al contenido (solo cuando entregado, una vez)
+        if (showConfetti) {
+            KonfettiView(
+                modifier = Modifier.fillMaxSize(),
+                parties = listOf(
+                    Party(
+                        emitter = Emitter(duration = 3, TimeUnit.SECONDS).perSecond(80),
+                        position = Position.Relative(0.5, 0.0)
+                    )
+                ),
+                updateListener = object : OnParticleSystemUpdateListener {
+                    override fun onParticleSystemEnded(system: PartySystem, activeSystems: Int) {
+                        if (activeSystems == 0) confettiShown = true
+                    }
+                }
+            )
+        }
+        } // cierre Box
     }
 }
 

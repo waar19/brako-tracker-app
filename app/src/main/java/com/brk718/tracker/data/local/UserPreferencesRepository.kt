@@ -25,6 +25,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_IS_PREMIUM             = booleanPreferencesKey("is_premium")
         val KEY_ONBOARDING_DONE        = booleanPreferencesKey("onboarding_done")
         val KEY_DELIVERED_COUNT        = intPreferencesKey("delivered_count")
+        val KEY_TOTAL_TRACKED          = intPreferencesKey("total_tracked")
     }
 
     val preferences: Flow<UserPreferences> = dataStore.data.map { prefs ->
@@ -37,7 +38,8 @@ class UserPreferencesRepository @Inject constructor(
             theme                = prefs[KEY_THEME] ?: "system",
             isPremium            = prefs[KEY_IS_PREMIUM] ?: false,
             onboardingDone       = prefs[KEY_ONBOARDING_DONE] ?: false,
-            deliveredCount       = prefs[KEY_DELIVERED_COUNT] ?: 0
+            deliveredCount       = prefs[KEY_DELIVERED_COUNT] ?: 0,
+            totalTracked         = prefs[KEY_TOTAL_TRACKED] ?: 0
         )
     }
 
@@ -79,6 +81,12 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun incrementDeliveredCount() {
         dataStore.edit { prefs ->
             prefs[KEY_DELIVERED_COUNT] = (prefs[KEY_DELIVERED_COUNT] ?: 0) + 1
+        }
+    }
+
+    suspend fun incrementTotalTracked() {
+        dataStore.edit { prefs ->
+            prefs[KEY_TOTAL_TRACKED] = (prefs[KEY_TOTAL_TRACKED] ?: 0) + 1
         }
     }
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
+import com.brk718.tracker.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,8 +23,16 @@ private const val RATING_TRIGGER_COUNT = 3
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: ShipmentRepository,
-    private val prefsRepository: UserPreferencesRepository
+    private val prefsRepository: UserPreferencesRepository,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
+
+    val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
 
     /** true cuando el usuario ha tenido >= RATING_TRIGGER_COUNT entregas exitosas */
     val shouldShowRatingRequest: StateFlow<Boolean> = prefsRepository.preferences

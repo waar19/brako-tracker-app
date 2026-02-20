@@ -184,6 +184,11 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // === Debug (solo visible en builds DEBUG) ===
+    fun setIsPremiumDebug(value: Boolean) = viewModelScope.launch {
+        prefsRepo.setIsPremium(value)
+    }
+
     // === Helpers ===
     private fun scheduleSyncWorker(intervalHours: Int, onlyWifi: Boolean) {
         if (intervalHours == 0) return  // manual — no programar

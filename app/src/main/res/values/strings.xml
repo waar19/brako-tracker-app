@@ -55,6 +55,16 @@
     <string name="add_hint_coordinadora">Formato: 10 dígitos (ej: 5XXXXXXXXX)</string>
     <string name="add_hint_servientrega">Formato: 10-11 dígitos (ej: 9XXXXXXXXX)</string>
     <string name="add_hint_envia">Formato: 12-13 dígitos (ej: 1XXXXXXXXXXXX)</string>
+    <string name="add_hint_listo">Formato: L + 8-12 dígitos (ej: L123456789)</string>
+    <string name="add_hint_treda">Formato: T + 9 dígitos (ej: T123456789)</string>
+    <string name="add_hint_speed">Formato: S + 10 dígitos (ej: S1234567890)</string>
+    <string name="add_hint_castores">Formato: C + 9-10 dígitos (ej: C123456789)</string>
+    <string name="add_hint_avianca_cargo">Formato: 134 + 8 dígitos (ej: 13412345678)</string>
+    <string name="add_hint_tcc">Formato: 7 + 9-11 dígitos (ej: 7123456789)</string>
+    <string name="add_hint_saferbo">Formato: 3 + 8-9 dígitos (ej: 312345678)</string>
+    <string name="add_hint_deprisa">Formato: DEP… o 20 + 6-7 dígitos</string>
+    <string name="add_hint_picap">Formato: PIC… o PKP…</string>
+    <string name="add_hint_mensajeros_urbanos">Formato: MU + 6-10 dígitos (ej: MU123456)</string>
     <string name="add_title_label">Título (opcional)</string>
     <string name="add_title_placeholder">Ej: Zapatillas Nike, Pedido Amazon…</string>
     <string name="add_carrier_label">Transportista (opcional)</string>

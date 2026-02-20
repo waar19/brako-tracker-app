@@ -59,6 +59,17 @@ private fun detectCarrier(tracking: String): String? {
         t.matches(Regex("C\\d{9,10}", RegexOption.IGNORE_CASE)) -> "Castores"
         // Avianca Cargo: 11 dígitos que comienzan con 134
         t.matches(Regex("134\\d{8}")) -> "Avianca Cargo"
+        // TCC: 10-12 dígitos que comienzan con 7
+        t.matches(Regex("7\\d{9,11}")) -> "TCC"
+        // Saferbo: 9-10 dígitos que comienzan con 3
+        t.matches(Regex("3\\d{8,9}")) -> "Saferbo"
+        // Deprisa: empieza con "DEP" o dígitos que comienzan con 20
+        t.startsWith("DEP", ignoreCase = true) -> "Deprisa"
+        t.matches(Regex("20\\d{6,7}")) -> "Deprisa"
+        // Picap: empieza con "PIC" o "PKP"
+        t.startsWith("PIC", ignoreCase = true) || t.startsWith("PKP", ignoreCase = true) -> "Picap"
+        // Mensajeros Urbanos: empieza con "MU" + dígitos
+        t.matches(Regex("MU\\d{6,10}", RegexOption.IGNORE_CASE)) -> "Mensajeros Urbanos"
         else -> null
     }
 }
@@ -76,9 +87,14 @@ private fun carrierColor(carrier: String): Color = when (carrier.lowercase()) {
     "listo"           -> Color(0xFF00B4D8) // azul claro Listo
     "treda"           -> Color(0xFF7209B7) // morado Treda
     "speed"           -> Color(0xFFE63946) // rojo Speed
-    "castores"        -> Color(0xFF2D6A4F) // verde oscuro Castores
-    "avianca cargo"   -> Color(0xFFD62828) // rojo Avianca
-    else              -> Color(0xFF535D7E)
+    "castores"           -> Color(0xFF2D6A4F) // verde oscuro Castores
+    "avianca cargo"      -> Color(0xFFD62828) // rojo Avianca
+    "tcc"                -> Color(0xFF1565C0) // azul TCC
+    "saferbo"            -> Color(0xFF4A148C) // morado Saferbo
+    "deprisa"            -> Color(0xFFE65100) // naranja Deprisa
+    "picap"              -> Color(0xFF00897B) // verde azulado Picap
+    "mensajeros urbanos" -> Color(0xFF37474F) // gris oscuro Mensajeros Urbanos
+    else                 -> Color(0xFF535D7E)
 }
 
 private fun carrierTextColor(carrier: String): Color = when (carrier.lowercase()) {
@@ -88,16 +104,26 @@ private fun carrierTextColor(carrier: String): Color = when (carrier.lowercase()
 
 @Composable
 private fun carrierHint(carrier: String): String = when (carrier.lowercase()) {
-    "amazon"          -> stringResource(R.string.add_hint_amazon)
-    "ups"             -> stringResource(R.string.add_hint_ups)
-    "fedex"           -> stringResource(R.string.add_hint_fedex)
-    "usps"            -> stringResource(R.string.add_hint_usps)
-    "dhl"             -> stringResource(R.string.add_hint_dhl)
-    "interrapidísimo" -> stringResource(R.string.add_hint_interrapidisimo)
-    "coordinadora"    -> stringResource(R.string.add_hint_coordinadora)
-    "servientrega"    -> stringResource(R.string.add_hint_servientrega)
-    "envía"           -> stringResource(R.string.add_hint_envia)
-    else              -> ""
+    "amazon"             -> stringResource(R.string.add_hint_amazon)
+    "ups"                -> stringResource(R.string.add_hint_ups)
+    "fedex"              -> stringResource(R.string.add_hint_fedex)
+    "usps"               -> stringResource(R.string.add_hint_usps)
+    "dhl"                -> stringResource(R.string.add_hint_dhl)
+    "interrapidísimo"    -> stringResource(R.string.add_hint_interrapidisimo)
+    "coordinadora"       -> stringResource(R.string.add_hint_coordinadora)
+    "servientrega"       -> stringResource(R.string.add_hint_servientrega)
+    "envía"              -> stringResource(R.string.add_hint_envia)
+    "listo"              -> stringResource(R.string.add_hint_listo)
+    "treda"              -> stringResource(R.string.add_hint_treda)
+    "speed"              -> stringResource(R.string.add_hint_speed)
+    "castores"           -> stringResource(R.string.add_hint_castores)
+    "avianca cargo"      -> stringResource(R.string.add_hint_avianca_cargo)
+    "tcc"                -> stringResource(R.string.add_hint_tcc)
+    "saferbo"            -> stringResource(R.string.add_hint_saferbo)
+    "deprisa"            -> stringResource(R.string.add_hint_deprisa)
+    "picap"              -> stringResource(R.string.add_hint_picap)
+    "mensajeros urbanos" -> stringResource(R.string.add_hint_mensajeros_urbanos)
+    else                 -> ""
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

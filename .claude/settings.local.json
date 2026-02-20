@@ -36,7 +36,20 @@
       "Bash(./gradlew compileDebugKotlin:*)",
       "Bash(python:*)",
       "Bash(./gradlew:*)",
-      "Bash(ls -la \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\"\" 2>/dev/null || dir \"C:Userswaar1AndroidStudioProjectsTrackerappbuildoutputsapkdebug \")"
+      "Bash(ls -la \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\"\" 2>/dev/null || dir \"C:Userswaar1AndroidStudioProjectsTrackerappbuildoutputsapkdebug \")",
+      "Bash(findstr:*)",
+      "Bash(javap:*)",
+      "Bash(jar tf:*)",
+      "Bash(cmd /c \".\\\\gradlew.bat assembleDebug 2>&1\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker && gradlew.bat assembleDebug > C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\build_output.txt 2>&1 && echo BUILD_SUCCESS >> C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\build_output.txt || echo BUILD_FAILED >> C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\build_output.txt\")",
+      "Bash(cmd /c \"gradlew.bat assembleDebug\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker && gradlew.bat clean assembleDebug 2>&1\")",
+      "Bash(.gradlew.bat assembleDebug)",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker && gradlew.bat assembleDebug > C:\\\\Users\\\\waar1\\\\build_output.txt 2>&1 & findstr /I /C:\"error:\" /C:\"BUILD SUCCESSFUL\" /C:\"BUILD FAILED\" /C:\"FAILURE:\" C:\\\\Users\\\\waar1\\\\build_output.txt\")",
+      "Bash(cmd /c \"findstr /I /C:\"\"error:\"\" /C:\"\"BUILD SUCCESSFUL\"\" /C:\"\"BUILD FAILED\"\" /C:\"\"FAILURE:\"\" C:\\\\Users\\\\waar1\\\\build_output.txt\")",
+      "Bash(cmd /c \"type C:\\\\Users\\\\waar1\\\\build_output.txt\")",
+      "Bash(cmd /c:*)",
+      "Bash(\"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\\\\gradlew.bat\" assembleDebug --project-dir \"C:\\\\Users\\\\waar1\\\\AndroidStudioProjects\\\\Tracker\")"
     ]
   }
 }

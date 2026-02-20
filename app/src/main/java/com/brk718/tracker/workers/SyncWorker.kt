@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -13,6 +14,8 @@ import com.brk718.tracker.R
 import com.brk718.tracker.TrackerApp
 import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
+import com.brk718.tracker.ui.widget.TrackerWidget
+import com.brk718.tracker.util.CrashReporter
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
@@ -62,11 +65,29 @@ class SyncWorker @AssistedInject constructor(
                     }
                 } catch (e: Exception) {
                     // Continuar con los demás envíos aunque uno falle
+                    CrashReporter.recordException(e)
                 }
             }
+            // Actualizar el widget con los datos frescos
+            updateWidgetIfInstalled()
+
             Result.success()
         } catch (e: Exception) {
+            CrashReporter.recordException(e)
             if (runAttemptCount < 3) Result.retry() else Result.failure()
+        }
+    }
+
+    private suspend fun updateWidgetIfInstalled() {
+        try {
+            val manager = GlanceAppWidgetManager(appContext)
+            val glanceIds = manager.getGlanceIds(TrackerWidget::class.java)
+            glanceIds.forEach { glanceId ->
+                TrackerWidget().update(appContext, glanceId)
+            }
+        } catch (e: Exception) {
+            // El widget puede no estar instalado — ignorar silenciosamente
+            android.util.Log.d("SyncWorker", "Widget no instalado o error al actualizar: ${e.message}")
         }
     }
 

@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brk718.tracker.BuildConfig
 import com.brk718.tracker.R
 import com.brk718.tracker.data.billing.BillingState
 
@@ -411,6 +412,62 @@ fun SettingsScreen(
 
             item { SettingsDivider() }
 
+            item { SettingsDivider() }
+
+            // ──────────────────────────────────────────────
+            // ESTADÍSTICAS
+            // ──────────────────────────────────────────────
+            item {
+                SettingsSectionHeader(title = "Mis estadisticas", icon = Icons.Default.BarChart)
+            }
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatItem(
+                            value = prefs.totalTracked.toString(),
+                            label = "Rastreados",
+                            icon = Icons.Default.Inventory2
+                        )
+                        VerticalDivider(
+                            modifier = Modifier.height(48.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        StatItem(
+                            value = prefs.deliveredCount.toString(),
+                            label = "Entregados",
+                            icon = Icons.Default.CheckCircle
+                        )
+                        VerticalDivider(
+                            modifier = Modifier.height(48.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        val successRate = if (prefs.totalTracked > 0)
+                            "${(prefs.deliveredCount * 100 / prefs.totalTracked)}%"
+                        else "—"
+                        StatItem(
+                            value = successRate,
+                            label = "Exito",
+                            icon = Icons.Default.TrendingUp
+                        )
+                    }
+                }
+            }
+
+            item { SettingsDivider() }
+
             // ──────────────────────────────────────────────
             // ACERCA DE
             // ──────────────────────────────────────────────
@@ -431,6 +488,28 @@ fun SettingsScreen(
                     icon = Icons.Default.DeleteSweep,
                     onClick = { showClearCacheDialog = true }
                 )
+            }
+
+            // ──────────────────────────────────────────────
+            // DEVELOPER (solo en builds DEBUG)
+            // ──────────────────────────────────────────────
+            if (BuildConfig.DEBUG) {
+                item { SettingsDivider() }
+                item {
+                    SettingsSectionHeader(
+                        title = "Developer",
+                        icon = Icons.Default.BugReport
+                    )
+                }
+                item {
+                    SettingsSwitchItem(
+                        title = "Simular Premium",
+                        subtitle = if (prefs.isPremium) "Modo Premium activo" else "Modo Free activo",
+                        icon = Icons.Default.AdminPanelSettings,
+                        checked = prefs.isPremium,
+                        onCheckedChange = { viewModel.setIsPremiumDebug(it) }
+                    )
+                }
             }
 
             item { Spacer(Modifier.height(32.dp)) }
@@ -852,4 +931,30 @@ private fun SyncIntervalDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_cancel)) }
         }
     )
+}
+
+@Composable
+private fun StatItem(value: String, label: String, icon: ImageVector) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }

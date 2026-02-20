@@ -1,5 +1,9 @@
 package com.brk718.tracker.ui.onboarding
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -63,6 +67,19 @@ fun OnboardingScreen(
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val coroutineScope = rememberCoroutineScope()
     val isLastPage = pagerState.currentPage == pages.lastIndex
+
+    // Pedir permiso de notificaciones cuando llegue a la página de Notificaciones (última)
+    val notifPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* granted or not, continuamos */ }
+
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage == pages.lastIndex &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        ) {
+            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.surface) { padding ->
         Column(

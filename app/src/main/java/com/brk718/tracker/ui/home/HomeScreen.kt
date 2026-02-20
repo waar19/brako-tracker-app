@@ -28,12 +28,13 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -79,6 +80,7 @@ fun HomeScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val shouldShowRating by viewModel.shouldShowRatingRequest.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -186,6 +188,35 @@ fun HomeScreen(
                         }
                     }
                 )
+
+                // Banner sin conexión
+                AnimatedVisibility(
+                    visible = !isOnline,
+                    enter = expandVertically(),
+                    exit = shrinkVertically()
+                ) {
+                    Surface(color = MaterialTheme.colorScheme.errorContainer) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.WifiOff,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "Sin conexion — mostrando ultima informacion guardada",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
 
                 // Barra de búsqueda colapsable
                 AnimatedVisibility(
@@ -648,10 +679,10 @@ fun ShipmentCard(
                         )
                     }
 
-                    // Último evento (fecha)
+                    // Último evento (tiempo relativo)
                     if (lastEvent != null) {
                         Text(
-                            text = dateFormat.format(Date(lastEvent.timestamp)),
+                            text = relativeTime(lastEvent.timestamp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -677,5 +708,20 @@ fun ShipmentCard(
                 }
             }
         }
+    }
+}
+
+/** Convierte un timestamp a texto relativo: "hace 5 min", "hace 2 h", "hace 3 d" */
+private fun relativeTime(timestampMs: Long): String {
+    val diff = System.currentTimeMillis() - timestampMs
+    val minutes = diff / 60_000
+    val hours = diff / 3_600_000
+    val days = diff / 86_400_000
+    return when {
+        minutes < 1   -> "ahora"
+        minutes < 60  -> "hace $minutes min"
+        hours   < 24  -> "hace $hours h"
+        days    < 30  -> "hace $days d"
+        else          -> "hace ${days / 30} mes"
     }
 }
