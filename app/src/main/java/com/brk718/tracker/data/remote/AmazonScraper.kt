@@ -2,6 +2,7 @@ package com.brk718.tracker.data.remote
 
 import android.annotation.SuppressLint
 import android.content.Context
+import com.brk718.tracker.BuildConfig
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -469,26 +470,28 @@ class AmazonScraper @Inject constructor(
 
                             Log.d(TAG, "HTML extraído, longitud: ${html.length}")
 
-                            // DEBUG: guardar HTML capturado al almacenamiento interno
-                            try {
-                                val file = java.io.File(context.filesDir, "amazon_debug.html")
-                                file.writeText(html)
-                                Log.d(TAG, "HTML guardado en: ${file.absolutePath}")
-                            } catch (e: Exception) {
-                                Log.w(TAG, "No se pudo guardar HTML debug: ${e.message}")
-                            }
-                            // DEBUG: loguear selectores clave para diagnosticar estructura real
-                            try {
-                                val testDoc = org.jsoup.Jsoup.parse(html)
-                                Log.d(TAG, "DEBUG od-status-message (h3): '${testDoc.selectFirst("h3.od-status-message")?.text()}'")
-                                Log.d(TAG, "DEBUG od-status-message (div): '${testDoc.selectFirst("div.od-status-message")?.text()}'")
-                                Log.d(TAG, "DEBUG od-tracking-sheet-content-0: ${testDoc.selectFirst("#od-tracking-sheet-content-0") != null}")
-                                Log.d(TAG, "DEBUG od-tracking-event-description-column count: ${testDoc.select(".od-tracking-event-description-column").size}")
-                                Log.d(TAG, "DEBUG od-vertical-line-wrapper count: ${testDoc.select(".od-vertical-line-wrapper").size}")
-                                val trackContainerLen = testDoc.selectFirst("#od-tracking-sheet-content-0")?.childrenSize() ?: 0
-                                Log.d(TAG, "DEBUG od-tracking-sheet-content-0 children: $trackContainerLen")
-                            } catch (e: Exception) {
-                                Log.w(TAG, "DEBUG parse error: ${e.message}")
+                            if (BuildConfig.DEBUG) {
+                                // DEBUG: guardar HTML capturado al almacenamiento interno
+                                try {
+                                    val file = java.io.File(context.filesDir, "amazon_debug.html")
+                                    file.writeText(html)
+                                    Log.d(TAG, "HTML guardado en: ${file.absolutePath}")
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "No se pudo guardar HTML debug: ${e.message}")
+                                }
+                                // DEBUG: loguear selectores clave para diagnosticar estructura real
+                                try {
+                                    val testDoc = org.jsoup.Jsoup.parse(html)
+                                    Log.d(TAG, "DEBUG od-status-message (h3): '${testDoc.selectFirst("h3.od-status-message")?.text()}'")
+                                    Log.d(TAG, "DEBUG od-status-message (div): '${testDoc.selectFirst("div.od-status-message")?.text()}'")
+                                    Log.d(TAG, "DEBUG od-tracking-sheet-content-0: ${testDoc.selectFirst("#od-tracking-sheet-content-0") != null}")
+                                    Log.d(TAG, "DEBUG od-tracking-event-description-column count: ${testDoc.select(".od-tracking-event-description-column").size}")
+                                    Log.d(TAG, "DEBUG od-vertical-line-wrapper count: ${testDoc.select(".od-vertical-line-wrapper").size}")
+                                    val trackContainerLen = testDoc.selectFirst("#od-tracking-sheet-content-0")?.childrenSize() ?: 0
+                                    Log.d(TAG, "DEBUG od-tracking-sheet-content-0 children: $trackContainerLen")
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "DEBUG parse error: ${e.message}")
+                                }
                             }
 
                             if (html.isBlank()) {

@@ -1,13 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
--->
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reglas de backup para Android < 12 (ignorado en API 31+)
+     https://developer.android.com/guide/topics/data/autobackup
+     Nota: cuando no hay <include>, Android hace backup de todo por defecto.
+     Solo excluimos lo que NO queremos respaldar. -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Excluir caché de tiles del mapa osmdroid (grande e inútil en otro dispositivo) -->
+    <exclude domain="sharedpref" path="osmdroid" />
+    <!-- Excluir archivos internos (debug html, etc.) -->
+    <exclude domain="file" path="." />
 </full-backup-content>
