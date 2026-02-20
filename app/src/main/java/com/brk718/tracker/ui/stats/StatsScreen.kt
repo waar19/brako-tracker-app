@@ -23,6 +23,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -329,26 +331,28 @@ private fun BarChart(
 
                 // Número encima de la barra
                 if (bar.count > 0 && animProgress.value > 0.8f) {
-                    drawContext.canvas.nativeCanvas.drawText(
-                        bar.count.toString(),
-                        x + barWidth / 2,
-                        (top - 4.dp.toPx()).coerceAtLeast(4.dp.toPx()),
-                        android.graphics.Paint().apply {
-                            color = countColor.copy(alpha = 1f)
-                                .let { c ->
-                                    android.graphics.Color.argb(
-                                        (c.alpha * 255).toInt(),
-                                        (c.red   * 255).toInt(),
-                                        (c.green * 255).toInt(),
-                                        (c.blue  * 255).toInt()
-                                    )
-                                }
-                            textSize = 10.sp.toPx()
-                            textAlign = android.graphics.Paint.Align.CENTER
-                            isFakeBoldText = true
-                            isAntiAlias = true
-                        }
-                    )
+                    drawIntoCanvas { canvas ->
+                        canvas.nativeCanvas.drawText(
+                            bar.count.toString(),
+                            x + barWidth / 2,
+                            (top - 4.dp.toPx()).coerceAtLeast(4.dp.toPx()),
+                            android.graphics.Paint().apply {
+                                color = countColor.copy(alpha = 1f)
+                                    .let { c ->
+                                        android.graphics.Color.argb(
+                                            (c.alpha * 255).toInt(),
+                                            (c.red   * 255).toInt(),
+                                            (c.green * 255).toInt(),
+                                            (c.blue  * 255).toInt()
+                                        )
+                                    }
+                                textSize = 10.sp.toPx()
+                                textAlign = android.graphics.Paint.Align.CENTER
+                                isFakeBoldText = true
+                                isAntiAlias = true
+                            }
+                        )
+                    }
                 }
             }
         }

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Directorio de caché interno — para las imágenes de compartir -->
+    <cache-path name="shared_images" path="images/" />
+</paths>

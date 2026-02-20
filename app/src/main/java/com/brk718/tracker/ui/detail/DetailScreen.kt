@@ -44,8 +44,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import com.brk718.tracker.util.ShareCardGenerator
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -188,6 +191,7 @@ fun DetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
 
     // Estado para el diálogo del mapa
     var showMapDialog by remember { mutableStateOf(false) }
@@ -213,6 +217,20 @@ fun DetailScreen(
                         }
                     },
                     actions = {
+                        // Botón de compartir — solo visible cuando hay datos cargados
+                        if (uiState is DetailUiState.Success) {
+                            IconButton(onClick = {
+                                ShareCardGenerator.shareShipmentAsImage(
+                                    context,
+                                    (uiState as DetailUiState.Success).shipment
+                                )
+                            }) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = "Compartir estado del envío"
+                                )
+                            }
+                        }
                         IconButton(
                             onClick = { viewModel.refresh() },
                             enabled = !isRefreshing

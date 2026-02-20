@@ -504,6 +504,7 @@ fun HomeScreen(
             }
         )
     }
+    }
 }
 
 /** Fondo que se muestra detrás de la card al hacer swipe */
