@@ -16,3 +16,4 @@ local.properties
 nul
 app/brako-release.jks
 app/release/*.aab
+app/google-services.json
