@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.brk718.tracker.ui.add.AddScreen
+import com.brk718.tracker.ui.add.BarcodeScannerScreen
 import com.brk718.tracker.ui.ads.AdManager
 import com.brk718.tracker.ui.auth.AmazonAuthScreen
 import com.brk718.tracker.ui.detail.DetailScreen
@@ -40,6 +41,7 @@ object Routes {
     const val SETTINGS    = "settings"
     const val ARCHIVED    = "archived"
     const val PAYWALL     = "paywall"
+    const val BARCODE_SCANNER = "barcode_scanner"
     fun detail(id: String) = "detail/$id"
 }
 
@@ -136,11 +138,29 @@ fun App(
                     }
                 )
             }
-            composable(Routes.ADD) {
+            composable(Routes.ADD) { backStackEntry ->
+                // Leer el código escaneado que devuelve BarcodeScannerScreen
+                val scannedBarcode = backStackEntry
+                    .savedStateHandle
+                    .get<String>("scanned_barcode")
                 AddScreen(
-                    onBack        = { navController.popBackStack() },
-                    onSuccess     = { navController.popBackStack() },
-                    onUpgradeClick = { navController.navigate(Routes.PAYWALL) }
+                    onBack         = { navController.popBackStack() },
+                    onSuccess      = { navController.popBackStack() },
+                    onUpgradeClick = { navController.navigate(Routes.PAYWALL) },
+                    onScanClick    = { navController.navigate(Routes.BARCODE_SCANNER) },
+                    scannedBarcode = scannedBarcode
+                )
+            }
+            composable(Routes.BARCODE_SCANNER) {
+                BarcodeScannerScreen(
+                    onBarcodeDetected = { barcode ->
+                        // Pasar el resultado de vuelta a AddScreen via SavedStateHandle
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("scanned_barcode", barcode)
+                        navController.popBackStack()
+                    },
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(Routes.PAYWALL) {

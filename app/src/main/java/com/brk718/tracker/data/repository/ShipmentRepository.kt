@@ -11,6 +11,7 @@ import com.brk718.tracker.data.remote.CreateTrackingRequest
 import com.brk718.tracker.data.remote.DetectCourierBody
 import com.brk718.tracker.data.remote.DetectCourierRequest
 import com.brk718.tracker.data.remote.TrackingApi
+import com.brk718.tracker.util.StatusTranslator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -259,14 +260,16 @@ class ShipmentRepository @Inject constructor(
             val response = api.getTrackingInfo(effectiveSlug, shipment.trackingNumber)
             val tracking = response.data?.tracking ?: return@withContext
 
-            val statusText = when (tracking.tag) {
-                "Delivered"     -> "Entregado"
-                "InTransit"     -> "En Tránsito"
-                "OutForDelivery"-> "En reparto"
-                "AttemptFail"   -> "Intento fallido"
-                "Exception"     -> "Incidencia"
-                "Pending"       -> "Pendiente"
-                else            -> tracking.subtag_message ?: tracking.tag
+            // Traducir el tag principal al español; si el subtag_message aporta más detalle,
+            // intentar traducirlo también y usar el más descriptivo (el subtag es más específico).
+            val tagTranslation = StatusTranslator.translateTag(tracking.tag)
+            val subtagTranslation = tracking.subtag_message
+                ?.let { StatusTranslator.translateMessage(it) }
+            // Preferir subtag traducido si difiere del raw (significa que aportó info real)
+            val statusText = if (subtagTranslation != null && subtagTranslation != tracking.subtag_message) {
+                subtagTranslation
+            } else {
+                tagTranslation
             }
 
             dao.insertShipment(shipment.copy(
@@ -281,13 +284,16 @@ class ShipmentRepository @Inject constructor(
             }
 
             val events = tracking.checkpoints.mapIndexed { index, checkpoint ->
+                val rawDescription = checkpoint.message
+                    ?: checkpoint.subtag_message
+                    ?: "Sin descripción"
                 TrackingEventEntity(
                     id = 0L,
                     shipmentId = id,
                     timestamp = System.currentTimeMillis() - (index * 3600000L),
-                    description = checkpoint.message ?: checkpoint.subtag_message ?: "Sin descripción",
+                    description = StatusTranslator.translateMessage(rawDescription),
                     location = checkpoint.location ?: "",
-                    status = checkpoint.tag ?: ""
+                    status = checkpoint.tag?.let { StatusTranslator.translateTag(it) } ?: ""
                 )
             }
             dao.clearEventsForShipment(id)

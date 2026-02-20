@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Notificaciones push (requerido en Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Cámara para escanear códigos de barras en la pantalla Añadir -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <!-- Escritura en almacenamiento externo para exportar CSV (solo Android 9 y anteriores; Android 10+ usa MediaStore) -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
