@@ -67,11 +67,20 @@ class GmailViewModel @Inject constructor(
                         error = null
                     )
                 }
+                // Escanear automáticamente al conectarse por primera vez
+                scanEmails()
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(error = "Error al conectar: ${e.message}")
                 }
             }
+        }
+    }
+
+    fun disconnect() {
+        viewModelScope.launch {
+            gmailService.disconnect()
+            _uiState.update { GmailUiState() }
         }
     }
 
@@ -150,5 +159,12 @@ class GmailViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /** Importa todos los envíos encontrados que aún no han sido importados */
+    fun importAll() {
+        val pending = _uiState.value.foundShipments
+            .filter { it.trackingNumber !in _uiState.value.importedIds }
+        pending.forEach { importShipment(it) }
     }
 }

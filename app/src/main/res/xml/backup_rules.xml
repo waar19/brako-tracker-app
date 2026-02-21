@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Reglas de backup para Android < 12 (ignorado en API 31+)
      https://developer.android.com/guide/topics/data/autobackup
-     Nota: cuando no hay <include>, Android hace backup de todo por defecto.
+     Cuando no hay <include>, Android respalda todo por defecto.
      Solo excluimos lo que NO queremos respaldar. -->
 <full-backup-content>
     <!-- Excluir caché de tiles del mapa osmdroid (grande e inútil en otro dispositivo) -->
     <exclude domain="sharedpref" path="osmdroid" />
-    <!-- Excluir archivos internos (debug html, etc.) -->
-    <exclude domain="file" path="." />
+    <!-- Excluir archivo de debug de Amazon (solo existe en debug builds) -->
+    <exclude domain="file" path="amazon_debug.html" />
+    <!-- Excluir caché HTTP de OkHttp -->
+    <exclude domain="cache" path="." />
 </full-backup-content>

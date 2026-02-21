@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -53,6 +54,13 @@ fun GmailScreen(
                     if (uiState.isConnected) {
                         IconButton(onClick = { viewModel.scanEmails() }) {
                             Icon(Icons.Default.Refresh, stringResource(R.string.gmail_scan))
+                        }
+                        IconButton(onClick = { viewModel.disconnect() }) {
+                            Icon(
+                                Icons.Default.Logout,
+                                contentDescription = "Desconectar cuenta",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -176,6 +184,19 @@ fun GmailScreen(
                                     )
                                 }
                             }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // Botón "Importar todos" — solo si hay pendientes sin importar
+                    val pendingCount = uiState.foundShipments
+                        .count { it.trackingNumber !in uiState.importedIds }
+                    if (pendingCount > 0) {
+                        FilledTonalButton(
+                            onClick = { viewModel.importAll() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Importar todos ($pendingCount)")
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                     }

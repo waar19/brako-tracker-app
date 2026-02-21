@@ -288,9 +288,14 @@ fun DetailScreen(
                                 MaterialTheme.colorScheme.onSecondaryContainer
                     }
 
-                    Surface(
-                        color = headerBg,
-                        modifier = Modifier.fillMaxWidth()
+                    Spacer(Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = headerBg),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
                             // Título + ícono de editar

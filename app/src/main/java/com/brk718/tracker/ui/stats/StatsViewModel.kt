@@ -37,6 +37,7 @@ data class StatsUiState(
     val avgDeliveryDays: Float = 0f,    // promedio de días de entrega
     val topCarrier: String = "",        // transportista más usado
     val topCarrierCount: Int = 0,
+    val staleShipments: Int = 0,        // activos sin movimiento en >3 días
     val monthBars: List<MonthBar> = emptyList(),   // últimos 6 meses
     val statusSlices: List<StatusSlice> = emptyList()  // dona de estado
 )
@@ -66,23 +67,34 @@ class StatsViewModel @Inject constructor(
 
         // ── Transportista más usado ──────────────────────────────────────
         val carrierGroup = shipments.groupBy { it.shipment.carrier.lowercase().trim() }
-        val topEntry  = carrierGroup.maxByOrNull { it.value.size }
+        val topEntry        = carrierGroup.maxByOrNull { it.value.size }
         val topCarrier      = topEntry?.value?.firstOrNull()?.shipment?.carrier ?: ""
         val topCarrierCount = topEntry?.value?.size ?: 0
 
         // ── Tiempo promedio de entrega ───────────────────────────────────
+        // Usa el primer evento disponible (o lastUpdate como fallback) hasta el último evento,
+        // así incluye envíos con un solo checkpoint.
         val deliveryTimes = shipments
             .filter { it.shipment.status.equals("Entregado", ignoreCase = true) }
             .mapNotNull { swe ->
                 val events = swe.events
-                if (events.size < 2) return@mapNotNull null
-                val first = events.minByOrNull { it.timestamp }?.timestamp ?: return@mapNotNull null
-                val last  = events.maxByOrNull { it.timestamp }?.timestamp ?: return@mapNotNull null
-                val diffMs = last - first
+                val lastTs = events.maxByOrNull { it.timestamp }?.timestamp
+                    ?: return@mapNotNull null
+                val firstTs = events.minByOrNull { it.timestamp }?.timestamp
+                    ?: swe.shipment.lastUpdate  // fallback: usar lastUpdate si solo hay 1 evento
+                val diffMs = lastTs - firstTs
                 if (diffMs <= 0) null else diffMs / (1000L * 60 * 60 * 24).toFloat()
             }
         val avgDays = if (deliveryTimes.isEmpty()) 0f
                       else deliveryTimes.average().toFloat()
+
+        // ── Sin movimiento: activos sin actualización en >3 días ─────────
+        val staleCutoff = System.currentTimeMillis() - (3L * 24 * 60 * 60 * 1000)
+        val stale = shipments.count { swe ->
+            !swe.shipment.isArchived &&
+            !swe.shipment.status.equals("Entregado", ignoreCase = true) &&
+            swe.shipment.lastUpdate < staleCutoff
+        }
 
         // ── Barras de los últimos 6 meses ────────────────────────────────
         val monthBars = buildMonthBars(shipments)
@@ -91,16 +103,17 @@ class StatsViewModel @Inject constructor(
         val statusSlices = buildStatusSlices(shipments)
 
         return StatsUiState(
-            isLoading         = false,
-            totalShipments    = total,
+            isLoading          = false,
+            totalShipments     = total,
             deliveredShipments = delivered,
-            activeShipments   = active,
-            successRate       = rate,
-            avgDeliveryDays   = avgDays,
-            topCarrier        = topCarrier,
-            topCarrierCount   = topCarrierCount,
-            monthBars         = monthBars,
-            statusSlices      = statusSlices
+            activeShipments    = active,
+            successRate        = rate,
+            avgDeliveryDays    = avgDays,
+            topCarrier         = topCarrier,
+            topCarrierCount    = topCarrierCount,
+            staleShipments     = stale,
+            monthBars          = monthBars,
+            statusSlices       = statusSlices
         )
     }
 
@@ -125,10 +138,16 @@ class StatsViewModel @Inject constructor(
             Triple(year, month, label)
         }
 
+        // Usamos el primer evento del envío (cuando fue creado/añadido) para la barra
+        // del mes en que se rastreó, no la última actualización.
+        val barCal = Calendar.getInstance()
         val bars = months.map { (year, month, label) ->
             val count = shipments.count { swe ->
-                cal.time = Date(swe.shipment.lastUpdate)
-                cal.get(Calendar.YEAR) == year && cal.get(Calendar.MONTH) == month
+                // Fecha de referencia: primer evento disponible o lastUpdate como fallback
+                val refTs = swe.events.minByOrNull { it.timestamp }?.timestamp
+                    ?: swe.shipment.lastUpdate
+                barCal.time = Date(refTs)
+                barCal.get(Calendar.YEAR) == year && barCal.get(Calendar.MONTH) == month
             }
             MonthBar(label = label, count = count)
         }
@@ -142,19 +161,29 @@ class StatsViewModel @Inject constructor(
         val entregado = active.count { it.shipment.status.equals("Entregado", ignoreCase = true) }
         val enTransito = active.count {
             val s = it.shipment.status.lowercase()
-            s.contains("tránsito") || s.contains("transito") || s.contains("reparto") || s.contains("camino")
+            s.contains("tránsito") || s.contains("transito") ||
+            s.contains("reparto") || s.contains("camino")
         }
         val novedad = active.count {
             val s = it.shipment.status.lowercase()
-            s.contains("novedad") || s.contains("problema") || s.contains("inciden") || s.contains("devuelto")
+            s.contains("novedad") || s.contains("problema") ||
+            s.contains("inciden") || s.contains("devuelto") ||
+            s.contains("dañado") || s.contains("perdido")
         }
-        val otros = active.size - entregado - enTransito - novedad
+        val pendiente = active.count {
+            val s = it.shipment.status.lowercase()
+            s.contains("pendiente") || s.contains("información") ||
+            s.contains("recibida") || s.contains("etiqueta")
+        }
+        // "Otros" = lo que no encaja en ninguna categoría anterior
+        val otros = active.size - entregado - enTransito - novedad - pendiente
 
         return buildList {
-            if (entregado > 0) add(StatusSlice("Entregado",   entregado,  0xFF22C55E))
+            if (entregado > 0)  add(StatusSlice("Entregado",   entregado,  0xFF22C55E))
             if (enTransito > 0) add(StatusSlice("En tránsito", enTransito, 0xFF3B82F6))
-            if (novedad > 0)   add(StatusSlice("Novedad",     novedad,    0xFFEF4444))
-            if (otros > 0)     add(StatusSlice("Otros",       otros,      0xFF94A3B8))
+            if (pendiente > 0)  add(StatusSlice("Pendiente",   pendiente,  0xFFFFB400))
+            if (novedad > 0)    add(StatusSlice("Novedad",     novedad,    0xFFEF4444))
+            if (otros > 0)      add(StatusSlice("Otros",       otros,      0xFF94A3B8))
         }
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -100,7 +101,7 @@ fun StatsScreen(
                     modifier = Modifier.weight(1f),
                     value = "${state.successRate}%",
                     label = "Éxito",
-                    icon = Icons.Default.TrendingUp,
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
                     color = MaterialTheme.colorScheme.tertiary
                 )
             }
@@ -135,6 +136,24 @@ fun StatsScreen(
                     icon = Icons.Default.Star,
                     color = Color(0xFFFFB400)
                 )
+            }
+
+            // ── Tercera fila KPI ─────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                KpiCard(
+                    modifier = Modifier.weight(1f),
+                    value = if (state.staleShipments > 0) state.staleShipments.toString() else "0",
+                    label = "Sin movimiento",
+                    icon = Icons.Default.HourglassEmpty,
+                    color = if (state.staleShipments > 0)
+                        Color(0xFFEF4444)
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.weight(2f))
             }
 
             // ── Gráfica de barras: envíos por mes ────────────────────────
