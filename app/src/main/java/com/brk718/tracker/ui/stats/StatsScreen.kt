@@ -31,7 +31,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brk718.tracker.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,10 +46,10 @@ fun StatsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Mis estadísticas") },
+                title = { Text(stringResource(R.string.stats_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.stats_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -86,21 +88,21 @@ fun StatsScreen(
                 KpiCard(
                     modifier = Modifier.weight(1f),
                     value = state.totalShipments.toString(),
-                    label = "Rastreados",
+                    label = stringResource(R.string.stats_kpi_tracked),
                     icon = Icons.Default.Inventory2,
                     color = MaterialTheme.colorScheme.primary
                 )
                 KpiCard(
                     modifier = Modifier.weight(1f),
                     value = state.deliveredShipments.toString(),
-                    label = "Entregados",
+                    label = stringResource(R.string.stats_kpi_delivered),
                     icon = Icons.Default.CheckCircle,
                     color = Color(0xFF22C55E)
                 )
                 KpiCard(
                     modifier = Modifier.weight(1f),
                     value = "${state.successRate}%",
-                    label = "Éxito",
+                    label = stringResource(R.string.stats_kpi_success),
                     icon = Icons.AutoMirrored.Filled.TrendingUp,
                     color = MaterialTheme.colorScheme.tertiary
                 )
@@ -114,7 +116,7 @@ fun StatsScreen(
                 KpiCard(
                     modifier = Modifier.weight(1f),
                     value = state.activeShipments.toString(),
-                    label = "Activos",
+                    label = stringResource(R.string.stats_kpi_active),
                     icon = Icons.Default.LocalShipping,
                     color = Color(0xFF3B82F6)
                 )
@@ -123,7 +125,7 @@ fun StatsScreen(
                     value = if (state.avgDeliveryDays > 0f)
                         "${"%.1f".format(state.avgDeliveryDays)}d"
                     else "—",
-                    label = "Días promedio",
+                    label = stringResource(R.string.stats_kpi_avg_days),
                     icon = Icons.Default.Schedule,
                     color = MaterialTheme.colorScheme.secondary
                 )
@@ -132,7 +134,7 @@ fun StatsScreen(
                     value = if (state.topCarrierCount > 0) state.topCarrierCount.toString() else "—",
                     label = if (state.topCarrier.isNotEmpty())
                         state.topCarrier.take(10)
-                    else "Transportista",
+                    else stringResource(R.string.stats_kpi_carrier),
                     icon = Icons.Default.Star,
                     color = Color(0xFFFFB400)
                 )
@@ -146,7 +148,7 @@ fun StatsScreen(
                 KpiCard(
                     modifier = Modifier.weight(1f),
                     value = if (state.staleShipments > 0) state.staleShipments.toString() else "0",
-                    label = "Sin movimiento",
+                    label = stringResource(R.string.stats_kpi_stale),
                     icon = Icons.Default.HourglassEmpty,
                     color = if (state.staleShipments > 0)
                         Color(0xFFEF4444)
@@ -158,7 +160,7 @@ fun StatsScreen(
 
             // ── Gráfica de barras: envíos por mes ────────────────────────
             if (state.monthBars.isNotEmpty()) {
-                StatsCard(title = "Envíos por mes", icon = Icons.Default.BarChart) {
+                StatsCard(title = stringResource(R.string.stats_chart_shipments_by_month), icon = Icons.Default.BarChart) {
                     BarChart(
                         bars = state.monthBars,
                         barColor = MaterialTheme.colorScheme.primary,
@@ -172,7 +174,7 @@ fun StatsScreen(
 
             // ── Gráfica de dona: estado de envíos activos ────────────────
             if (state.statusSlices.isNotEmpty()) {
-                StatsCard(title = "Estado de envíos activos", icon = Icons.Default.PieChart) {
+                StatsCard(title = stringResource(R.string.stats_chart_active_status), icon = Icons.Default.PieChart) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

@@ -37,6 +37,29 @@ class ShipmentRepository @Inject constructor(
     private val interrapidisimoScraper: InterrapidisimoScraper
 ) {
     companion object {
+        // ── SimpleDateFormat cacheados (ThreadLocal = thread-safe con Dispatchers.IO) ───────────
+        /** ISO 8601 con hora: "yyyy-MM-dd'T'HH:mm:ss" */
+        private val FMT_ISO_DATETIME: ThreadLocal<SimpleDateFormat> = ThreadLocal.withInitial {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).also {
+                it.timeZone = TimeZone.getTimeZone("UTC")
+            }
+        }
+        /** ISO 8601 solo fecha: "yyyy-MM-dd" */
+        private val FMT_ISO_DATE: ThreadLocal<SimpleDateFormat> = ThreadLocal.withInitial {
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).also {
+                it.timeZone = TimeZone.getTimeZone("UTC")
+            }
+        }
+        /** Formatos de fecha usados por Interrapidísimo — lista inmutable, reutilizada entre llamadas */
+        private val INTERRAPIDISIMO_DATE_FORMATS: List<Pair<String, Locale>> = listOf(
+            Pair("dd/MM/yyyy HH:mm:ss", Locale.getDefault()),
+            Pair("dd/MM/yyyy HH:mm",    Locale.getDefault()),
+            Pair("dd/MM/yyyy",          Locale.getDefault()),
+            Pair("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
+            Pair("yyyy-MM-dd HH:mm:ss", Locale.US),
+            Pair("yyyy-MM-dd",          Locale.US)
+        )
+
         // Mapeo conocido: nombre del carrier → slug de AfterShip
         // AfterShip se encarga del scraping (incluyendo CAPTCHAs)
         private val CARRIER_SLUG_MAP = mapOf(
@@ -497,18 +520,10 @@ class ShipmentRepository @Inject constructor(
 
     private fun parseInterrapidisimoDate(dateStr: String): Long? {
         if (dateStr.isBlank()) return null
-        // Formatos posibles: "dd/MM/yyyy HH:mm:ss", "dd/MM/yyyy", "yyyy-MM-dd HH:mm:ss"
-        val formats = listOf(
-            java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()),
-            java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()),
-            java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()),
-            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
-            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US),
-            java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        )
-        for (fmt in formats) {
+        // Reutilizar la lista de formatos cacheada — solo se crea SimpleDateFormat por iteración
+        for ((pattern, locale) in INTERRAPIDISIMO_DATE_FORMATS) {
             try {
-                return fmt.parse(dateStr.trim())?.time
+                return SimpleDateFormat(pattern, locale).parse(dateStr.trim())?.time
             } catch (_: Exception) {}
         }
         android.util.Log.w("ShipmentRepository", "No se pudo parsear fecha Inter: $dateStr")
@@ -553,14 +568,10 @@ class ShipmentRepository @Inject constructor(
     /** Parsea un string ISO 8601 (ej. "2025-02-28T00:00:00") a timestamp en milisegundos. */
     private fun parseIso8601Date(dateStr: String): Long? {
         return try {
-            val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-            fmt.timeZone = TimeZone.getTimeZone("UTC")
-            fmt.parse(dateStr.take(19))?.time
+            FMT_ISO_DATETIME.get()!!.parse(dateStr.take(19))?.time
         } catch (e: Exception) {
             try {
-                val fmtDate = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                fmtDate.timeZone = TimeZone.getTimeZone("UTC")
-                fmtDate.parse(dateStr.take(10))?.time
+                FMT_ISO_DATE.get()!!.parse(dateStr.take(10))?.time
             } catch (e2: Exception) {
                 null
             }
@@ -574,9 +585,7 @@ class ShipmentRepository @Inject constructor(
         try {
             if (dateStr.contains("T") && dateStr.endsWith("Z")) {
                 val cleanDate = if (dateStr.length > 19) dateStr.substring(0, 19) else dateStr.replace("Z", "")
-                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                isoFormat.timeZone = TimeZone.getTimeZone("UTC")
-                return isoFormat.parse(cleanDate)?.time
+                return FMT_ISO_DATETIME.get()!!.parse(cleanDate)?.time
             }
         } catch (e: Exception) {
             // Ignorar y seguir

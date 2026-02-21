@@ -59,7 +59,7 @@ fun SettingsScreen(
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/csv"
                     putExtra(Intent.EXTRA_STREAM, result.uri)
-                    putExtra(Intent.EXTRA_SUBJECT, "Mis envíos — Tracker")
+                    putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.settings_csv_share_subject))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 context.startActivity(Intent.createChooser(shareIntent, "Guardar o compartir CSV"))
@@ -121,7 +121,7 @@ fun SettingsScreen(
             // ──────────────────────────────────────────────
             item {
                 SettingsSectionHeader(
-                    title = "Premium",
+                    title = stringResource(R.string.settings_section_premium),
                     icon = Icons.Default.WorkspacePremium
                 )
             }
@@ -150,7 +150,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    "Plan Premium activo",
+                                    stringResource(R.string.settings_premium_active_title),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -158,7 +158,7 @@ fun SettingsScreen(
                             }
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                "✓ Sin anuncios  ✓ Envíos ilimitados  ✓ Historial completo  ✓ Sync cada 30 min  ✓ Exportar CSV",
+                                stringResource(R.string.settings_premium_active_benefits),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -167,7 +167,7 @@ fun SettingsScreen(
                                 onClick = { viewModel.restorePurchases() },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Restaurar compra")
+                                Text(stringResource(R.string.settings_premium_restore))
                             }
                         } else {
                             // Oferta premium
@@ -180,14 +180,14 @@ fun SettingsScreen(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    "Hazte Premium",
+                                    stringResource(R.string.settings_premium_cta_title),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                "✓ Sin anuncios  ✓ Envíos ilimitados\n✓ Historial completo  ✓ Sync cada 30 min  ✓ Exportar CSV",
+                                stringResource(R.string.settings_premium_free_benefits),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -215,8 +215,8 @@ fun SettingsScreen(
                                 } else {
                                     val price = state.subscriptionPriceText
                                     Text(
-                                        if (price == "—") "Suscribirse — anual"
-                                        else "Suscribirse — $price / año"
+                                        if (price == "—") stringResource(R.string.settings_premium_subscribe_no_price)
+                                        else stringResource(R.string.settings_premium_subscribe_price, price)
                                     )
                                 }
                             }
@@ -226,7 +226,7 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    "Restaurar compra anterior",
+                                    stringResource(R.string.settings_premium_restore_alt),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.outline
                                 )
@@ -272,8 +272,8 @@ fun SettingsScreen(
             }
             item {
                 SettingsSwitchItem(
-                    title = "Horas de silencio",
-                    subtitle = "No enviar notificaciones en el rango horario indicado",
+                    title = stringResource(R.string.settings_quiet_hours_title),
+                    subtitle = stringResource(R.string.settings_quiet_hours_subtitle),
                     icon = Icons.Default.BedtimeOff,
                     checked = prefs.quietHoursEnabled,
                     enabled = prefs.notificationsEnabled,
@@ -283,7 +283,7 @@ fun SettingsScreen(
             if (prefs.quietHoursEnabled && prefs.notificationsEnabled) {
                 item {
                     SettingsNavigationItem(
-                        title = "Inicio del silencio",
+                        title = stringResource(R.string.settings_quiet_hours_start_title),
                         subtitle = "%02d:00".format(prefs.quietHoursStart),
                         icon = Icons.Default.NightsStay,
                         onClick = { showQuietHoursStartDialog = true }
@@ -291,7 +291,7 @@ fun SettingsScreen(
                 }
                 item {
                     SettingsNavigationItem(
-                        title = "Fin del silencio",
+                        title = stringResource(R.string.settings_quiet_hours_end_title),
                         subtitle = "%02d:00".format(prefs.quietHoursEnd),
                         icon = Icons.Default.WbSunny,
                         onClick = { showQuietHoursEndDialog = true }
@@ -318,7 +318,7 @@ fun SettingsScreen(
             }
             item {
                 val intervalLabel = when (prefs.syncIntervalHours) {
-                    -1   -> "Cada 30 min ✦"
+                    -1   -> stringResource(R.string.settings_sync_30min_premium)
                     0    -> stringResource(R.string.settings_sync_manual)
                     1    -> stringResource(R.string.settings_sync_1h)
                     2    -> stringResource(R.string.settings_sync_2h)
@@ -353,7 +353,7 @@ fun SettingsScreen(
                     trailingContent = {
                         if (syncFailed) {
                             TextButton(onClick = { viewModel.syncNow() }) {
-                                Text("Reintentar")
+                                Text(stringResource(R.string.settings_sync_retry))
                             }
                         }
                     }
@@ -378,11 +378,11 @@ fun SettingsScreen(
             }
             item {
                 SettingsNavigationItem(
-                    title = "Exportar envíos a CSV",
+                    title = stringResource(R.string.settings_csv_export_title),
                     subtitle = when {
                         !isPremium               -> "✦ Solo Premium"
                         exportResult is ExportResult.Loading -> "Exportando..."
-                        else                     -> "Descarga un archivo con todos tus envíos"
+                        else                     -> stringResource(R.string.settings_csv_export_subtitle)
                     },
                     icon = Icons.Default.FileDownload,
                     enabled = isPremium && exportResult !is ExportResult.Loading,
@@ -416,7 +416,7 @@ fun SettingsScreen(
                     }
                 }
                 SettingsCustomTrailingItem(
-                    title = "Amazon",
+                    title = stringResource(R.string.settings_amazon_section_title),
                     subtitle = amazonSubtitle,
                     icon = Icons.Default.ShoppingCart,
                     trailingContent = amazonTrailing
@@ -459,12 +459,12 @@ fun SettingsScreen(
             // ESTADÍSTICAS
             // ──────────────────────────────────────────────
             item {
-                SettingsSectionHeader(title = "Mis estadísticas", icon = Icons.Default.BarChart)
+                SettingsSectionHeader(title = stringResource(R.string.settings_section_stats), icon = Icons.Default.BarChart)
             }
             item {
                 SettingsNavigationItem(
-                    title = "Ver estadísticas",
-                    subtitle = "Gráficas de envíos, transportistas y más",
+                    title = stringResource(R.string.settings_stats_title),
+                    subtitle = stringResource(R.string.settings_stats_subtitle),
                     icon = Icons.Default.BarChart,
                     onClick = onStatsClick
                 )
@@ -532,7 +532,7 @@ fun SettingsScreen(
 
     if (showQuietHoursStartDialog) {
         HourPickerDialog(
-            title = "Inicio del silencio",
+            title = stringResource(R.string.settings_quiet_hours_start_title),
             current = prefs.quietHoursStart,
             onSelect = { viewModel.setQuietHoursStart(it); showQuietHoursStartDialog = false },
             onDismiss = { showQuietHoursStartDialog = false }
@@ -541,7 +541,7 @@ fun SettingsScreen(
 
     if (showQuietHoursEndDialog) {
         HourPickerDialog(
-            title = "Fin del silencio",
+            title = stringResource(R.string.settings_quiet_hours_end_title),
             current = prefs.quietHoursEnd,
             onSelect = { viewModel.setQuietHoursEnd(it); showQuietHoursEndDialog = false },
             onDismiss = { showQuietHoursEndDialog = false }
@@ -610,13 +610,13 @@ fun SettingsScreen(
                     modifier = Modifier.size(32.dp)
                 )
             },
-            title = { Text("Función Premium") },
-            text = { Text("Esta función está disponible solo para suscriptores Premium.\n\n✓ Sin anuncios\n✓ Envíos ilimitados\n✓ Historial completo\n✓ Sync cada 30 min\n✓ Exportar CSV") },
+            title = { Text(stringResource(R.string.settings_premium_feature_title)) },
+            text = { Text(stringResource(R.string.settings_premium_feature_message)) },
             confirmButton = {
                 Button(onClick = {
                     showPremiumSyncDialog = false
                     viewModel.purchaseSubscription(activity)
-                }) { Text("Hazte Premium") }
+                }) { Text(stringResource(R.string.settings_premium_feature_cta)) }
             },
             dismissButton = {
                 TextButton(onClick = { showPremiumSyncDialog = false }) {

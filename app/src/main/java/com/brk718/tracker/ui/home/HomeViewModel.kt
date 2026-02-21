@@ -79,15 +79,32 @@ class HomeViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private val _refreshError = MutableStateFlow<String?>(null)
+    val refreshError: StateFlow<String?> = _refreshError.asStateFlow()
+
+    fun clearRefreshError() { _refreshError.value = null }
+
     fun refreshAll() {
         viewModelScope.launch {
             _isRefreshing.value = true
+            _refreshError.value = null
+            var failCount = 0
             try {
-                // first() garantiza que esperamos la primera emisión del Flow antes de iterar,
-                // evitando la race condition de stateIn().value que puede ser lista vacía.
                 repository.activeShipments.first().forEach { shipmentWithEvents ->
-                    repository.refreshShipment(shipmentWithEvents.shipment.id)
+                    try {
+                        repository.refreshShipment(shipmentWithEvents.shipment.id)
+                    } catch (e: Exception) {
+                        failCount++
+                    }
                 }
+                if (failCount > 0) {
+                    _refreshError.value = if (failCount == 1)
+                        "No se pudo actualizar 1 envío"
+                    else
+                        "No se pudieron actualizar $failCount envíos"
+                }
+            } catch (e: Exception) {
+                _refreshError.value = "Error al actualizar: sin conexión"
             } finally {
                 _isRefreshing.value = false
             }

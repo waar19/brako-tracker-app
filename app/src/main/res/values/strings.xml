@@ -193,6 +193,80 @@
     <string name="status_manual">Seguimiento manual</string>
 
     <!-- ══════════════════════════════════════════
+         HOME SCREEN (adicionales)
+    ══════════════════════════════════════════ -->
+    <string name="home_offline_banner">Sin conexión — mostrando última información guardada</string>
+    <string name="home_selected_count">%d seleccionado</string>
+    <string name="home_selected_count_plural">%d seleccionados</string>
+    <string name="home_search_placeholder">Buscar por título, número, transportista…</string>
+    <string name="home_search_clear">Limpiar</string>
+    <string name="home_search_no_results">No se encontraron envíos para \"%s\"</string>
+    <string name="home_empty_subtitle_extended">Añade un número de seguimiento o importa\nautomáticamente desde Gmail</string>
+    <string name="home_limit_chip_count">%d / %d envíos activos</string>
+    <string name="home_limit_chip_upgrade">Ampliar →</string>
+    <string name="home_delete_confirm_title">Eliminar %d envío</string>
+    <string name="home_delete_confirm_title_plural">Eliminar %d envíos</string>
+    <string name="home_delete_confirm_message">Esta acción no se puede deshacer. ¿Confirmas la eliminación?</string>
+    <string name="home_delete_confirm_button">Eliminar</string>
+    <string name="home_cancel">Cancelar</string>
+    <string name="home_share">Compartir</string>
+    <string name="home_share_chooser">Compartir envío</string>
+
+    <!-- ══════════════════════════════════════════
+         DETAIL SCREEN (adicionales)
+    ══════════════════════════════════════════ -->
+    <string name="detail_no_events_title">Aún no hay eventos</string>
+    <string name="detail_no_events_subtitle">El transportista aún no registró movimientos. Vuelve a revisar en un rato.</string>
+    <string name="detail_edit_title_dialog">Editar nombre</string>
+    <string name="detail_edit_title_label">Nombre del envío</string>
+    <string name="detail_edit_save">Guardar</string>
+    <string name="detail_edit_cancel">Cancelar</string>
+
+    <!-- ══════════════════════════════════════════
+         SETTINGS SCREEN (adicionales)
+    ══════════════════════════════════════════ -->
+    <string name="settings_section_premium">Premium</string>
+    <string name="settings_section_stats">Mis estadísticas</string>
+    <string name="settings_premium_active_title">Plan Premium activo</string>
+    <string name="settings_premium_active_benefits">✓ Sin anuncios  ✓ Envíos ilimitados  ✓ Historial completo  ✓ Sync cada 30 min  ✓ Exportar CSV</string>
+    <string name="settings_premium_restore">Restaurar compra</string>
+    <string name="settings_premium_cta_title">Hazte Premium</string>
+    <string name="settings_premium_free_benefits">✓ Sin anuncios  ✓ Envíos ilimitados\n✓ Historial completo  ✓ Sync cada 30 min  ✓ Exportar CSV</string>
+    <string name="settings_premium_subscribe_no_price">Suscribirse — anual</string>
+    <string name="settings_premium_subscribe_price">Suscribirse — %s / año</string>
+    <string name="settings_premium_restore_alt">Restaurar compra anterior</string>
+    <string name="settings_quiet_hours_title">Horas de silencio</string>
+    <string name="settings_quiet_hours_subtitle">No enviar notificaciones en el rango horario indicado</string>
+    <string name="settings_quiet_hours_start_title">Inicio del silencio</string>
+    <string name="settings_quiet_hours_end_title">Fin del silencio</string>
+    <string name="settings_sync_30min_premium">Cada 30 min ✦</string>
+    <string name="settings_sync_retry">Reintentar</string>
+    <string name="settings_csv_export_title">Exportar envíos a CSV</string>
+    <string name="settings_csv_export_subtitle">Descarga un archivo con todos tus envíos</string>
+    <string name="settings_csv_share_subject">Mis envíos — Tracker</string>
+    <string name="settings_amazon_section_title">Amazon</string>
+    <string name="settings_stats_title">Ver estadísticas</string>
+    <string name="settings_stats_subtitle">Gráficas de envíos, transportistas y más</string>
+    <string name="settings_premium_feature_title">Función Premium</string>
+    <string name="settings_premium_feature_message">Esta función está disponible solo para suscriptores Premium.\n\n✓ Sin anuncios\n✓ Envíos ilimitados\n✓ Historial completo\n✓ Sync cada 30 min\n✓ Exportar CSV</string>
+    <string name="settings_premium_feature_cta">Hazte Premium</string>
+
+    <!-- ══════════════════════════════════════════
+         STATS SCREEN
+    ══════════════════════════════════════════ -->
+    <string name="stats_title">Mis estadísticas</string>
+    <string name="stats_back">Atrás</string>
+    <string name="stats_kpi_tracked">Rastreados</string>
+    <string name="stats_kpi_delivered">Entregados</string>
+    <string name="stats_kpi_success">Éxito</string>
+    <string name="stats_kpi_active">Activos</string>
+    <string name="stats_kpi_avg_days">Días promedio</string>
+    <string name="stats_kpi_carrier">Transportista</string>
+    <string name="stats_kpi_stale">Sin movimiento</string>
+    <string name="stats_chart_shipments_by_month">Envíos por mes</string>
+    <string name="stats_chart_active_status">Estado de envíos activos</string>
+
+    <!-- ══════════════════════════════════════════
          WIDGET
     ══════════════════════════════════════════ -->
     <string name="widget_description">Muestra el estado de tu último envío en la pantalla de inicio</string>

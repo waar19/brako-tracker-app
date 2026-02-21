@@ -707,13 +707,13 @@ fun DetailScreen(
                                         tint = MaterialTheme.colorScheme.outlineVariant
                                     )
                                     Text(
-                                        text = "Aun no hay eventos",
+                                        text = stringResource(R.string.detail_no_events_title),
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Text(
-                                        text = "El transportista aun no registro movimientos. Vuelve a revisar en un rato.",
+                                        text = stringResource(R.string.detail_no_events_subtitle),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.outline,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -847,12 +847,12 @@ fun DetailScreen(
                 if (showEditTitleDialog) {
                     AlertDialog(
                         onDismissRequest = { showEditTitleDialog = false },
-                        title = { Text("Editar nombre") },
+                        title = { Text(stringResource(R.string.detail_edit_title_dialog)) },
                         text = {
                             OutlinedTextField(
                                 value = editTitleText,
                                 onValueChange = { editTitleText = it },
-                                label = { Text("Nombre del envio") },
+                                label = { Text(stringResource(R.string.detail_edit_title_label)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -865,12 +865,12 @@ fun DetailScreen(
                                 },
                                 enabled = editTitleText.isNotBlank()
                             ) {
-                                Text("Guardar")
+                                Text(stringResource(R.string.detail_edit_save))
                             }
                         },
                         dismissButton = {
                             TextButton(onClick = { showEditTitleDialog = false }) {
-                                Text("Cancelar")
+                                Text(stringResource(R.string.detail_edit_cancel))
                             }
                         }
                     )

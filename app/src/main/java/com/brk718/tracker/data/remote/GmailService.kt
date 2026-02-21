@@ -56,10 +56,16 @@ class GmailService @Inject constructor(
             context, listOf(GmailScopes.GMAIL_READONLY)
         )
         credential.selectedAccount = acct.account
+        // Envuelve el credential para añadir timeout de red (evita ANR en conexiones lentas)
+        val requestInitializer = com.google.api.client.http.HttpRequestInitializer { request ->
+            credential.initialize(request)
+            request.connectTimeout = 30_000   // 30 s para establecer conexión
+            request.readTimeout    = 30_000   // 30 s para leer respuesta
+        }
         gmailClient = Gmail.Builder(
             NetHttpTransport(),
             GsonFactory.getDefaultInstance(),
-            credential
+            requestInitializer
         ).setApplicationName("Tracker").build()
     }
 
