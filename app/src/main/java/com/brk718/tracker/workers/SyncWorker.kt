@@ -70,6 +70,13 @@ class SyncWorker @AssistedInject constructor(
                 }
             }
 
+            // Verificar que el sistema permite notificaciones antes de intentar enviarlas
+            if (!androidx.core.app.NotificationManagerCompat.from(appContext).areNotificationsEnabled()) {
+                android.util.Log.w("SyncWorker", "Notificaciones bloqueadas a nivel sistema — saltando envío")
+                updateWidgetIfInstalled()
+                return Result.success()
+            }
+
             // Enviar notificaciones: individual si hay 1, agrupada si hay 2+
             when {
                 updates.size == 1 -> {
@@ -152,7 +159,7 @@ class SyncWorker @AssistedInject constructor(
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(newStatus)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setGroup(NOTIFICATION_GROUP_KEY)
@@ -193,7 +200,7 @@ class SyncWorker @AssistedInject constructor(
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(status)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .setGroup(NOTIFICATION_GROUP_KEY)
@@ -213,7 +220,7 @@ class SyncWorker @AssistedInject constructor(
             .setContentTitle("${updates.size} envíos actualizados")
             .setContentText(updates.joinToString(", ") { it.first })
             .setStyle(inboxStyle)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(summaryPendingIntent)
             .setAutoCancel(true)
             .setGroup(NOTIFICATION_GROUP_KEY)
