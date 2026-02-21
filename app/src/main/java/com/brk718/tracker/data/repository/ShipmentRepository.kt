@@ -349,12 +349,6 @@ class ShipmentRepository @Inject constructor(
                 estimatedDelivery = estimatedDeliveryMs ?: shipment.estimatedDelivery
             ))
 
-            // Auto-archivar si el envío fue entregado
-            if (statusText == "Entregado") {
-                dao.archiveShipment(id)
-                android.util.Log.d("Tracking", "Auto-archivado envío entregado: $id")
-            }
-
             val events = tracking.checkpoints.mapIndexed { index, checkpoint ->
                 val rawDescription = checkpoint.message
                     ?: checkpoint.subtag_message
@@ -419,12 +413,6 @@ class ShipmentRepository @Inject constructor(
                 subCarrierTrackingId = result.subCarrierTrackingId ?: shipment.subCarrierTrackingId
             ))
 
-            // Auto-archivar si el envío fue entregado
-            if (status.lowercase().let { it.contains("entregado") || it.contains("delivered") }) {
-                dao.archiveShipment(id)
-                android.util.Log.d("Tracking", "Auto-archivado envío Amazon entregado: $id")
-            }
-
             // Guardar eventos
             if (result.events.isNotEmpty()) {
                 val events = result.events.mapIndexed { index, event ->
@@ -482,12 +470,6 @@ class ShipmentRepository @Inject constructor(
                 title = fixedTitle,
                 lastUpdate = System.currentTimeMillis()
             ))
-
-            // Auto-archivar si el envío fue entregado
-            if (displayStatus.lowercase().contains("entregado")) {
-                dao.archiveShipment(id)
-                android.util.Log.d("Tracking", "Auto-archivado envío Interrapidísimo entregado: $id")
-            }
 
             // Guardar eventos
             if (result.events.isNotEmpty()) {
