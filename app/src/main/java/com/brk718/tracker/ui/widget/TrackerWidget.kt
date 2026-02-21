@@ -50,13 +50,15 @@ import java.util.Date
 import java.util.Locale
 
 // -- Claves del estado del widget ---------------------------------------------
-private val KEY_IS_PREMIUM       = booleanPreferencesKey("widget_is_premium")
-private val KEY_HAS_SHIPMENTS    = booleanPreferencesKey("widget_has_shipments")
-private val KEY_SHIPMENT_TITLE   = stringPreferencesKey("widget_title")
-private val KEY_SHIPMENT_STATUS  = stringPreferencesKey("widget_status")
-private val KEY_SHIPMENT_CARRIER = stringPreferencesKey("widget_carrier")
-private val KEY_LAST_UPDATED     = stringPreferencesKey("widget_last_updated")
-private val KEY_SHIPMENT_COUNT   = stringPreferencesKey("widget_count")
+private val KEY_IS_PREMIUM          = booleanPreferencesKey("widget_is_premium")
+private val KEY_HAS_SHIPMENTS       = booleanPreferencesKey("widget_has_shipments")
+private val KEY_SHIPMENT_TITLE      = stringPreferencesKey("widget_title")
+private val KEY_SHIPMENT_STATUS     = stringPreferencesKey("widget_status")
+private val KEY_SHIPMENT_CARRIER    = stringPreferencesKey("widget_carrier")
+private val KEY_LAST_UPDATED        = stringPreferencesKey("widget_last_updated")
+private val KEY_SHIPMENT_COUNT      = stringPreferencesKey("widget_count")
+private val KEY_ESTIMATED_DELIVERY  = stringPreferencesKey("widget_eta")
+private val KEY_LAST_EVENT          = stringPreferencesKey("widget_last_event")
 
 // -- Entry point Hilt ---------------------------------------------------------
 @EntryPoint
@@ -72,13 +74,15 @@ class TrackerWidget : GlanceAppWidget() {
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        var isPremium    = false
-        var hasShipments = false
-        var title        = ""
-        var status       = ""
-        var carrier      = ""
-        var dateStr      = ""
-        var countStr     = ""
+        var isPremium       = false
+        var hasShipments    = false
+        var title           = ""
+        var status          = ""
+        var carrier         = ""
+        var dateStr         = ""
+        var countStr        = ""
+        var etaStr          = ""
+        var lastEventStr    = ""
 
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
@@ -93,7 +97,11 @@ class TrackerWidget : GlanceAppWidget() {
             val shipments = repo.activeShipments.first()
             val latest    = shipments.firstOrNull()
             hasShipments  = shipments.isNotEmpty()
-            countStr      = if (shipments.size > 1) "+${shipments.size - 1} mas" else ""
+            countStr      = when {
+                shipments.size > 1 -> "${shipments.size} activos"
+                shipments.size == 1 -> "1 activo"
+                else -> ""
+            }
 
             dateStr = latest?.let {
                 SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(it.shipment.lastUpdate))
@@ -104,18 +112,34 @@ class TrackerWidget : GlanceAppWidget() {
             carrier = latest?.let {
                 ShipmentRepository.displayName(it.shipment.carrier)
             } ?: ""
+
+            // Fecha estimada de entrega
+            etaStr = latest?.shipment?.estimatedDelivery
+                ?.takeIf { status.lowercase() != "entregado" }
+                ?.let { SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(Date(it)) }
+                ?: ""
+
+            // Último evento (descripción breve)
+            lastEventStr = latest?.events
+                ?.maxByOrNull { it.timestamp }
+                ?.description
+                ?.take(50)
+                ?: ""
+
         } catch (e: Exception) {
             android.util.Log.e("TrackerWidget", "Error cargando datos: ${e.message}", e)
         }
 
         updateAppWidgetState(context, id) { p ->
-            p[KEY_IS_PREMIUM]       = isPremium
-            p[KEY_HAS_SHIPMENTS]    = hasShipments
-            p[KEY_SHIPMENT_TITLE]   = title
-            p[KEY_SHIPMENT_STATUS]  = status
-            p[KEY_SHIPMENT_CARRIER] = carrier
-            p[KEY_LAST_UPDATED]     = dateStr
-            p[KEY_SHIPMENT_COUNT]   = countStr
+            p[KEY_IS_PREMIUM]         = isPremium
+            p[KEY_HAS_SHIPMENTS]      = hasShipments
+            p[KEY_SHIPMENT_TITLE]     = title
+            p[KEY_SHIPMENT_STATUS]    = status
+            p[KEY_SHIPMENT_CARRIER]   = carrier
+            p[KEY_LAST_UPDATED]       = dateStr
+            p[KEY_SHIPMENT_COUNT]     = countStr
+            p[KEY_ESTIMATED_DELIVERY] = etaStr
+            p[KEY_LAST_EVENT]         = lastEventStr
         }
 
         provideContent {
@@ -129,14 +153,16 @@ class TrackerWidget : GlanceAppWidget() {
 // -- Composicion del widget ---------------------------------------------------
 @Composable
 private fun WidgetContent() {
-    val state        = currentState<Preferences>()
-    val isPremium    = state[KEY_IS_PREMIUM] ?: false
-    val hasShipments = state[KEY_HAS_SHIPMENTS] ?: false
-    val title        = state[KEY_SHIPMENT_TITLE] ?: ""
-    val status       = state[KEY_SHIPMENT_STATUS] ?: ""
-    val carrier      = state[KEY_SHIPMENT_CARRIER] ?: ""
-    val lastUpdated  = state[KEY_LAST_UPDATED] ?: ""
-    val extraCount   = state[KEY_SHIPMENT_COUNT] ?: ""
+    val state             = currentState<Preferences>()
+    val isPremium         = state[KEY_IS_PREMIUM] ?: false
+    val hasShipments      = state[KEY_HAS_SHIPMENTS] ?: false
+    val title             = state[KEY_SHIPMENT_TITLE] ?: ""
+    val status            = state[KEY_SHIPMENT_STATUS] ?: ""
+    val carrier           = state[KEY_SHIPMENT_CARRIER] ?: ""
+    val lastUpdated       = state[KEY_LAST_UPDATED] ?: ""
+    val extraCount        = state[KEY_SHIPMENT_COUNT] ?: ""
+    val estimatedDelivery = state[KEY_ESTIMATED_DELIVERY] ?: ""
+    val lastEvent         = state[KEY_LAST_EVENT] ?: ""
 
     if (!hasShipments) {
         WidgetNoShipments()
@@ -147,7 +173,9 @@ private fun WidgetContent() {
             carrier = carrier,
             lastUpdated = lastUpdated,
             isPremium = isPremium,
-            extraCount = extraCount
+            extraCount = extraCount,
+            estimatedDelivery = estimatedDelivery,
+            lastEvent = lastEvent
         )
     }
 }
@@ -224,7 +252,9 @@ private fun WidgetShipmentInfo(
     carrier: String,
     lastUpdated: String,
     isPremium: Boolean,
-    extraCount: String
+    extraCount: String,
+    estimatedDelivery: String = "",
+    lastEvent: String = ""
 ) {
     Column(
         modifier = GlanceModifier
@@ -317,6 +347,32 @@ private fun WidgetShipmentInfo(
                         color = GlanceTheme.colors.onSecondaryContainer
                     ),
                     maxLines = 1
+                )
+            }
+
+            // Último evento (descripción breve)
+            if (lastEvent.isNotEmpty()) {
+                Spacer(GlanceModifier.height(5.dp))
+                Text(
+                    text = lastEvent,
+                    style = TextStyle(
+                        fontSize = 10.sp,
+                        color = GlanceTheme.colors.onSurfaceVariant
+                    ),
+                    maxLines = 1
+                )
+            }
+
+            // Fecha estimada de entrega
+            if (estimatedDelivery.isNotEmpty()) {
+                Spacer(GlanceModifier.height(4.dp))
+                Text(
+                    text = "~$estimatedDelivery",
+                    style = TextStyle(
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 10.sp,
+                        color = GlanceTheme.colors.primary
+                    )
                 )
             }
 

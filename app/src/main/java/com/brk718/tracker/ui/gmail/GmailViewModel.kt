@@ -80,11 +80,21 @@ class GmailViewModel @Inject constructor(
             _uiState.update { it.copy(isScanning = true, error = null) }
             try {
                 val shipments = gmailService.fetchRecentTrackingNumbers()
+
+                // Pre-marcar como importados los que ya existen en la BD (activos + archivados)
+                val allSaved = repository.allShipments.first()
+                val savedTrackingNumbers = allSaved.map { it.shipment.trackingNumber.trim() }.toSet()
+                val alreadyImported = shipments
+                    .map { it.trackingNumber.trim() }
+                    .filter { it in savedTrackingNumbers }
+                    .toSet()
+
                 _uiState.update {
                     it.copy(
                         isScanning = false,
                         hasScanned = true,
-                        foundShipments = shipments
+                        foundShipments = shipments,
+                        importedIds = it.importedIds + alreadyImported
                     )
                 }
             } catch (e: Exception) {

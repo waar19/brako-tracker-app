@@ -78,7 +78,8 @@ data class AfterShipTracking(
     val slug: String,
     val tag: String,           // Estado normalizado: "InTransit", "Delivered", etc.
     val subtag_message: String?,
-    val checkpoints: List<AfterShipCheckpoint>
+    val checkpoints: List<AfterShipCheckpoint>,
+    val expected_delivery: String? = null // ISO 8601 fecha estimada de entrega
 )
 
 data class AfterShipCheckpoint(

@@ -1,5 +1,7 @@
 package com.brk718.tracker.data.repository
 
+import android.content.Context
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import com.brk718.tracker.data.local.ShipmentDao
 import com.brk718.tracker.data.local.ShipmentEntity
 import com.brk718.tracker.data.local.ShipmentWithEvents
@@ -11,7 +13,9 @@ import com.brk718.tracker.data.remote.CreateTrackingRequest
 import com.brk718.tracker.data.remote.DetectCourierBody
 import com.brk718.tracker.data.remote.DetectCourierRequest
 import com.brk718.tracker.data.remote.TrackingApi
+import com.brk718.tracker.ui.widget.TrackerWidget
 import com.brk718.tracker.util.StatusTranslator
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -26,6 +30,7 @@ import javax.inject.Singleton
 
 @Singleton
 class ShipmentRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val dao: ShipmentDao,
     private val api: TrackingApi,
     private val amazonService: AmazonTrackingService,
@@ -80,6 +85,40 @@ class ShipmentRepository @Inject constructor(
             "amazon" to "amazon",
             "amazon logistics" to "amazon",
         )
+
+        /**
+         * Genera la URL de seguimiento en el sitio web del carrier para abrir en el navegador.
+         * Devuelve null si el carrier no tiene URL de seguimiento conocida.
+         */
+        fun trackingUrl(carrier: String, trackingNumber: String): String? {
+            val encoded = java.net.URLEncoder.encode(trackingNumber, "UTF-8")
+            return when (carrier.lowercase().trim()) {
+                "amazon"              -> "https://track.amazon.com/tracking/$trackingNumber"
+                "fedex"               -> "https://www.fedex.com/apps/fedextrack/?tracknumbers=$encoded"
+                "ups"                 -> "https://www.ups.com/track?loc=es&tracknum=$encoded"
+                "usps"                -> "https://tools.usps.com/go/TrackConfirmAction?tLabels=$encoded"
+                "dhl"                 -> "https://www.dhl.com/es-co-en/home/tracking.html?tracking-id=$encoded"
+                "coordinadora"        -> "https://www.coordinadora.com/portafolio-de-servicios/servicios-en-linea/rastrear-guias/?guia=$encoded"
+                "servientrega"        -> "https://www.servientrega.com/wps/portal/colombia/rastreo-de-envios?tracking=$encoded"
+                "interrapidisimo-scraper", "inter-rapidisimo"
+                                      -> "https://www.interrapidisimo.com/rastreo/?tracking=$encoded"
+                "envia-co"            -> "https://www.envia.co/rastreo?guia=$encoded"
+                "tcc-co"              -> "https://www.tcc.com.co/rastreo/?codigo=$encoded"
+                "deprisa"             -> "https://www.deprisa.com/rastrear?guia=$encoded"
+                "saferbo"             -> "https://www.saferbo.com.co/rastreo?guia=$encoded"
+                "472-co"              -> "https://www.472.com.co/rastreo?guia=$encoded"
+                "logysto"             -> "https://www.logysto.com/rastreo?guia=$encoded"
+                "listo"               -> "https://www.listo.com.co/rastreo?guia=$encoded"
+                "treda"               -> "https://www.treda.co/rastreo?guia=$encoded"
+                "speed-co"            -> "https://www.speed.com.co/rastreo?guia=$encoded"
+                "castores"            -> "https://www.castores.com.co/rastreo?guia=$encoded"
+                "avianca-cargo"       -> "https://www.aviancacargo.com/rastreo?guia=$encoded"
+                "picap"               -> "https://www.picap.app/rastreo?guia=$encoded"
+                "mensajerosurbanos"   -> "https://www.mensajerosurbanos.com/rastreo?guia=$encoded"
+                "pasarex"             -> "https://pasarex.com/co/"
+                else                  -> null
+            }
+        }
 
         /**
          * Resuelve el slug de AfterShip (o slug interno) a partir del nombre del carrier
@@ -171,6 +210,7 @@ class ShipmentRepository @Inject constructor(
                 android.util.Log.d("Tracking", "Usando Interrapidísimo scraper para $trackingNumber")
                 dao.insertShipment(shipment.copy(carrier = "interrapidisimo-scraper"))
                 refreshShipmentInterrapidisimo(id)
+                notifyWidget()
                 return@withContext
             }
 
@@ -223,6 +263,7 @@ class ShipmentRepository @Inject constructor(
                     status = "Seguimiento manual"
                 ))
             }
+            notifyWidget()
         }
     }
 
@@ -274,9 +315,15 @@ class ShipmentRepository @Inject constructor(
                 tagTranslation
             }
 
+            // Parsear fecha estimada de entrega si AfterShip la devuelve
+            val estimatedDeliveryMs = tracking.expected_delivery
+                ?.takeIf { it.isNotBlank() }
+                ?.let { parseIso8601Date(it) }
+
             dao.insertShipment(shipment.copy(
                 status = statusText,
-                lastUpdate = System.currentTimeMillis()
+                lastUpdate = System.currentTimeMillis(),
+                estimatedDelivery = estimatedDeliveryMs ?: shipment.estimatedDelivery
             ))
 
             // Auto-archivar si el envío fue entregado
@@ -344,7 +391,9 @@ class ShipmentRepository @Inject constructor(
                 carrier = "Amazon",
                 title = fixedTitle,
                 status = status,
-                lastUpdate = System.currentTimeMillis()
+                lastUpdate = System.currentTimeMillis(),
+                subCarrierName = result.subCarrierName ?: shipment.subCarrierName,
+                subCarrierTrackingId = result.subCarrierTrackingId ?: shipment.subCarrierTrackingId
             ))
 
             // Auto-archivar si el envío fue entregado
@@ -472,18 +521,51 @@ class ShipmentRepository @Inject constructor(
 
     suspend fun archiveShipment(id: String) {
         dao.archiveShipment(id)
+        notifyWidget()
     }
 
     suspend fun unarchiveShipment(id: String) {
         dao.unarchiveShipment(id)
+        notifyWidget()
     }
 
     suspend fun deleteShipment(id: String) {
         dao.deleteShipment(id)
+        notifyWidget()
+    }
+
+    /** Dispara una actualización inmediata del widget de pantalla de inicio. */
+    private suspend fun notifyWidget() {
+        try {
+            val manager = GlanceAppWidgetManager(context)
+            val glanceIds = manager.getGlanceIds(TrackerWidget::class.java)
+            glanceIds.forEach { glanceId ->
+                TrackerWidget().update(context, glanceId)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("ShipmentRepository", "Error actualizando widget: ${e.message}")
+        }
     }
 
     suspend fun countAllShipments(): Int = withContext(Dispatchers.IO) { dao.countAllShipments() }
     suspend fun countDeliveredShipments(): Int = withContext(Dispatchers.IO) { dao.countDeliveredShipments() }
+
+    /** Parsea un string ISO 8601 (ej. "2025-02-28T00:00:00") a timestamp en milisegundos. */
+    private fun parseIso8601Date(dateStr: String): Long? {
+        return try {
+            val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+            fmt.timeZone = TimeZone.getTimeZone("UTC")
+            fmt.parse(dateStr.take(19))?.time
+        } catch (e: Exception) {
+            try {
+                val fmtDate = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                fmtDate.timeZone = TimeZone.getTimeZone("UTC")
+                fmtDate.parse(dateStr.take(10))?.time
+            } catch (e2: Exception) {
+                null
+            }
+        }
+    }
 
     private fun parseAmazonDate(dateStr: String): Long? {
         if (dateStr.isBlank()) return null

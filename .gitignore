@@ -18,3 +18,4 @@ app/brako-release.jks
 app/release/*.aab
 app/google-services.json
 app/release/app-release.aab
+app/release/app-release.aab

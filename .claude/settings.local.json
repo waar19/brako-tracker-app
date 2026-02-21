@@ -84,7 +84,11 @@
       "Bash(git -C:*)",
       "Bash(\"C:/Users/waar1/AndroidStudioProjects/Tracker/gradlew.bat\" assembleDebug)",
       "Bash(gradlew assembleDebug:*)",
-      "Bash(./gradlew.bat assembleDebug:*)"
+      "Bash(./gradlew.bat assembleDebug:*)",
+      "Bash(./gradlew.bat clean)",
+      "Bash(./gradlew.bat assembleRelease:*)",
+      "Bash(./gradlew.bat:*)",
+      "Bash(find:*)"
     ]
   }
 }

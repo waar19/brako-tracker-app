@@ -25,9 +25,9 @@ class AdManager @Inject constructor(
     companion object {
         private const val TAG = "AdManager"
 
-        // IDs de producción
-        private const val BANNER_AD_UNIT_ID_PROD       = "ca-app-pub-5629360571814219/4080460471"
-        private const val INTERSTITIAL_AD_UNIT_ID_PROD = "ca-app-pub-5629360571814219/4620775704"
+        // IDs de producción (app ca-app-pub-5629360571814219~4389970712)
+        private const val BANNER_AD_UNIT_ID_PROD       = "ca-app-pub-5629360571814219/4788233029"
+        private const val INTERSTITIAL_AD_UNIT_ID_PROD = "ca-app-pub-5629360571814219/9410508896"
 
         // IDs de prueba oficiales de Google (siempre seguros, nunca cobran)
         private const val BANNER_AD_UNIT_ID_TEST       = "ca-app-pub-3940256099942544/6300978111"

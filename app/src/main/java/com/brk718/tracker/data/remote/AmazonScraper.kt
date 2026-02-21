@@ -2,6 +2,7 @@ package com.brk718.tracker.data.remote
 
 import android.annotation.SuppressLint
 import android.content.Context
+import com.brk718.tracker.BuildConfig
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -45,7 +46,9 @@ class AmazonScraper @Inject constructor(
         val arrivalDate: String?,
         val location: String?,
         val progress: Int?,
-        val events: List<ScrapedEvent> = emptyList()
+        val events: List<ScrapedEvent> = emptyList(),
+        val subCarrierName: String? = null,       // Ej: "PASAREX"
+        val subCarrierTrackingId: String? = null  // Ej: "AMZPSR021419193"
     )
 
     // Scripts separados para evitar problemas de escape al empaquetar HTML en JSON
@@ -247,12 +250,65 @@ class AmazonScraper @Inject constructor(
         // ===== LOCATION PARA MAPA =====
         val location = uniqueEvents.firstOrNull { !it.location.isNullOrBlank() }?.location
 
+        // ===== SUB-CARRIER (ej. PASAREX + AMZPSR...) =====
+        // Amazon muestra el carrier de última milla en varios posibles elementos:
+        //   - .od-carrier-info, .od-carrier-name  (clase dedicada)
+        //   - Texto del estilo "Enviado con PASAREX | AMZPSR021419193"
+        //   - Texto "Shipped with PASAREX | AMZPSR021419193" (en inglés)
+        var subCarrierName: String? = null
+        var subCarrierTrackingId: String? = null
+
+        // Intento 1: selectores de clase conocidos
+        val carrierEl = doc.selectFirst(
+            ".od-carrier-name, .od-carrier-info, [class*=carrier-name], [class*=carrier-info]"
+        )
+        if (carrierEl != null) {
+            val txt = carrierEl.text().trim()
+            if (txt.isNotBlank()) subCarrierName = txt
+            Log.d(TAG, "Sub-carrier (clase): $txt")
+        }
+
+        // Intento 2: buscar texto "Enviado con X | Y" o "Shipped with X | Y" en todo el DOM
+        if (subCarrierName == null) {
+            val shippedPattern = Regex(
+                """(?:enviado con|shipped with)\s+([A-Z0-9 ]+?)(?:\s*[|\-–]\s*([A-Z0-9]+))?$""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)
+            )
+            val allText = doc.body()?.wholeText() ?: ""
+            val match = shippedPattern.find(allText)
+            if (match != null) {
+                subCarrierName = match.groupValues[1].trim().takeIf { it.isNotBlank() }
+                subCarrierTrackingId = match.groupValues[2].trim().takeIf { it.isNotBlank() }
+                Log.d(TAG, "Sub-carrier (texto): $subCarrierName | $subCarrierTrackingId")
+            }
+        }
+
+        // Intento 3: buscar el patrón AMZPSR/AMZL directamente en texto visible
+        if (subCarrierTrackingId == null) {
+            val amzIdPattern = Regex("""(AMZPSR[A-Z0-9]+|AMZL[A-Z0-9]+)""")
+            val allText = doc.body()?.wholeText() ?: ""
+            subCarrierTrackingId = amzIdPattern.find(allText)?.value
+            if (subCarrierTrackingId != null) {
+                Log.d(TAG, "Sub-carrier ID (patrón AMZPSR): $subCarrierTrackingId")
+                // Si encontramos el ID pero no el nombre, inferir el nombre del prefijo
+                if (subCarrierName == null) {
+                    subCarrierName = when {
+                        subCarrierTrackingId!!.startsWith("AMZPSR") -> "PASAREX"
+                        subCarrierTrackingId!!.startsWith("AMZL")   -> "Amazon Logistics"
+                        else -> null
+                    }
+                }
+            }
+        }
+
         return ScrapedInfo(
             status = status,
             arrivalDate = arrivalDate?.ifBlank { null },
             location = location,
             progress = null,
-            events = uniqueEvents
+            events = uniqueEvents,
+            subCarrierName = subCarrierName,
+            subCarrierTrackingId = subCarrierTrackingId
         )
     }
 
@@ -469,26 +525,28 @@ class AmazonScraper @Inject constructor(
 
                             Log.d(TAG, "HTML extraído, longitud: ${html.length}")
 
-                            // DEBUG: guardar HTML capturado al almacenamiento interno
-                            try {
-                                val file = java.io.File(context.filesDir, "amazon_debug.html")
-                                file.writeText(html)
-                                Log.d(TAG, "HTML guardado en: ${file.absolutePath}")
-                            } catch (e: Exception) {
-                                Log.w(TAG, "No se pudo guardar HTML debug: ${e.message}")
-                            }
-                            // DEBUG: loguear selectores clave para diagnosticar estructura real
-                            try {
-                                val testDoc = org.jsoup.Jsoup.parse(html)
-                                Log.d(TAG, "DEBUG od-status-message (h3): '${testDoc.selectFirst("h3.od-status-message")?.text()}'")
-                                Log.d(TAG, "DEBUG od-status-message (div): '${testDoc.selectFirst("div.od-status-message")?.text()}'")
-                                Log.d(TAG, "DEBUG od-tracking-sheet-content-0: ${testDoc.selectFirst("#od-tracking-sheet-content-0") != null}")
-                                Log.d(TAG, "DEBUG od-tracking-event-description-column count: ${testDoc.select(".od-tracking-event-description-column").size}")
-                                Log.d(TAG, "DEBUG od-vertical-line-wrapper count: ${testDoc.select(".od-vertical-line-wrapper").size}")
-                                val trackContainerLen = testDoc.selectFirst("#od-tracking-sheet-content-0")?.childrenSize() ?: 0
-                                Log.d(TAG, "DEBUG od-tracking-sheet-content-0 children: $trackContainerLen")
-                            } catch (e: Exception) {
-                                Log.w(TAG, "DEBUG parse error: ${e.message}")
+                            if (BuildConfig.DEBUG) {
+                                // DEBUG: guardar HTML capturado al almacenamiento interno
+                                try {
+                                    val file = java.io.File(context.filesDir, "amazon_debug.html")
+                                    file.writeText(html)
+                                    Log.d(TAG, "HTML guardado en: ${file.absolutePath}")
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "No se pudo guardar HTML debug: ${e.message}")
+                                }
+                                // DEBUG: loguear selectores clave para diagnosticar estructura real
+                                try {
+                                    val testDoc = org.jsoup.Jsoup.parse(html)
+                                    Log.d(TAG, "DEBUG od-status-message (h3): '${testDoc.selectFirst("h3.od-status-message")?.text()}'")
+                                    Log.d(TAG, "DEBUG od-status-message (div): '${testDoc.selectFirst("div.od-status-message")?.text()}'")
+                                    Log.d(TAG, "DEBUG od-tracking-sheet-content-0: ${testDoc.selectFirst("#od-tracking-sheet-content-0") != null}")
+                                    Log.d(TAG, "DEBUG od-tracking-event-description-column count: ${testDoc.select(".od-tracking-event-description-column").size}")
+                                    Log.d(TAG, "DEBUG od-vertical-line-wrapper count: ${testDoc.select(".od-vertical-line-wrapper").size}")
+                                    val trackContainerLen = testDoc.selectFirst("#od-tracking-sheet-content-0")?.childrenSize() ?: 0
+                                    Log.d(TAG, "DEBUG od-tracking-sheet-content-0 children: $trackContainerLen")
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "DEBUG parse error: ${e.message}")
+                                }
                             }
 
                             if (html.isBlank()) {

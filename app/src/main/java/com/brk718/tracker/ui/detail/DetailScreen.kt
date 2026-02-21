@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -47,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import com.brk718.tracker.util.ShareCardGenerator
 import androidx.compose.ui.Modifier
@@ -193,6 +195,7 @@ fun DetailScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
 
     // Estado para el diálogo del mapa
     var showMapDialog by remember { mutableStateOf(false) }
@@ -318,7 +321,7 @@ fun DetailScreen(
                                 }
                             }
                             Spacer(Modifier.height(4.dp))
-                            // Carrier + tracking number + ícono de copiar
+                            // Carrier + tracking number + ícono de copiar + abrir en web
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth()
@@ -329,6 +332,7 @@ fun DetailScreen(
                                     color = headerContentColor.copy(alpha = 0.75f),
                                     modifier = Modifier.weight(1f)
                                 )
+                                // Copiar tracking number
                                 IconButton(
                                     onClick = {
                                         clipboardManager.setText(AnnotatedString(shipment.trackingNumber))
@@ -342,7 +346,78 @@ fun DetailScreen(
                                         tint = headerContentColor.copy(alpha = 0.7f)
                                     )
                                 }
+                                // Abrir en el sitio web del carrier
+                                val trackUrl = ShipmentRepository.trackingUrl(
+                                    shipment.carrier,
+                                    shipment.trackingNumber
+                                )
+                                if (trackUrl != null) {
+                                    IconButton(
+                                        onClick = { uriHandler.openUri(trackUrl) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.OpenInNew,
+                                            contentDescription = "Abrir en el sitio del carrier",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = headerContentColor.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
                             }
+
+                            // Sub-carrier row (ej. PASAREX + AMZPSR021419193)
+                            val subName = shipment.subCarrierName
+                            val subId   = shipment.subCarrierTrackingId
+                            // URL del sitio del sub-carrier (no necesita el ID para existir)
+                            val subUrl  = ShipmentRepository.trackingUrl(
+                                subName?.lowercase() ?: "", subId ?: ""
+                            )
+                            if (!subName.isNullOrBlank() || !subId.isNullOrBlank()) {
+                                Spacer(Modifier.height(4.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = listOfNotNull(subName, subId).joinToString(" · "),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = headerContentColor.copy(alpha = 0.65f),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    // Copiar ID del sub-carrier (solo si hay ID)
+                                    if (!subId.isNullOrBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                clipboardManager.setText(AnnotatedString(subId))
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.ContentCopy,
+                                                contentDescription = "Copiar guía $subName",
+                                                modifier = Modifier.size(14.dp),
+                                                tint = headerContentColor.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                    }
+                                    // Abrir web del carrier (siempre que haya URL, con o sin ID)
+                                    if (subUrl != null) {
+                                        IconButton(
+                                            onClick = { uriHandler.openUri(subUrl) },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.OpenInNew,
+                                                contentDescription = "Abrir $subName en navegador",
+                                                modifier = Modifier.size(14.dp),
+                                                tint = headerContentColor.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             Spacer(Modifier.height(12.dp))
 
                             val needsLogin = shipment.status == "LOGIN_REQUIRED" ||

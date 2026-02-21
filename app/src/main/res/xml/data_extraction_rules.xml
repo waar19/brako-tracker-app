@@ -1,19 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
--->
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reglas de extracción de datos para Android 12+ (API 31+)
+     https://developer.android.com/about/versions/12/backup-restore#xml-changes
+     Nota: cuando no hay <include>, Android hace backup de todo por defecto.
+     Solo excluimos lo que NO queremos respaldar. -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- Excluir caché de tiles del mapa osmdroid (grande e inútil en otro dispositivo) -->
+        <exclude domain="sharedpref" path="osmdroid" />
+        <!-- Excluir archivos internos de debug -->
+        <exclude domain="file" path="." />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <!-- Excluir caché de tiles del mapa osmdroid -->
+        <exclude domain="sharedpref" path="osmdroid" />
     </device-transfer>
-    -->
 </data-extraction-rules>

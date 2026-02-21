@@ -34,6 +34,10 @@ class SyncWorker @AssistedInject constructor(
             val prefs = prefsRepository.preferences.first()
             val activeShipments = repository.activeShipments.first()
 
+            // Recopilar todas las actualizaciones antes de notificar
+            data class ShipmentUpdate(val title: String, val newStatus: String, val id: String)
+            val updates = mutableListOf<ShipmentUpdate>()
+
             activeShipments.forEach { shipmentWithEvents ->
                 val oldStatus = shipmentWithEvents.shipment.status
                 try {
@@ -43,7 +47,7 @@ class SyncWorker @AssistedInject constructor(
                     val updated = repository.getShipment(shipmentWithEvents.shipment.id).first()
                     val newStatus = updated?.shipment?.status ?: return@forEach
 
-                    // Notificar si el estado cambió y las notificaciones están habilitadas
+                    // Acumular actualizaciones de estado
                     if (newStatus != oldStatus) {
                         // Contar entregas exitosas para el rating dialog
                         if (newStatus.lowercase().contains("entregado")) {
@@ -56,11 +60,7 @@ class SyncWorker @AssistedInject constructor(
                                 true
                             }
                             if (shouldNotify) {
-                                sendNotification(
-                                    title = updated.shipment.title,
-                                    newStatus = newStatus,
-                                    shipmentId = updated.shipment.id
-                                )
+                                updates.add(ShipmentUpdate(updated.shipment.title, newStatus, updated.shipment.id))
                             }
                         }
                     }
@@ -69,6 +69,18 @@ class SyncWorker @AssistedInject constructor(
                     CrashReporter.recordException(e)
                 }
             }
+
+            // Enviar notificaciones: individual si hay 1, agrupada si hay 2+
+            when {
+                updates.size == 1 -> {
+                    val u = updates.first()
+                    sendIndividualNotification(u.title, u.newStatus, u.id)
+                }
+                updates.size >= 2 -> {
+                    sendGroupedNotification(updates.map { Triple(it.title, it.newStatus, it.id) })
+                }
+            }
+
             // Actualizar el widget con los datos frescos
             updateWidgetIfInstalled()
 
@@ -121,7 +133,7 @@ class SyncWorker @AssistedInject constructor(
             lower.contains("exception")
     }
 
-    private fun sendNotification(title: String, newStatus: String, shipmentId: String) {
+    private fun sendIndividualNotification(title: String, newStatus: String, shipmentId: String) {
         val notificationManager =
             appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -143,8 +155,77 @@ class SyncWorker @AssistedInject constructor(
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .setGroup(NOTIFICATION_GROUP_KEY)
+            .setNumber(1)
             .build()
 
         notificationManager.notify(shipmentId.hashCode(), notification)
+    }
+
+    private fun sendGroupedNotification(updates: List<Triple<String, String, String>>) {
+        val notificationManager =
+            appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        // Intento que abre la pantalla principal
+        val summaryIntent = Intent(appContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val summaryPendingIntent = PendingIntent.getActivity(
+            appContext,
+            SUMMARY_NOTIFICATION_ID,
+            summaryIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Publicar una notificación individual por envío (parte del grupo)
+        updates.forEach { (title, status, id) ->
+            val intent = Intent(appContext, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("shipmentId", id)
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                appContext,
+                id.hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val notification = NotificationCompat.Builder(appContext, TrackerApp.CHANNEL_SHIPMENT_UPDATES)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setContentText(status)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setGroup(NOTIFICATION_GROUP_KEY)
+                .build()
+            notificationManager.notify(id.hashCode(), notification)
+        }
+
+        // Notificación de resumen (requerida para el grupo en Android)
+        val inboxStyle = NotificationCompat.InboxStyle()
+            .setBigContentTitle("${updates.size} envíos actualizados")
+        updates.forEach { (title, status, _) ->
+            inboxStyle.addLine("$title — $status")
+        }
+
+        val summaryNotification = NotificationCompat.Builder(appContext, TrackerApp.CHANNEL_SHIPMENT_UPDATES)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("${updates.size} envíos actualizados")
+            .setContentText(updates.joinToString(", ") { it.first })
+            .setStyle(inboxStyle)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(summaryPendingIntent)
+            .setAutoCancel(true)
+            .setGroup(NOTIFICATION_GROUP_KEY)
+            .setGroupSummary(true)
+            .setNumber(updates.size)
+            .build()
+
+        notificationManager.notify(SUMMARY_NOTIFICATION_ID, summaryNotification)
+    }
+
+    companion object {
+        private const val NOTIFICATION_GROUP_KEY = "com.brk718.tracker.SHIPMENT_UPDATES"
+        private const val SUMMARY_NOTIFICATION_ID = 0
     }
 }
