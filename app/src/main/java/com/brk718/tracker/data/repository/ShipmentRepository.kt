@@ -105,7 +105,7 @@ class ShipmentRepository @Inject constructor(
             "picap" to "picap",
             "mensajeros urbanos" to "mensajerosurbanos",
             "mensajerosurbanos" to "mensajerosurbanos",
-            // Internacionales
+            // Internacionales (genéricos)
             "fedex" to "fedex",
             "ups" to "ups",
             "usps" to "usps",
@@ -113,6 +113,31 @@ class ShipmentRepository @Inject constructor(
             "dhl express" to "dhl",
             "amazon" to "amazon",
             "amazon logistics" to "amazon",
+            // ── México ──────────────────────────────────────────────────────────
+            "estafeta" to "estafeta",
+            "redpack" to "redpack",
+            "paquetexpress" to "paquetexpress",
+            "99minutos" to "99minutos",
+            "j&t express mx" to "jet-express",
+            "j&t express" to "jet-express",
+            "jet-express" to "jet-express",
+            "ivoy" to "ivoy",
+            "correos de méxico" to "correos-de-mexico",
+            "correos de mexico" to "correos-de-mexico",
+            "correos-de-mexico" to "correos-de-mexico",
+            // ── Chile ───────────────────────────────────────────────────────────
+            "chilexpress" to "chilexpress",
+            "starken" to "starken",
+            "blue express" to "bluex-cl",
+            "bluex" to "bluex-cl",
+            "bluex-cl" to "bluex-cl",
+            "correos de chile" to "correos-de-chile",
+            "correos-de-chile" to "correos-de-chile",
+            "shippify" to "shippify",
+            // ── MercadoLibre (entrada manual; prefijo ME → auto-detect) ─────────
+            "mercado envíos" to "mercadolibre",
+            "mercado envios" to "mercadolibre",
+            "mercadolibre" to "mercadolibre",
         )
 
         /**
@@ -145,6 +170,27 @@ class ShipmentRepository @Inject constructor(
                 "picap"               -> "https://www.picap.app/rastreo?guia=$encoded"
                 "mensajerosurbanos"   -> "https://www.mensajerosurbanos.com/rastreo?guia=$encoded"
                 "pasarex"             -> "https://pasarex.com/co/"
+                // ── México ──────────────────────────────────────────────────────
+                "estafeta"            -> "https://www.estafeta.com/herramientas/rastreo?guiaNumbers=$encoded"
+                "redpack"             -> "https://www.redpack.com.mx/es/rastreo/?guia=$encoded"
+                "paquetexpress"       -> "https://www.paquetexpress.com.mx/rastreo/$encoded"
+                "99minutos"           -> "https://www.99minutos.com/track/$encoded"
+                "jet-express"         -> "https://www.jtexpress.mx/index/query/gzquery.html?bills=$encoded"
+                "ivoy"                -> "https://www.ivoy.com.mx/tracking/$encoded"
+                "correos-de-mexico"   -> "https://www.correosdemexico.gob.mx/SSLServicios/ConsultaCP/Rastreo.aspx?id=$encoded"
+                // ── Chile ────────────────────────────────────────────────────────
+                "chilexpress"         -> "https://www.chilexpress.cl/views/chilevision/informacion-de-envio.aspx?NroDocumento=$encoded"
+                "starken"             -> "https://www.starken.cl/seguimiento?codigo=$encoded"
+                "bluex-cl"            -> "https://www.bluex.cl/tracking/?tracking=$encoded"
+                "correos-de-chile"    -> "https://www.correos.cl/seguimiento-de-envios/?n_envio=$encoded"
+                "shippify"            -> "https://app.shippify.co/tracking/$encoded"
+                // ── MercadoLibre (varios slugs posibles del auto-detect) ─────────
+                "mercadolibre",
+                "mercadolibre-mx",
+                "mercadolibre-cl",
+                "mercadolibre-co",
+                "mercadolibre-ar",
+                "mercadolibre-br"     -> "https://www.mercadolibre.com/envios/tracking?search_type=package&package_id=$encoded"
                 else                  -> null
             }
         }
@@ -185,6 +231,27 @@ class ShipmentRepository @Inject constructor(
             "ups"                 -> "UPS"
             "usps"                -> "USPS"
             "dhl"                 -> "DHL"
+            // ── México ──────────────────────────────────────────────────────────
+            "estafeta"            -> "Estafeta"
+            "redpack"             -> "Redpack"
+            "paquetexpress"       -> "Paquetexpress"
+            "99minutos"           -> "99 Minutos"
+            "jet-express"         -> "J&T Express MX"
+            "ivoy"                -> "iVoy"
+            "correos-de-mexico"   -> "Correos de México"
+            // ── Chile ────────────────────────────────────────────────────────────
+            "chilexpress"         -> "Chilexpress"
+            "starken"             -> "Starken"
+            "bluex-cl"            -> "Blue Express"
+            "correos-de-chile"    -> "Correos de Chile"
+            "shippify"            -> "Shippify"
+            // ── MercadoLibre (varios slugs posibles del auto-detect) ─────────────
+            "mercadolibre",
+            "mercadolibre-mx",
+            "mercadolibre-cl",
+            "mercadolibre-co",
+            "mercadolibre-ar",
+            "mercadolibre-br"     -> "Mercado Envíos"
             "manual"              -> "Manual"
             else                  -> carrier.replaceFirstChar { it.uppercaseChar() }
         }

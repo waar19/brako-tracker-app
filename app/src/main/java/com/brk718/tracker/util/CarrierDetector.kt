@@ -60,6 +60,17 @@ object CarrierDetector {
             t.matches(Regex("9\\d{9,10}")) -> "Servientrega"     // 10-11 dígitos, empieza con 9
             t.matches(Regex("22\\d{8}")) -> "Servientrega"       // 10 dígitos, empieza con 22 (formato alternativo)
 
+            // ── MercadoLibre (prefijo ME + 8-18 alfanuméricos) ───────────────
+            // NO se mapea a slug fijo → AfterShip detectCouriers() elige el slug
+            // correcto por país (mercadolibre-mx, mercadolibre-cl, etc.)
+            t.matches(Regex("ME[A-Z0-9]{8,18}")) -> "Mercado Envíos"
+
+            // ── Postal internacional UPU ──────────────────────────────────────
+            // Formato: XX999999999XX (2 letras + 9 dígitos + 2 letras = 13 chars)
+            // Cubre Correos de México, Correos de Chile, 4-72 Colombia, etc.
+            // También sin slug fijo → AfterShip auto-detect por origen
+            t.matches(Regex("[A-Z]{2}\\d{9}[A-Z]{2}")) -> "Correo Postal Internacional"
+
             // ── DHL (catch-all 10 dígitos genérico) ───────────────────────────
             t.matches(Regex("\\d{10}")) -> "DHL"
 
