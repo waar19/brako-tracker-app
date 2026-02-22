@@ -19,7 +19,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -184,6 +187,10 @@ class ShipmentRepository @Inject constructor(
         }
     }
 
+    // Un Mutex por shipment ID — evita que SyncWorker y pull-to-refresh refresquen el mismo
+    // envío simultáneamente (race condition de escritura en la DB)
+    private val refreshLocks = ConcurrentHashMap<String, Mutex>()
+
     val activeShipments: Flow<List<ShipmentWithEvents>> = dao.getAllActiveShipments()
     val archivedShipments: Flow<List<ShipmentWithEvents>> = dao.getAllArchivedShipments()
     /** Todos los envíos (activos + archivados) — usado por StatsViewModel. */
@@ -291,7 +298,9 @@ class ShipmentRepository @Inject constructor(
     }
 
     suspend fun refreshShipment(id: String) = withContext(Dispatchers.IO) {
-        val shipmentWithEvents = dao.getShipmentById(id).first() ?: return@withContext
+        val lock = refreshLocks.getOrPut(id) { Mutex() }
+        lock.withLock {
+        val shipmentWithEvents = dao.getShipmentById(id).first() ?: return@withLock
         var shipment = shipmentWithEvents.shipment
 
         // Auto-corregir título genérico heredado de versiones anteriores
@@ -303,14 +312,14 @@ class ShipmentRepository @Inject constructor(
         // Si es un tracking de Amazon, usar el servicio de Amazon directamente
         if (amazonService.isAmazonTracking(shipment.trackingNumber)) {
             refreshShipmentAmazon(id)
-            return@withContext
+            return@withLock
         }
 
         // Si es Interrapidísimo, usar el scraper directo
         if (shipment.carrier == "interrapidisimo-scraper" ||
             InterrapidisimoScraper.isInterrapidisimoTracking(shipment.trackingNumber)) {
             refreshShipmentInterrapidisimo(id)
-            return@withContext
+            return@withLock
         }
 
         // Resolver el slug correcto: el carrier guardado puede ser el nombre (ej. "interrapidisimo")
@@ -324,7 +333,7 @@ class ShipmentRepository @Inject constructor(
 
         try {
             val response = api.getTrackingInfo(effectiveSlug, shipment.trackingNumber)
-            val tracking = response.data?.tracking ?: return@withContext
+            val tracking = response.data?.tracking ?: return@withLock
 
             // Traducir el tag principal al español; si el subtag_message aporta más detalle,
             // intentar traducirlo también y usar el más descriptivo (el subtag es más específico).
@@ -368,6 +377,7 @@ class ShipmentRepository @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("ShipmentRepository", "Error al refrescar envío AfterShip: ${e.message}", e)
         }
+        } // lock.withLock
     }
 
     private suspend fun refreshShipmentAmazon(id: String) = withContext(Dispatchers.IO) {

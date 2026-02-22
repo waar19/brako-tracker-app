@@ -17,6 +17,11 @@
     <string name="home_menu_options">Opciones</string>
     <string name="home_reconnect_amazon">Reconectar Amazon</string>
     <string name="home_events_count">%d eventos</string>
+    <!-- Selección múltiple -->
+    <string name="home_selection_cancel">Cancelar selección</string>
+    <string name="home_selection_select_all">Seleccionar todos</string>
+    <string name="home_selection_archive">Archivar seleccionados</string>
+    <string name="home_selection_delete">Eliminar seleccionados</string>
 
     <!-- ══════════════════════════════════════════
          DETAIL SCREEN
@@ -37,6 +42,18 @@
     <string name="detail_no_events">No hay eventos registrados aún.</string>
     <string name="detail_show_less">Ver menos</string>
     <string name="detail_show_all">Ver todos (%d)</string>
+    <!-- Acciones del header -->
+    <string name="detail_share">Compartir estado del envío</string>
+    <string name="detail_copy_tracking">Copiar número de tracking</string>
+    <string name="detail_open_carrier_site">Abrir en el sitio del carrier</string>
+    <!-- Zoom del mapa ampliado -->
+    <string name="detail_map_zoom_in">Acercar</string>
+    <string name="detail_map_zoom_out">Alejar</string>
+    <!-- Eventos ocultos (historial limitado) -->
+    <plurals name="detail_hidden_events">
+        <item quantity="one">%d evento oculto</item>
+        <item quantity="other">%d eventos ocultos</item>
+    </plurals>
 
     <!-- ══════════════════════════════════════════
          ADD SCREEN

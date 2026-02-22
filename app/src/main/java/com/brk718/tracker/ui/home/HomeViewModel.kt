@@ -7,6 +7,9 @@ import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -88,14 +91,20 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _isRefreshing.value = true
             _refreshError.value = null
-            var failCount = 0
             try {
-                repository.activeShipments.first().forEach { shipmentWithEvents ->
-                    try {
-                        repository.refreshShipment(shipmentWithEvents.shipment.id)
-                    } catch (e: Exception) {
-                        failCount++
-                    }
+                val shipments = repository.activeShipments.first()
+                // Refrescar todos en paralelo — cada async devuelve true si falló
+                val failCount = coroutineScope {
+                    shipments.map { shipmentWithEvents ->
+                        async {
+                            try {
+                                repository.refreshShipment(shipmentWithEvents.shipment.id)
+                                false // sin fallo
+                            } catch (e: Exception) {
+                                true  // fallo
+                            }
+                        }
+                    }.awaitAll().count { it }
                 }
                 if (failCount > 0) {
                     _refreshError.value = if (failCount == 1)

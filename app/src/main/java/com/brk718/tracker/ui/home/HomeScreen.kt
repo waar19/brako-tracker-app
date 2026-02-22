@@ -164,23 +164,23 @@ fun HomeScreen(
                         ),
                         navigationIcon = {
                             IconButton(onClick = { viewModel.clearSelection() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Cancelar selección")
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.home_selection_cancel))
                             }
                         },
                         actions = {
                             // Seleccionar todos
                             IconButton(onClick = { viewModel.selectAll() }) {
-                                Icon(Icons.Default.SelectAll, contentDescription = "Seleccionar todos")
+                                Icon(Icons.Default.SelectAll, contentDescription = stringResource(R.string.home_selection_select_all))
                             }
                             // Archivar seleccionados
                             IconButton(onClick = { viewModel.archiveSelected() }) {
-                                Icon(Icons.Default.Archive, contentDescription = "Archivar seleccionados")
+                                Icon(Icons.Default.Archive, contentDescription = stringResource(R.string.home_selection_archive))
                             }
                             // Eliminar seleccionados (con confirmación)
                             IconButton(onClick = { showDeleteConfirmDialog = true }) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Eliminar seleccionados",
+                                    contentDescription = stringResource(R.string.home_selection_delete),
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -970,6 +970,6 @@ private fun relativeTime(timestampMs: Long): String {
         minutes < 60  -> "hace $minutes min"
         hours   < 24  -> "hace $hours h"
         days    < 30  -> "hace $days d"
-        else          -> "hace ${days / 30} mes"
+        else          -> { val m = days / 30; "hace $m ${if (m == 1L) "mes" else "meses"}" }
     }
 }

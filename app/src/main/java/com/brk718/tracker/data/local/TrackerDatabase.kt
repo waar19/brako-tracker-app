@@ -6,7 +6,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [ShipmentEntity::class, TrackingEventEntity::class],
     version = 6,
-    exportSchema = false
+    exportSchema = true   // Exporta el schema a /schemas/ para poder escribir migraciones futuras
 )
 abstract class TrackerDatabase : RoomDatabase() {
     abstract fun shipmentDao(): ShipmentDao

@@ -39,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -193,9 +195,20 @@ fun DetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val refreshError by viewModel.refreshError.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Mostrar snackbar cuando falla el refresh en detalle
+    LaunchedEffect(refreshError) {
+        refreshError?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearRefreshError()
+        }
+    }
 
     // Estado para el diálogo del mapa
     var showMapDialog by remember { mutableStateOf(false) }
@@ -231,7 +244,7 @@ fun DetailScreen(
                             }) {
                                 Icon(
                                     Icons.Default.Share,
-                                    contentDescription = "Compartir estado del envío"
+                                    contentDescription = stringResource(R.string.detail_share)
                                 )
                             }
                         }
@@ -251,6 +264,7 @@ fun DetailScreen(
                 }
             }
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -346,7 +360,7 @@ fun DetailScreen(
                                 ) {
                                     Icon(
                                         Icons.Default.ContentCopy,
-                                        contentDescription = "Copiar número de tracking",
+                                        contentDescription = stringResource(R.string.detail_copy_tracking),
                                         modifier = Modifier.size(16.dp),
                                         tint = headerContentColor.copy(alpha = 0.7f)
                                     )
@@ -363,7 +377,7 @@ fun DetailScreen(
                                     ) {
                                         Icon(
                                             Icons.AutoMirrored.Filled.OpenInNew,
-                                            contentDescription = "Abrir en el sitio del carrier",
+                                            contentDescription = stringResource(R.string.detail_open_carrier_site),
                                             modifier = Modifier.size(16.dp),
                                             tint = headerContentColor.copy(alpha = 0.7f)
                                         )
@@ -633,7 +647,7 @@ fun DetailScreen(
                                             ) {
                                                 Icon(
                                                     Icons.Default.Add,
-                                                    contentDescription = "Acercar",
+                                                    contentDescription = stringResource(R.string.detail_map_zoom_in),
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
@@ -643,7 +657,7 @@ fun DetailScreen(
                                             ) {
                                                 Icon(
                                                     Icons.Default.Remove,
-                                                    contentDescription = "Alejar",
+                                                    contentDescription = stringResource(R.string.detail_map_zoom_out),
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
@@ -808,7 +822,7 @@ fun DetailScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         if (hiddenEventCount > 0)
-                                            "$hiddenEventCount evento${if (hiddenEventCount == 1) "" else "s"} oculto${if (hiddenEventCount == 1) "" else "s"}"
+                                            pluralStringResource(R.plurals.detail_hidden_events, hiddenEventCount, hiddenEventCount)
                                         else
                                             "Historial de $FREE_HISTORY_DAYS días",
                                         style = MaterialTheme.typography.labelLarge,

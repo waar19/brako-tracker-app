@@ -70,6 +70,11 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // Room: exportar schemas a /app/schemas/ para poder escribir migraciones futuras
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

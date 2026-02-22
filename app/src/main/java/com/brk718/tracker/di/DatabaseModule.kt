@@ -22,8 +22,11 @@ object DatabaseModule {
             context,
             TrackerDatabase::class.java,
             "tracker_db"
-        ).fallbackToDestructiveMigration()
-         .build()
+        )
+        // NOTA: No usar fallbackToDestructiveMigration() — borraría todos los envíos del usuario
+        // Al cambiar el schema, incrementar version en TrackerDatabase y añadir una Migration aquí
+        // Ejemplo: .addMigrations(MIGRATION_6_7)
+        .build()
     }
 
     @Provides
