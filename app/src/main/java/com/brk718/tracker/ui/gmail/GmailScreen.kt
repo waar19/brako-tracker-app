@@ -58,7 +58,7 @@ fun GmailScreen(
                         IconButton(onClick = { viewModel.disconnect() }) {
                             Icon(
                                 Icons.Default.Logout,
-                                contentDescription = "Desconectar cuenta",
+                                contentDescription = stringResource(R.string.gmail_disconnect),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

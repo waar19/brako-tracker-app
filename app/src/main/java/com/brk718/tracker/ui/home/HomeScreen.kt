@@ -208,7 +208,7 @@ fun HomeScreen(
                                 }) {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "Cerrar búsqueda"
+                                        contentDescription = stringResource(R.string.home_search_close)
                                     )
                                 }
                             }
@@ -218,7 +218,7 @@ fun HomeScreen(
                                 IconButton(onClick = onUpgradeClick) {
                                     Icon(
                                         Icons.Default.WorkspacePremium,
-                                        contentDescription = "Premium",
+                                        contentDescription = stringResource(R.string.home_premium_icon),
                                         tint = Color(0xFFFFB400)
                                     )
                                 }
@@ -227,7 +227,7 @@ fun HomeScreen(
                             IconButton(onClick = { searchVisible = !searchVisible }) {
                                 Icon(
                                     Icons.Default.Search,
-                                    contentDescription = "Buscar",
+                                    contentDescription = stringResource(R.string.home_search_icon),
                                     tint = if (searchVisible) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurface
                                 )

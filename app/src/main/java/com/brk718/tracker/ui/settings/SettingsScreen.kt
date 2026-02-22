@@ -31,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.BuildConfig
 import com.brk718.tracker.R
 import com.brk718.tracker.data.billing.BillingState
+import com.google.android.play.core.review.ReviewManagerFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +63,7 @@ fun SettingsScreen(
                     putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.settings_csv_share_subject))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                context.startActivity(Intent.createChooser(shareIntent, "Guardar o compartir CSV"))
+                context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.settings_csv_chooser_title)))
             }
             is ExportResult.Error -> {
                 viewModel.clearExportResult()
@@ -484,6 +485,31 @@ fun SettingsScreen(
                             stringResource(R.string.settings_clear_map_cache_subtitle),
                         icon = Icons.Default.DeleteSweep,
                         onClick = { showClearCacheDialog = true }
+                    )
+                    SettingsItemDivider()
+                    SettingsNavigationItem(
+                        title = stringResource(R.string.settings_rate_app_title),
+                        subtitle = stringResource(R.string.settings_rate_app_subtitle),
+                        icon = Icons.Default.Star,
+                        onClick = {
+                            val reviewManager = ReviewManagerFactory.create(activity)
+                            reviewManager.requestReviewFlow().addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    reviewManager.launchReviewFlow(activity, task.result)
+                                } else {
+                                    // Fallback: abrir Play Store directamente
+                                    try {
+                                        activity.startActivity(
+                                            Intent(Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${activity.packageName}"))
+                                        )
+                                    } catch (e: Exception) {
+                                        activity.startActivity(
+                                            Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=${activity.packageName}"))
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     )
                 }
             }

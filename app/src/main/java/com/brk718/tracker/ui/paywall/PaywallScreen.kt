@@ -15,10 +15,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brk718.tracker.R
 import com.brk718.tracker.data.billing.BillingState
 import com.brk718.tracker.ui.settings.SettingsViewModel
 
@@ -85,13 +87,13 @@ fun PaywallScreen(
             Spacer(Modifier.height(20.dp))
 
             Text(
-                "Brako Premium",
+                stringResource(R.string.paywall_title),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "La mejor experiencia de seguimiento de envíos",
+                stringResource(R.string.paywall_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -105,7 +107,7 @@ fun PaywallScreen(
                 color = MaterialTheme.colorScheme.tertiaryContainer
             ) {
                 Text(
-                    "✓  7 días de prueba gratuita — cancela cuando quieras",
+                    stringResource(R.string.paywall_trial_badge),
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
@@ -187,8 +189,8 @@ fun PaywallScreen(
                             Icon(Icons.Default.WorkspacePremium, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                if (price == "—") "Empezar prueba gratis"
-                                else "Empezar prueba gratis — luego $price/año",
+                                if (price == "—") stringResource(R.string.paywall_cta_no_price)
+                                else stringResource(R.string.paywall_cta_price, price),
                                 fontWeight = FontWeight.Bold
                             )
                         }

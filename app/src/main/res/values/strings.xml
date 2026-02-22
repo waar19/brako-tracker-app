@@ -88,6 +88,7 @@
     <string name="add_carrier_placeholder_detected">Detectado: %s</string>
     <string name="add_carrier_placeholder_auto">Auto-detectado si se deja vacío</string>
     <string name="add_carrier_supporting">Deja vacío para usar la detección automática</string>
+    <string name="add_scan_barcode">Escanear código de barras</string>
     <string name="add_save_button">Guardar Envío</string>
 
     <!-- ══════════════════════════════════════════
@@ -166,6 +167,7 @@
     <string name="archived_empty">No hay envíos archivados</string>
     <string name="archived_unarchive">Desarchivar</string>
     <string name="archived_delete">Eliminar</string>
+    <string name="archived_selection_unarchive">Desarchivar seleccionados</string>
 
     <!-- ══════════════════════════════════════════
          GMAIL SCREEN
@@ -185,6 +187,7 @@
     <string name="gmail_imported_chip">Importado</string>
     <string name="gmail_importing_button">Importando…</string>
     <string name="gmail_import_button">Importar</string>
+    <string name="gmail_disconnect">Desconectar cuenta</string>
 
     <!-- ══════════════════════════════════════════
          AMAZON AUTH SCREEN
@@ -215,6 +218,9 @@
     <string name="home_offline_banner">Sin conexión — mostrando última información guardada</string>
     <string name="home_selected_count">%d seleccionado</string>
     <string name="home_selected_count_plural">%d seleccionados</string>
+    <string name="home_search_close">Cerrar búsqueda</string>
+    <string name="home_search_icon">Buscar</string>
+    <string name="home_premium_icon">Premium</string>
     <string name="home_search_placeholder">Buscar por título, número, transportista…</string>
     <string name="home_search_clear">Limpiar</string>
     <string name="home_search_no_results">No se encontraron envíos para \"%s\"</string>
@@ -261,12 +267,15 @@
     <string name="settings_csv_export_title">Exportar envíos a CSV</string>
     <string name="settings_csv_export_subtitle">Descarga un archivo con todos tus envíos</string>
     <string name="settings_csv_share_subject">Mis envíos — Tracker</string>
+    <string name="settings_csv_chooser_title">Guardar o compartir CSV</string>
     <string name="settings_amazon_section_title">Amazon</string>
     <string name="settings_stats_title">Ver estadísticas</string>
     <string name="settings_stats_subtitle">Gráficas de envíos, transportistas y más</string>
     <string name="settings_premium_feature_title">Función Premium</string>
     <string name="settings_premium_feature_message">Esta función está disponible solo para suscriptores Premium.\n\n✓ Sin anuncios\n✓ Envíos ilimitados\n✓ Historial completo\n✓ Sync cada 30 min\n✓ Exportar CSV</string>
     <string name="settings_premium_feature_cta">Hazte Premium</string>
+    <string name="settings_rate_app_title">Valorar la app</string>
+    <string name="settings_rate_app_subtitle">¿Te está gustando? Déjanos una valoración</string>
 
     <!-- ══════════════════════════════════════════
          STATS SCREEN
@@ -294,4 +303,13 @@
     <string name="widget_premium_upgrade">Hazte Premium</string>
     <string name="widget_updated_prefix">Act: </string>
     <string name="widget_refresh">Actualizar</string>
+
+    <!-- ══════════════════════════════════════════
+         PAYWALL SCREEN
+    ══════════════════════════════════════════ -->
+    <string name="paywall_title">Brako Premium</string>
+    <string name="paywall_subtitle">La mejor experiencia de seguimiento de envíos</string>
+    <string name="paywall_trial_badge">✓  7 días de prueba gratuita — cancela cuando quieras</string>
+    <string name="paywall_cta_no_price">Empezar prueba gratis</string>
+    <string name="paywall_cta_price">Empezar prueba gratis — luego %s/año</string>
 </resources>

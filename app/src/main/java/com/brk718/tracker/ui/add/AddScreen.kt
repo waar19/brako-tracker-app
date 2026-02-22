@@ -180,7 +180,7 @@ fun AddScreen(
                     IconButton(onClick = onScanClick) {
                         Icon(
                             Icons.Filled.QrCodeScanner,
-                            contentDescription = "Escanear código de barras",
+                            contentDescription = stringResource(R.string.add_scan_barcode),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }

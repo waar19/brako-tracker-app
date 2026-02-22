@@ -23,9 +23,13 @@ object DatabaseModule {
             TrackerDatabase::class.java,
             "tracker_db"
         )
-        // NOTA: No usar fallbackToDestructiveMigration() — borraría todos los envíos del usuario
-        // Al cambiar el schema, incrementar version en TrackerDatabase y añadir una Migration aquí
-        // Ejemplo: .addMigrations(MIGRATION_6_7)
+        // Migraciones definidas — preservan los datos del usuario al actualizar la app
+        .addMigrations(
+            TrackerDatabase.MIGRATION_4_5,  // estimatedDelivery
+            TrackerDatabase.MIGRATION_5_6   // subCarrierName + subCarrierTrackingId
+        )
+        // Fallback de seguridad para versiones < 4 (beta antigua) — reinicia la DB si no hay migración
+        .fallbackToDestructiveMigration()
         .build()
     }
 
