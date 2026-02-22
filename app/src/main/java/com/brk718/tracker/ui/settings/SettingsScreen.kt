@@ -38,6 +38,7 @@ import com.google.android.play.core.review.ReviewManagerFactory
 fun SettingsScreen(
     onBack: () -> Unit,
     onGmailClick: () -> Unit,
+    onOutlookClick: () -> Unit = {},
     onAmazonAuthClick: () -> Unit,
     onArchivedClick: () -> Unit,
     onStatsClick: () -> Unit = {},
@@ -49,6 +50,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val activity = context as android.app.Activity
     val exportResult by viewModel.exportResult.collectAsState()
+    val isOutlookConnected by viewModel.isOutlookConnected.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Reaccionar al resultado de exportación
@@ -88,6 +90,7 @@ fun SettingsScreen(
     var showQuietHoursStartDialog by remember { mutableStateOf(false) }
     var showQuietHoursEndDialog by remember { mutableStateOf(false) }
     var showDisconnectAmazonDialog by remember { mutableStateOf(false) }
+    var showDisconnectOutlookDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showPremiumSyncDialog by remember { mutableStateOf(false) }
     var cacheCleared by remember { mutableStateOf(false) }
@@ -421,6 +424,27 @@ fun SettingsScreen(
                         icon = Icons.Default.Email,
                         onClick = onGmailClick
                     )
+                    SettingsItemDivider()
+                    // Tile Outlook / Hotmail
+                    val outlookSubtitle = if (isOutlookConnected) "Cuenta conectada" else "Importar guías desde Outlook u Hotmail"
+                    val outlookTrailing: @Composable () -> Unit = {
+                        if (isOutlookConnected) {
+                            TextButton(
+                                onClick = { showDisconnectOutlookDialog = true },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) { Text("Desconectar") }
+                        } else {
+                            TextButton(onClick = onOutlookClick) { Text("Conectar") }
+                        }
+                    }
+                    SettingsCustomTrailingItem(
+                        title = "Outlook / Hotmail",
+                        subtitle = outlookSubtitle,
+                        icon = Icons.Default.Email,
+                        trailingContent = outlookTrailing
+                    )
                 }
             }
 
@@ -605,6 +629,27 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDisconnectAmazonDialog = false }) { Text(stringResource(R.string.dialog_cancel)) }
+            }
+        )
+    }
+
+    if (showDisconnectOutlookDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisconnectOutlookDialog = false },
+            icon = { Icon(Icons.Default.LinkOff, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Desconectar Outlook") },
+            text = { Text("Se cerrará la sesión de Outlook. Puedes volver a conectarla cuando quieras.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.disconnectOutlook()
+                        showDisconnectOutlookDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Desconectar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisconnectOutlookDialog = false }) { Text("Cancelar") }
             }
         )
     }

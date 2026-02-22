@@ -32,6 +32,7 @@ android {
         }
         buildConfigField("String", "AFTERSHIP_API_KEY", "\"${localProperties["AFTERSHIP_API_KEY"] ?: ""}\"")
         buildConfigField("String", "GMAIL_CLIENT_ID", "\"${localProperties["GMAIL_CLIENT_ID"] ?: ""}\"")
+        buildConfigField("String", "OUTLOOK_CLIENT_ID", "\"${localProperties["OUTLOOK_CLIENT_ID"] ?: ""}\"")
     }
 
     signingConfigs {
@@ -136,6 +137,11 @@ dependencies {
 
     // Confetti animation
     implementation("nl.dionsegijn:konfetti-compose:2.0.4")
+
+    // Microsoft Authentication Library (Outlook/Hotmail OAuth2 + Graph API)
+    implementation("com.microsoft.identity.client:msal:4.9.0") {
+        exclude(group = "io.opentelemetry")
+    }
 
     // Play Services Auth (Gmail)
     implementation(libs.play.services.auth)

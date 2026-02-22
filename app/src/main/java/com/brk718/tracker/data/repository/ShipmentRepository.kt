@@ -358,10 +358,43 @@ class ShipmentRepository @Inject constructor(
                 android.util.Log.d("Tracking", "Usando Amazon tracking para $trackingNumber")
                 refreshShipmentAmazon(id)
             } else {
-                dao.insertShipment(shipment.copy(
-                    carrier = carrier.ifBlank { "manual" },
-                    status = "Seguimiento manual"
-                ))
+                val carrierSlug = slug ?: carrier.ifBlank { "manual" }
+                // AfterShip rechazó el número — intentar scraper directo si existe uno
+                val directScraper = scraperFactory.getFor(carrierSlug)
+                if (directScraper != null) {
+                    android.util.Log.d("AfterShip",
+                        "AfterShip rechazó $carrierSlug/$trackingNumber → intentando scraper")
+                    dao.insertShipment(shipment.copy(carrier = carrierSlug, status = "Registrando..."))
+                    try {
+                        val scraperResult = directScraper.getTracking(trackingNumber)
+                        if (scraperResult.error == null && scraperResult.status != null) {
+                            dao.insertShipment(shipment.copy(
+                                carrier = carrierSlug,
+                                status = scraperResult.status,
+                                lastUpdate = System.currentTimeMillis()
+                            ))
+                            if (scraperResult.events.isNotEmpty()) {
+                                val scraperEvents = scraperResult.events.mapIndexed { index, event ->
+                                    TrackingEventEntity(0L, id,
+                                        System.currentTimeMillis() - (index * 3_600_000L),
+                                        event.description, event.location, "")
+                                }
+                                dao.clearEventsForShipment(id)
+                                dao.insertEvents(scraperEvents)
+                            }
+                        } else {
+                            dao.insertShipment(shipment.copy(carrier = carrierSlug, status = "Seguimiento manual"))
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("AfterShip", "Scraper falló para $carrierSlug: ${e.message}")
+                        dao.insertShipment(shipment.copy(carrier = carrierSlug, status = "Seguimiento manual"))
+                    }
+                } else {
+                    dao.insertShipment(shipment.copy(
+                        carrier = carrierSlug,
+                        status = "Seguimiento manual"
+                    ))
+                }
             }
             notifyWidget()
         }
@@ -425,6 +458,12 @@ class ShipmentRepository @Inject constructor(
                         if (createEx.code() != 409 && createEx.code() != 4009) {
                             android.util.Log.w("ShipmentRepository",
                                 "Auto-create falló HTTP ${createEx.code()}: ${createEx.message()}")
+                            // AfterShip no acepta este número → intentar scraper directo
+                            scraperFactory.getFor(effectiveSlug)?.let {
+                                android.util.Log.d("ShipmentRepository",
+                                    "AfterShip no acepta $effectiveSlug/${shipment.trackingNumber}, usando scraper")
+                                refreshShipmentWithScraper(id, shipment, it)
+                            }
                             return@withLock
                         }
                         android.util.Log.d("ShipmentRepository",

@@ -93,7 +93,15 @@
       "Bash(Select-String -Pattern \".\")",
       "Bash(Select-Object -First 200)",
       "Bash(test:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "WebFetch(domain:www.servientrega.com)",
+      "WebFetch(domain:coordinadora.com)",
+      "WebFetch(domain:www.tcc.com.co)",
+      "WebFetch(domain:www.deprisa.com)",
+      "WebFetch(domain:builtwith.com)",
+      "WebFetch(domain:mobile.servientrega.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.aftership.com)"
     ]
   }
 }

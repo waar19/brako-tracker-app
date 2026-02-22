@@ -3,6 +3,13 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- MSAL: permite lanzar Custom Tabs para el flujo OAuth de Microsoft (Android 11+) -->
+    <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
     <!-- Notificaciones push (requerido en Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Cámara para escanear códigos de barras en la pantalla Añadir -->
@@ -44,6 +51,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- MSAL: BrowserTabActivity para el flujo OAuth2 de Microsoft (Outlook/Hotmail) -->
+        <activity
+            android:name="com.microsoft.identity.client.BrowserTabActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="msauth"
+                    android:host="com.brk718.tracker" />
+            </intent-filter>
+        </activity>
+
         <!-- Widget Brako Tracker (Jetpack Glance) — solo premium -->
         <receiver
             android:name=".ui.widget.TrackerWidgetReceiver"

@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.util.concurrent.TimeUnit
@@ -16,16 +17,14 @@ import javax.inject.Singleton
  * Scraper para Servientrega Colombia.
  *
  * URL pública: https://www.servientrega.com/wps/portal/rastreo-envio?tracking={guia}
- * El portal IBM WebSphere Portal (WPS) renderiza el HTML server-side con los eventos
- * de rastreo en tablas.
  *
- * Estrategia:
- *  1. GET con User-Agent de navegador real para evitar bloqueos básicos
- *  2. Jsoup parsea el HTML buscando selectores conocidos del portal WPS
- *  3. Si ningún selector coincide, se logea el HTML truncado para depuración
+ * Estrategia (en orden):
+ *  1. Buscar JSON embebido en script tags (__NEXT_DATA__, application/json) —
+ *     el nuevo portal de Servientrega puede usar Next.js SSR.
+ *  2. Parsear HTML con Jsoup buscando selectores del portal WPS y del nuevo diseño.
+ *  3. Loguear HTML truncado para depuración si no se encuentran datos.
  *
- * NOTA: Si Servientrega cambia el layout del portal, ajustar los selectores en
- * [parseStatus] y [parseEvents].
+ * NOTA: Si Servientrega cambia el layout, ajustar [parseJsonScript] y [parseStatus]/[parseEvents].
  */
 @Singleton
 class ServientregaScraper @Inject constructor(
@@ -77,6 +76,11 @@ class ServientregaScraper @Inject constructor(
 
                 val doc = Jsoup.parse(html)
 
+                // Intento 1: JSON embebido (Next.js SSR u otro framework)
+                val jsonResult = parseJsonScript(doc)
+                if (jsonResult != null) return@withContext jsonResult
+
+                // Intento 2: HTML con Jsoup
                 val status = parseStatus(doc)
                 val events = parseEvents(doc)
 
@@ -99,22 +103,78 @@ class ServientregaScraper @Inject constructor(
             }
         }
 
+    // ─── JSON embebido (Next.js / React SSR) ──────────────────────────────────
+
+    private fun parseJsonScript(doc: Document): CarrierScraperResult? {
+        val scriptSelectors = listOf(
+            "script#__NEXT_DATA__",
+            "script[type='application/json']",
+            "script[type=\"application/json\"]",
+        )
+        for (selector in scriptSelectors) {
+            val script = doc.selectFirst(selector) ?: continue
+            try {
+                val json = JSONObject(script.html())
+                val pageProps = json.optJSONObject("props")?.optJSONObject("pageProps") ?: continue
+                val tracking = pageProps.optJSONObject("tracking")
+                    ?: pageProps.optJSONObject("rastreo")
+                    ?: pageProps.optJSONObject("envio")
+                    ?: continue
+
+                val status = tracking.optString("estado")
+                    .ifBlank { tracking.optString("estado_actual").ifBlank { null } }
+                val eventsArr = tracking.optJSONArray("novedades")
+                    ?: tracking.optJSONArray("historial")
+                    ?: tracking.optJSONArray("eventos")
+                    ?: tracking.optJSONArray("eventos_rastreo")
+
+                val events = mutableListOf<CarrierScraperEvent>()
+                if (eventsArr != null) {
+                    for (i in 0 until eventsArr.length()) {
+                        val item = eventsArr.optJSONObject(i) ?: continue
+                        val timestamp = item.optString("fecha_hora")
+                            .ifBlank { item.optString("fecha").ifBlank { item.optString("date") } }
+                        val description = item.optString("descripcion")
+                            .ifBlank { item.optString("novedad").ifBlank { item.optString("description") } }
+                        val location = item.optString("ciudad")
+                            .ifBlank { item.optString("city").ifBlank { "" } }
+                        if (description.isNotBlank()) {
+                            events.add(CarrierScraperEvent(timestamp, description, location))
+                        }
+                    }
+                }
+                if (status != null || events.isNotEmpty()) {
+                    android.util.Log.d(TAG, "JSON encontrado — status=$status, eventos=${events.size}")
+                    return CarrierScraperResult(status, events)
+                }
+            } catch (_: Exception) { }
+        }
+        return null
+    }
+
     // ─── Parseo de estado actual ───────────────────────────────────────────────
 
     private fun parseStatus(doc: Document): String? {
-        // Intentar selectores específicos del portal WPS de Servientrega (en orden de probabilidad)
+        // Intentar selectores específicos del portal WPS y del nuevo diseño React/Next.js
         val statusSelectors = listOf(
-            // Portal WPS portlet content
+            // Nuevo diseño (React/Next.js) — tarjeta de estado actual visible en screenshot
+            "[class*=estado-actual]",
+            "[class*=estadoActual]",
+            "[class*=estado-envio]",
+            "[class*=estadoEnvio]",
+            "[class*=estado-guia]",
+            "[class*=tracking-state]",
+            "[class*=trackingState]",
+            // Portal WPS portlet content (diseño legacy)
             ".portlet-body .estado",
             ".portlet-body .estado-actual",
             "#resultado-rastreo .estado",
-            "[class*=estado-actual]",
-            "[class*=estado-envio]",
             // Bootstrap / genérico
             ".tracking-status",
             "[class*=tracking-status]",
-            ".alert",
-            // Último estado en una tabla de eventos (primera fila)
+            ".alert-success", ".alert-info", ".alert",
+            // Último estado en tabla de eventos (primera fila de datos)
+            "table tr:nth-child(2) td:nth-child(2)",
             "table tr:first-child td:nth-child(2)",
         )
 
@@ -134,13 +194,17 @@ class ServientregaScraper @Inject constructor(
     private fun parseEvents(doc: Document): List<CarrierScraperEvent> {
         // Buscar tablas que parezcan de tracking (al menos 3 columnas: fecha, descripción, ciudad)
         val tableSelectors = listOf(
+            // Nuevo diseño (React/Next.js) — historial de eventos visible en screenshot
+            "table[class*=historial]",
+            "[class*=historial] table",
             "table[class*=rastreo]",
             "table[class*=tracking]",
             "table[class*=detalle]",
+            // Portal WPS legacy
             ".portlet-body table",
             "#resultado-rastreo table",
             "[class*=resultado] table",
-            // Fallback: cualquier tabla con ≥3 columnas
+            // Fallback: cualquier tabla
             "table",
         )
 
@@ -165,9 +229,9 @@ class ServientregaScraper @Inject constructor(
             }
         }
 
-        // Fallback: buscar lista de novedades (div/li)
+        // Fallback: buscar lista de novedades/historial (div/li)
         val listSelectors = listOf(
-            "[class*=novedad]", "[class*=evento]", "[class*=detalle-rastreo]"
+            "[class*=historial]", "[class*=novedad]", "[class*=evento]", "[class*=detalle-rastreo]"
         )
         for (selector in listSelectors) {
             val items = doc.select(selector)

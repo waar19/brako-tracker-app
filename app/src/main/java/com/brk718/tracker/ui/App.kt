@@ -23,6 +23,7 @@ import com.brk718.tracker.ui.ads.AdManager
 import com.brk718.tracker.ui.auth.AmazonAuthScreen
 import com.brk718.tracker.ui.detail.DetailScreen
 import com.brk718.tracker.ui.gmail.GmailScreen
+import com.brk718.tracker.ui.outlook.OutlookScreen
 import com.brk718.tracker.ui.home.HomeScreen
 import com.brk718.tracker.ui.onboarding.OnboardingScreen
 import com.brk718.tracker.ui.paywall.PaywallScreen
@@ -44,6 +45,7 @@ object Routes {
     const val PAYWALL     = "paywall"
     const val BARCODE_SCANNER = "barcode_scanner"
     const val STATS           = "stats"
+    const val OUTLOOK         = "outlook"
     fun detail(id: String) = "detail/$id"
 }
 
@@ -171,6 +173,9 @@ fun App(
             composable(Routes.GMAIL) {
                 GmailScreen(onBack = { navController.popBackStack() })
             }
+            composable(Routes.OUTLOOK) {
+                OutlookScreen(onBack = { navController.popBackStack() })
+            }
             composable(Routes.AMAZON_AUTH) {
                 AmazonAuthScreen(
                     onBack         = { navController.popBackStack() },
@@ -181,6 +186,7 @@ fun App(
                 SettingsScreen(
                     onBack            = { navController.popBackStack() },
                     onGmailClick      = { navController.navigate(Routes.GMAIL) },
+                    onOutlookClick    = { navController.navigate(Routes.OUTLOOK) },
                     onAmazonAuthClick = { navController.navigate(Routes.AMAZON_AUTH) },
                     onArchivedClick   = { navController.navigate(Routes.ARCHIVED) },
                     onStatsClick      = { navController.navigate(Routes.STATS) }

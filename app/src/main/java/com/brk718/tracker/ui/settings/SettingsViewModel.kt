@@ -19,11 +19,13 @@ import com.brk718.tracker.data.billing.BillingState
 import com.brk718.tracker.data.local.AmazonSessionManager
 import com.brk718.tracker.data.local.UserPreferences
 import com.brk718.tracker.data.local.UserPreferencesRepository
+import com.brk718.tracker.data.remote.OutlookService
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.util.CsvExporter
 import com.brk718.tracker.workers.SyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -56,7 +59,8 @@ class SettingsViewModel @Inject constructor(
     private val prefsRepo: UserPreferencesRepository,
     private val amazonSessionManager: AmazonSessionManager,
     private val billingRepository: BillingRepository,
-    private val shipmentRepository: ShipmentRepository
+    private val shipmentRepository: ShipmentRepository,
+    private val outlookService: OutlookService
 ) : ViewModel() {
 
     init {
@@ -259,6 +263,24 @@ class SettingsViewModel @Inject constructor(
     // === Amazon ===
     fun disconnectAmazon() {
         amazonSessionManager.clearSession()
+    }
+
+    // === Outlook / Hotmail ===
+
+    /** Emite true si hay un token de Outlook activo, comprobando cada 2 s. */
+    val isOutlookConnected: StateFlow<Boolean> = flow {
+        while (true) {
+            emit(outlookService.isConnected())
+            delay(2_000)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = false
+    )
+
+    fun disconnectOutlook() {
+        viewModelScope.launch { outlookService.disconnect() }
     }
 
     // === Suscripción Premium ===
