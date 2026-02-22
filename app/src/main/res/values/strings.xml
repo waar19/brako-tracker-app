@@ -225,7 +225,7 @@
     <string name="home_search_clear">Limpiar</string>
     <string name="home_search_no_results">No se encontraron envíos para \"%s\"</string>
     <string name="home_empty_subtitle_extended">Añade un número de seguimiento o importa\nautomáticamente desde Gmail</string>
-    <string name="home_limit_chip_count">%d / %d envíos activos</string>
+    <string name="home_limit_chip_count" formatted="false">%d / %d envíos activos</string>
     <string name="home_limit_chip_upgrade">Ampliar →</string>
     <string name="home_delete_confirm_title">Eliminar %d envío</string>
     <string name="home_delete_confirm_title_plural">Eliminar %d envíos</string>
@@ -312,4 +312,53 @@
     <string name="paywall_trial_badge">✓  7 días de prueba gratuita — cancela cuando quieras</string>
     <string name="paywall_cta_no_price">Empezar prueba gratis</string>
     <string name="paywall_cta_price">Empezar prueba gratis — luego %s/año</string>
+    <!-- Paywall - benefit rows -->
+    <string name="paywall_benefit_no_ads_title">Sin anuncios</string>
+    <string name="paywall_benefit_no_ads_subtitle">Experiencia limpia y sin interrupciones</string>
+    <string name="paywall_benefit_unlimited_title">Envíos ilimitados</string>
+    <string name="paywall_benefit_unlimited_subtitle">Sin límite de 5 envíos activos</string>
+    <string name="paywall_benefit_history_title">Historial completo</string>
+    <string name="paywall_benefit_history_subtitle">Más allá de los 30 días del plan gratuito</string>
+    <string name="paywall_benefit_sync_title">Sync cada 30 min</string>
+    <string name="paywall_benefit_sync_subtitle">Actualizaciones más frecuentes</string>
+    <string name="paywall_benefit_csv_title">Exportar a CSV</string>
+    <string name="paywall_benefit_csv_subtitle">Descarga todos tus envíos</string>
+    <string name="paywall_benefit_widget_title">Widget en pantalla de inicio</string>
+    <string name="paywall_benefit_widget_subtitle">Estado de tu envío de un vistazo</string>
+    <!-- Paywall - precio y condiciones -->
+    <string name="paywall_per_month_hint">al año · menos de %s al mes</string>
+    <string name="paywall_terms">Suscripción anual con renovación automática. Cancela cuando quieras desde Google Play.</string>
+    <!-- Diálogos de settings -->
+    <string name="settings_sync_30min">Cada 30 min</string>
+    <string name="settings_premium_badge">✦ Premium</string>
+    <string name="dialog_hour_label">Hora</string>
+    <string name="dialog_minute_label">Minuto</string>
+    <string name="dialog_confirm">Aceptar</string>
+    <!-- Estados del export CSV -->
+    <string name="settings_csv_exporting">Exportando…</string>
+    <string name="settings_premium_only_badge">✦ Solo Premium</string>
+    <!-- Sección debug (solo visible en builds DEBUG) -->
+    <string name="settings_debug_section">Developer</string>
+    <string name="settings_debug_simulate_premium">Simular Premium</string>
+    <string name="settings_debug_premium_active">Modo Premium activo</string>
+    <string name="settings_debug_free_active">Modo Free activo</string>
+
+    <!-- ══════════════════════════════════════════
+         WHAT'S NEW DIALOG
+    ══════════════════════════════════════════ -->
+    <string name="whats_new_title">¿Qué hay de nuevo?</string>
+    <string name="whats_new_dismiss">¡Genial, gracias!</string>
+    <!-- Entradas v1.1 (versionCode 2) -->
+    <string name="whats_new_v2_stats_title">Estadísticas de envíos</string>
+    <string name="whats_new_v2_stats_sub">Gráficas y KPIs de todos tus envíos</string>
+    <string name="whats_new_v2_archived_title">Archivado mejorado</string>
+    <string name="whats_new_v2_archived_sub">Desliza para archivar o eliminar, o selecciona varios a la vez</string>
+    <string name="whats_new_v2_quiet_title">Horas de silencio exactas</string>
+    <string name="whats_new_v2_quiet_sub">Configura el inicio y fin de silencio al minuto exacto</string>
+    <string name="whats_new_v2_csv_title">Exportar a CSV</string>
+    <string name="whats_new_v2_csv_sub">Descarga todos tus envíos en un archivo (Premium)</string>
+    <string name="whats_new_v2_search_title">Búsqueda en tiempo real</string>
+    <string name="whats_new_v2_search_sub">Encuentra cualquier envío por nombre, número o transportista</string>
+    <string name="whats_new_v2_widget_title">Widget en pantalla de inicio</string>
+    <string name="whats_new_v2_widget_sub">Consulta tu envío sin abrir la app (Premium)</string>
 </resources>

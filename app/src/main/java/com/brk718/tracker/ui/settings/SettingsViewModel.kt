@@ -67,6 +67,19 @@ class SettingsViewModel @Inject constructor(
             prefsRepo.syncStatsFromRoom(total, delivered)
         }
 
+        // Al arrancar la app, programar el worker si autoSync está activo y no hay trabajo previo.
+        // Usa KEEP para no interferir con un worker ya en ejecución.
+        viewModelScope.launch {
+            val prefs = prefsRepo.preferences.first()
+            if (prefs.autoSync && prefs.syncIntervalHours != 0) {
+                scheduleSyncWorker(
+                    intervalHours = prefs.syncIntervalHours,
+                    onlyWifi      = prefs.syncOnlyOnWifi,
+                    policy        = ExistingPeriodicWorkPolicy.KEEP
+                )
+            }
+        }
+
         // Al perder premium, re-programar el worker con el intervalo free (ya reseteado a 2h)
         viewModelScope.launch {
             prefsRepo.preferences
@@ -109,7 +122,7 @@ class SettingsViewModel @Inject constructor(
         billingRepository.productDetails,
         billingRepository.billingState
     ) { prefs, workInfo, productDetails, billingState ->
-        val lastSyncText = workInfo?.let { formatLastSync(it) } ?: "Nunca"
+        val lastSyncText = formatSyncStatus(workInfo, prefs.lastSyncTimestamp)
         SettingsUiState(
             preferences = prefs,
             preferencesLoaded = true,
@@ -129,17 +142,36 @@ class SettingsViewModel @Inject constructor(
         )
     )
 
-    private fun formatLastSync(workInfo: WorkInfo): String {
-        // WorkManager no expone directamente el último tiempo de ejecución en la API pública,
-        // pero podemos usar el estado para dar retroalimentación útil
-        return when (workInfo.state) {
-            WorkInfo.State.RUNNING   -> "Sincronizando ahora..."
-            WorkInfo.State.ENQUEUED  -> "En cola"
-            WorkInfo.State.SUCCEEDED -> "Completado recientemente"
-            WorkInfo.State.FAILED    -> "Falló la última sincronización"
-            WorkInfo.State.CANCELLED -> "Cancelada"
-            WorkInfo.State.BLOCKED   -> "Esperando condiciones"
-            else                     -> "Desconocido"
+    /**
+     * Muestra el estado de sincronización de forma útil para el usuario:
+     * - Si está sincronizando ahora → "Sincronizando ahora..."
+     * - Si falló → "Falló la última sincronización"
+     * - Si hay timestamp guardado → "Hace X min" / "Hoy a las HH:mm" / fecha
+     * - Si nunca ha sincronizado → "Nunca"
+     */
+    private fun formatSyncStatus(workInfo: WorkInfo?, lastSyncTimestamp: Long): String {
+        if (workInfo?.state == WorkInfo.State.RUNNING) return "Sincronizando ahora..."
+        if (workInfo?.state == WorkInfo.State.FAILED)  return "Falló la última sincronización"
+        if (workInfo?.state == WorkInfo.State.BLOCKED) return "Esperando conexión..."
+
+        if (lastSyncTimestamp == 0L) return "Nunca sincronizado"
+
+        val diff = System.currentTimeMillis() - lastSyncTimestamp
+        return when {
+            diff < 60_000L     -> "Hace un momento"
+            diff < 3_600_000L  -> "Hace ${diff / 60_000} min"
+            diff < 86_400_000L -> {
+                val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                "Hoy a las ${sdf.format(java.util.Date(lastSyncTimestamp))}"
+            }
+            diff < 172_800_000L -> {
+                val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                "Ayer a las ${sdf.format(java.util.Date(lastSyncTimestamp))}"
+            }
+            else -> {
+                val sdf = java.text.SimpleDateFormat("dd MMM HH:mm", java.util.Locale.getDefault())
+                sdf.format(java.util.Date(lastSyncTimestamp))
+            }
         }
     }
 
@@ -271,7 +303,11 @@ class SettingsViewModel @Inject constructor(
     }
 
     // === Helpers ===
-    private fun scheduleSyncWorker(intervalHours: Int, onlyWifi: Boolean) {
+    private fun scheduleSyncWorker(
+        intervalHours: Int,
+        onlyWifi: Boolean,
+        policy: ExistingPeriodicWorkPolicy = ExistingPeriodicWorkPolicy.UPDATE
+    ) {
         // Guard defensivo: si el usuario no es premium, nunca encolar worker de 30 min
         val isPremium = uiState.value.preferences.isPremium
         val effectiveInterval = if (intervalHours == -1 && !isPremium) 2 else intervalHours
@@ -290,11 +326,7 @@ class SettingsViewModel @Inject constructor(
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10L, TimeUnit.MINUTES)
                 .build()
         }
-        workManager.enqueueUniquePeriodicWork(
-            "TrackerSync",
-            ExistingPeriodicWorkPolicy.UPDATE,
-            request
-        )
+        workManager.enqueueUniquePeriodicWork("TrackerSync", policy, request)
     }
 }
 

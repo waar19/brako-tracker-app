@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -31,6 +32,8 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_ONBOARDING_DONE        = booleanPreferencesKey("onboarding_done")
         val KEY_DELIVERED_COUNT        = intPreferencesKey("delivered_count")
         val KEY_TOTAL_TRACKED          = intPreferencesKey("total_tracked")
+        val KEY_LAST_SEEN_VERSION_CODE = intPreferencesKey("last_seen_version_code")
+        val KEY_LAST_SYNC_TIMESTAMP    = longPreferencesKey("last_sync_timestamp")
     }
 
     val preferences: Flow<UserPreferences> = dataStore.data.map { prefs ->
@@ -48,8 +51,10 @@ class UserPreferencesRepository @Inject constructor(
             theme                = prefs[KEY_THEME] ?: "system",
             isPremium            = prefs[KEY_IS_PREMIUM] ?: false,
             onboardingDone       = prefs[KEY_ONBOARDING_DONE] ?: false,
-            deliveredCount       = prefs[KEY_DELIVERED_COUNT] ?: 0,
-            totalTracked         = prefs[KEY_TOTAL_TRACKED] ?: 0
+            deliveredCount          = prefs[KEY_DELIVERED_COUNT] ?: 0,
+            totalTracked            = prefs[KEY_TOTAL_TRACKED] ?: 0,
+            lastSeenVersionCode     = prefs[KEY_LAST_SEEN_VERSION_CODE] ?: 0,
+            lastSyncTimestamp       = prefs[KEY_LAST_SYNC_TIMESTAMP] ?: 0L
         )
     }
 
@@ -124,6 +129,14 @@ class UserPreferencesRepository @Inject constructor(
         dataStore.edit { prefs ->
             prefs[KEY_TOTAL_TRACKED] = (prefs[KEY_TOTAL_TRACKED] ?: 0) + 1
         }
+    }
+
+    suspend fun setLastSeenVersionCode(versionCode: Int) {
+        dataStore.edit { it[KEY_LAST_SEEN_VERSION_CODE] = versionCode }
+    }
+
+    suspend fun setLastSyncTimestamp(epochMs: Long) {
+        dataStore.edit { it[KEY_LAST_SYNC_TIMESTAMP] = epochMs }
     }
 
     /** Backfills stats from Room if both counters are still 0 (first launch after feature addition). */

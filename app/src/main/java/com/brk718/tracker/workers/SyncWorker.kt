@@ -99,6 +99,9 @@ class SyncWorker @AssistedInject constructor(
                 }
             }
 
+            // Registrar el timestamp del último sync exitoso
+            prefsRepository.setLastSyncTimestamp(System.currentTimeMillis())
+
             // Actualizar el widget con los datos frescos
             updateWidgetIfInstalled()
 

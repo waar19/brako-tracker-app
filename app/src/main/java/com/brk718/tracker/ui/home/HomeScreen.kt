@@ -60,6 +60,7 @@ import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.ui.add.FREE_SHIPMENT_LIMIT
 import com.brk718.tracker.ui.ads.AdManager
+import com.brk718.tracker.BuildConfig
 import com.google.android.play.core.review.ReviewManagerFactory
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -88,6 +89,7 @@ fun HomeScreen(
     val isOnline by viewModel.isOnline.collectAsState()
     val selectedIds by viewModel.selectedIds.collectAsState()
     val isSelectionMode by viewModel.isSelectionMode.collectAsState()
+    val showWhatsNew by viewModel.showWhatsNew.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val canAddMore = isPremium || shipments.size < FREE_SHIPMENT_LIMIT
@@ -546,6 +548,14 @@ fun HomeScreen(
                 }
             }
         }
+    // ── What's New BottomSheet ────────────────────────────────────────────────
+    if (showWhatsNew) {
+        WhatsNewBottomSheet(
+            versionName = BuildConfig.VERSION_NAME,
+            onDismiss   = { viewModel.dismissWhatsNew() }
+        )
+    }
+
     // ── Diálogo confirmar eliminación en bloque ───────────────────────────────
     if (showDeleteConfirmDialog) {
         AlertDialog(

@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -57,7 +57,7 @@ fun GmailScreen(
                         }
                         IconButton(onClick = { viewModel.disconnect() }) {
                             Icon(
-                                Icons.Default.Logout,
+                                Icons.AutoMirrored.Filled.Logout,
                                 contentDescription = stringResource(R.string.gmail_disconnect),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )

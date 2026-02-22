@@ -15,5 +15,7 @@ data class UserPreferences(
     val isPremium: Boolean = false,
     val onboardingDone: Boolean = false,
     val deliveredCount: Int = 0,
-    val totalTracked: Int = 0
+    val totalTracked: Int = 0,
+    val lastSeenVersionCode: Int = 0,  // 0 = nunca visto; actualizado al cerrar el What's New
+    val lastSyncTimestamp: Long = 0L   // epoch ms del último sync exitoso; 0 = nunca
 )

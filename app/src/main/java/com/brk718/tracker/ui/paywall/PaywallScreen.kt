@@ -120,12 +120,12 @@ fun PaywallScreen(
 
             // Beneficios
             val benefits = listOf(
-                Triple(Icons.Default.Block, "Sin anuncios", "Experiencia limpia y sin interrupciones"),
-                Triple(Icons.Default.AllInclusive, "Envios ilimitados", "Sin limite de 10 envios activos"),
-                Triple(Icons.Default.History, "Historial completo", "Mas alla de los 30 dias del plan gratuito"),
-                Triple(Icons.Default.Bolt, "Sync cada 30 min", "Actualizaciones mas frecuentes"),
-                Triple(Icons.Default.FileDownload, "Exportar a CSV", "Descarga todos tus envios"),
-                Triple(Icons.Default.Widgets, "Widget en pantalla de inicio", "Estado de tu envio de un vistazo")
+                Triple(Icons.Default.Block, stringResource(R.string.paywall_benefit_no_ads_title), stringResource(R.string.paywall_benefit_no_ads_subtitle)),
+                Triple(Icons.Default.AllInclusive, stringResource(R.string.paywall_benefit_unlimited_title), stringResource(R.string.paywall_benefit_unlimited_subtitle)),
+                Triple(Icons.Default.History, stringResource(R.string.paywall_benefit_history_title), stringResource(R.string.paywall_benefit_history_subtitle)),
+                Triple(Icons.Default.Bolt, stringResource(R.string.paywall_benefit_sync_title), stringResource(R.string.paywall_benefit_sync_subtitle)),
+                Triple(Icons.Default.FileDownload, stringResource(R.string.paywall_benefit_csv_title), stringResource(R.string.paywall_benefit_csv_subtitle)),
+                Triple(Icons.Default.Widgets, stringResource(R.string.paywall_benefit_widget_title), stringResource(R.string.paywall_benefit_widget_subtitle))
             )
 
             benefits.forEach { (icon, title, subtitle) ->
@@ -154,7 +154,7 @@ fun PaywallScreen(
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
-                            "al año · menos de ${formatPerMonth(price)} al mes",
+                            stringResource(R.string.paywall_per_month_hint, formatPerMonth(price)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                         )
@@ -204,7 +204,7 @@ fun PaywallScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    "Restaurar compra anterior",
+                    stringResource(R.string.settings_premium_restore_alt),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -212,7 +212,7 @@ fun PaywallScreen(
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "Suscripción anual con renovación automática. Cancela cuando quieras desde Google Play.",
+                stringResource(R.string.paywall_terms),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
                 textAlign = TextAlign.Center

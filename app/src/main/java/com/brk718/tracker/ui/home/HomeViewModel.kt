@@ -2,6 +2,7 @@ package com.brk718.tracker.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.brk718.tracker.BuildConfig
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
@@ -169,6 +170,24 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _selectedIds.value.forEach { repository.deleteShipment(it) }
             _selectedIds.value = emptySet()
+        }
+    }
+
+    // ── What's New ────────────────────────────────────────────────────────────
+    /** true si el usuario ya completó el onboarding y hay una versión nueva que no ha visto */
+    val showWhatsNew: StateFlow<Boolean> = prefsRepository.preferences
+        .map { prefs ->
+            prefs.onboardingDone && prefs.lastSeenVersionCode < BuildConfig.VERSION_CODE
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
+    fun dismissWhatsNew() {
+        viewModelScope.launch {
+            prefsRepository.setLastSeenVersionCode(BuildConfig.VERSION_CODE)
         }
     }
 }

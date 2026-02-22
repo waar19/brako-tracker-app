@@ -370,8 +370,8 @@ fun SettingsScreen(
                     SettingsNavigationItem(
                         title = stringResource(R.string.settings_csv_export_title),
                         subtitle = when {
-                            !isPremium                           -> "✦ Solo Premium"
-                            exportResult is ExportResult.Loading -> "Exportando..."
+                            !isPremium                           -> stringResource(R.string.settings_premium_only_badge)
+                            exportResult is ExportResult.Loading -> stringResource(R.string.settings_csv_exporting)
                             else                                 -> stringResource(R.string.settings_csv_export_subtitle)
                         },
                         icon = Icons.Default.FileDownload,
@@ -519,15 +519,15 @@ fun SettingsScreen(
                 item { Spacer(Modifier.height(8.dp)) }
                 item {
                     SettingsSectionHeader(
-                        title = "Developer",
+                        title = stringResource(R.string.settings_debug_section),
                         icon = Icons.Default.BugReport
                     )
                 }
                 item {
                     SettingsCardGroup {
                         SettingsSwitchItem(
-                            title = "Simular Premium",
-                            subtitle = if (prefs.isPremium) "Modo Premium activo" else "Modo Free activo",
+                            title = stringResource(R.string.settings_debug_simulate_premium),
+                            subtitle = if (prefs.isPremium) stringResource(R.string.settings_debug_premium_active) else stringResource(R.string.settings_debug_free_active),
                             icon = Icons.Default.AdminPanelSettings,
                             checked = prefs.isPremium,
                             onCheckedChange = { viewModel.setIsPremiumDebug(it) }
@@ -926,7 +926,7 @@ private fun SyncIntervalDialog(
     // 30 min = valor -1 (usamos -1 internamente para "30 min", WorkManager acepta 15 min como mínimo)
     data class SyncOption(val value: Int, val label: String, val premiumOnly: Boolean = false)
     val options = listOf(
-        SyncOption(-1, "Cada 30 min", premiumOnly = true),
+        SyncOption(-1, stringResource(R.string.settings_sync_30min), premiumOnly = true),
         SyncOption(1,  stringResource(R.string.settings_sync_1h)),
         SyncOption(2,  stringResource(R.string.settings_sync_2h)),
         SyncOption(6,  stringResource(R.string.settings_sync_6h)),
@@ -973,7 +973,7 @@ private fun SyncIntervalDialog(
                                 color = Color(0xFFFFB400).copy(alpha = 0.2f)
                             ) {
                                 Text(
-                                    "✦ Premium",
+                                    stringResource(R.string.settings_premium_badge),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color(0xFFB8860B),
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -1011,7 +1011,7 @@ private fun HourMinutePickerDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // ── Horas ──────────────────────────────────────
                 Text(
-                    "Hora",
+                    stringResource(R.string.dialog_hour_label),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -1044,7 +1044,7 @@ private fun HourMinutePickerDialog(
                 }
                 // ── Minutos ─────────────────────────────────────
                 Text(
-                    "Minuto",
+                    stringResource(R.string.dialog_minute_label),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -1079,7 +1079,7 @@ private fun HourMinutePickerDialog(
         },
         confirmButton = {
             Button(onClick = { onSelect(selectedHour, selectedMinute) }) {
-                Text("Aceptar")
+                Text(stringResource(R.string.dialog_confirm))
             }
         },
         dismissButton = {
