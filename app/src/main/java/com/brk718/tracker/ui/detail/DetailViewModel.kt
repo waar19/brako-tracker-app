@@ -108,6 +108,14 @@ class DetailViewModel @Inject constructor(
             repository.updateTitle(shipmentId, trimmed)
         }
     }
+
+    fun toggleMute() {
+        val current = (uiState.value as? DetailUiState.Success)?.shipment?.shipment ?: return
+        viewModelScope.launch {
+            if (current.isMuted) repository.unmuteShipment(shipmentId)
+            else repository.muteShipment(shipmentId)
+        }
+    }
 }
 
 sealed class DetailUiState {

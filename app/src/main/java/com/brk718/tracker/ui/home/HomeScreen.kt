@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
@@ -874,13 +875,27 @@ fun ShipmentCard(
                         )
                     }
 
-                    // Último evento (tiempo relativo)
-                    if (lastEvent != null) {
-                        Text(
-                            text = relativeTime(lastEvent.timestamp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Indicador de silenciado
+                        if (item.shipment.isMuted) {
+                            Icon(
+                                Icons.Default.NotificationsOff,
+                                contentDescription = "Notificaciones silenciadas",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        }
+                        // Último evento (tiempo relativo)
+                        if (lastEvent != null) {
+                            Text(
+                                text = relativeTime(lastEvent.timestamp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
                 }
 

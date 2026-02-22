@@ -60,6 +60,8 @@ class SyncWorker @AssistedInject constructor(
                                 if (newStatus.lowercase().contains(ShipmentStatus.DELIVERED)) {
                                     prefsRepository.incrementDeliveredCount()
                                 }
+                                // Saltar notificación si el envío está silenciado
+                                if (updated.shipment.isMuted) return@async
                                 if (prefs.notificationsEnabled && !isInQuietHours(prefs.quietHoursEnabled, prefs.quietHoursStart, prefs.quietHoursStartMinute, prefs.quietHoursEnd, prefs.quietHoursEndMinute)) {
                                     val shouldNotify = if (prefs.onlyImportantEvents) {
                                         isImportantStatus(newStatus)
@@ -86,6 +88,29 @@ class SyncWorker @AssistedInject constructor(
                 android.util.Log.w("SyncWorker", "Notificaciones bloqueadas a nivel sistema — saltando envío")
                 updateWidgetIfInstalled()
                 return Result.success()
+            }
+
+            // === Recordatorio de entrega inminente (una sola vez por estimatedDelivery) ===
+            val nowMs = System.currentTimeMillis()
+            val in24h = nowMs + 24L * 60 * 60 * 1000L
+            // Re-leer el estado fresco de cada envío (los refresh ya se completaron arriba)
+            val freshShipments = repository.activeShipments.first()
+            freshShipments.forEach { swe ->
+                val s = swe.shipment
+                val eta = s.estimatedDelivery ?: return@forEach
+                if (s.isMuted) return@forEach
+                if (s.reminderSent) return@forEach
+                if (s.status.lowercase().contains(ShipmentStatus.DELIVERED)) return@forEach
+                if (eta in nowMs..in24h) {
+                    val isToday = isSameDay(eta, nowMs)
+                    val title = appContext.getString(R.string.notif_reminder_title)
+                    val body = if (isToday)
+                        appContext.getString(R.string.notif_reminder_today, s.title)
+                    else
+                        appContext.getString(R.string.notif_reminder_tomorrow, s.title)
+                    sendReminderNotification(s.id, title, body)
+                    repository.markReminderSent(s.id)
+                }
             }
 
             // Enviar notificaciones: individual si hay 1, agrupada si hay 2+
@@ -233,6 +258,41 @@ class SyncWorker @AssistedInject constructor(
             .build()
 
         notificationManager.notify(SUMMARY_NOTIFICATION_ID, summaryNotification)
+    }
+
+    /** Devuelve true si dos timestamps caen en el mismo día calendario. */
+    private fun isSameDay(ts1: Long, ts2: Long): Boolean {
+        val cal1 = java.util.Calendar.getInstance().apply { timeInMillis = ts1 }
+        val cal2 = java.util.Calendar.getInstance().apply { timeInMillis = ts2 }
+        return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR) &&
+               cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR)
+    }
+
+    private fun sendReminderNotification(shipmentId: String, title: String, body: String) {
+        val notificationManager =
+            appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val intent = Intent(appContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("shipmentId", shipmentId)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            appContext,
+            "reminder_$shipmentId".hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(appContext, TrackerApp.CHANNEL_SHIPMENT_UPDATES)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify("reminder_$shipmentId".hashCode(), notification)
     }
 
     companion object {

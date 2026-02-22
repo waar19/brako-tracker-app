@@ -352,10 +352,15 @@ class ShipmentRepository @Inject constructor(
                 ?.takeIf { it.isNotBlank() }
                 ?.let { parseIso8601Date(it) }
 
+            // Si estimatedDelivery cambia, resetear reminderSent para re-enviar el recordatorio
+            val newEstimatedDelivery = estimatedDeliveryMs ?: shipment.estimatedDelivery
+            val resetReminder = estimatedDeliveryMs != null && estimatedDeliveryMs != shipment.estimatedDelivery
+
             dao.insertShipment(shipment.copy(
                 status = statusText,
                 lastUpdate = System.currentTimeMillis(),
-                estimatedDelivery = estimatedDeliveryMs ?: shipment.estimatedDelivery
+                estimatedDelivery = newEstimatedDelivery,
+                reminderSent = if (resetReminder) false else shipment.reminderSent
             ))
 
             val events = tracking.checkpoints.mapIndexed { index, checkpoint ->
@@ -540,6 +545,10 @@ class ShipmentRepository @Inject constructor(
         dao.deleteShipment(id)
         notifyWidget()
     }
+
+    suspend fun muteShipment(id: String)     = dao.updateMuted(id, true)
+    suspend fun unmuteShipment(id: String)   = dao.updateMuted(id, false)
+    suspend fun markReminderSent(id: String) = dao.updateReminderSent(id, true)
 
     /** Dispara una actualización inmediata del widget de pantalla de inicio. */
     private suspend fun notifyWidget() {

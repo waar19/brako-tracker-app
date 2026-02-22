@@ -365,4 +365,9 @@
     <string name="whats_new_v2_search_sub">Encuentra cualquier envío por nombre, número o transportista</string>
     <string name="whats_new_v2_widget_title">Widget en pantalla de inicio</string>
     <string name="whats_new_v2_widget_sub">Consulta tu envío sin abrir la app (Premium)</string>
+
+    <!-- Notificaciones de recordatorio de entrega inminente -->
+    <string name="notif_reminder_title">📦 Entrega inminente</string>
+    <string name="notif_reminder_today">Tu envío "%s" llegará hoy</string>
+    <string name="notif_reminder_tomorrow">Tu envío "%s" llegará mañana</string>
 </resources>

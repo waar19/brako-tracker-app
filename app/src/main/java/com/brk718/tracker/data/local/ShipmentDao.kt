@@ -46,6 +46,12 @@ interface ShipmentDao {
     @Query("UPDATE shipments SET title = :newTitle WHERE id = :id")
     suspend fun updateTitle(id: String, newTitle: String)
 
+    @Query("UPDATE shipments SET isMuted = :muted WHERE id = :id")
+    suspend fun updateMuted(id: String, muted: Boolean)
+
+    @Query("UPDATE shipments SET reminderSent = :sent WHERE id = :id")
+    suspend fun updateReminderSent(id: String, sent: Boolean)
+
     @Query("SELECT COUNT(*) FROM shipments")
     suspend fun countAllShipments(): Int
 
