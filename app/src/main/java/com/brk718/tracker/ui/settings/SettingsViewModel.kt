@@ -160,8 +160,16 @@ class SettingsViewModel @Inject constructor(
         prefsRepo.setQuietHoursStart(hour)
     }
 
+    fun setQuietHoursStartMinute(minute: Int) = viewModelScope.launch {
+        prefsRepo.setQuietHoursStartMinute(minute)
+    }
+
     fun setQuietHoursEnd(hour: Int) = viewModelScope.launch {
         prefsRepo.setQuietHoursEnd(hour)
+    }
+
+    fun setQuietHoursEndMinute(minute: Int) = viewModelScope.launch {
+        prefsRepo.setQuietHoursEndMinute(minute)
     }
 
     fun syncNow() {

@@ -279,14 +279,14 @@ fun SettingsScreen(
                         SettingsItemDivider()
                         SettingsNavigationItem(
                             title = stringResource(R.string.settings_quiet_hours_start_title),
-                            subtitle = "%02d:00".format(prefs.quietHoursStart),
+                            subtitle = "%02d:%02d".format(prefs.quietHoursStart, prefs.quietHoursStartMinute),
                             icon = Icons.Default.NightsStay,
                             onClick = { showQuietHoursStartDialog = true }
                         )
                         SettingsItemDivider()
                         SettingsNavigationItem(
                             title = stringResource(R.string.settings_quiet_hours_end_title),
-                            subtitle = "%02d:00".format(prefs.quietHoursEnd),
+                            subtitle = "%02d:%02d".format(prefs.quietHoursEnd, prefs.quietHoursEndMinute),
                             icon = Icons.Default.WbSunny,
                             onClick = { showQuietHoursEndDialog = true }
                         )
@@ -551,19 +551,29 @@ fun SettingsScreen(
     }
 
     if (showQuietHoursStartDialog) {
-        HourPickerDialog(
+        HourMinutePickerDialog(
             title = stringResource(R.string.settings_quiet_hours_start_title),
-            current = prefs.quietHoursStart,
-            onSelect = { viewModel.setQuietHoursStart(it); showQuietHoursStartDialog = false },
+            currentHour = prefs.quietHoursStart,
+            currentMinute = prefs.quietHoursStartMinute,
+            onSelect = { h, m ->
+                viewModel.setQuietHoursStart(h)
+                viewModel.setQuietHoursStartMinute(m)
+                showQuietHoursStartDialog = false
+            },
             onDismiss = { showQuietHoursStartDialog = false }
         )
     }
 
     if (showQuietHoursEndDialog) {
-        HourPickerDialog(
+        HourMinutePickerDialog(
             title = stringResource(R.string.settings_quiet_hours_end_title),
-            current = prefs.quietHoursEnd,
-            onSelect = { viewModel.setQuietHoursEnd(it); showQuietHoursEndDialog = false },
+            currentHour = prefs.quietHoursEnd,
+            currentMinute = prefs.quietHoursEndMinute,
+            onSelect = { h, m ->
+                viewModel.setQuietHoursEnd(h)
+                viewModel.setQuietHoursEndMinute(m)
+                showQuietHoursEndDialog = false
+            },
             onDismiss = { showQuietHoursEndDialog = false }
         )
     }
@@ -982,46 +992,96 @@ private fun SyncIntervalDialog(
 }
 
 @Composable
-private fun HourPickerDialog(
+private fun HourMinutePickerDialog(
     title: String,
-    current: Int,
-    onSelect: (Int) -> Unit,
+    currentHour: Int,
+    currentMinute: Int,
+    onSelect: (hour: Int, minute: Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val hours = (0..23).toList()
+    var selectedHour   by remember { mutableStateOf(currentHour) }
+    var selectedMinute by remember { mutableStateOf(currentMinute) }
+    val minutes = listOf(0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Schedule, null) },
         title = { Text(title) },
         text = {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                modifier = Modifier.height(240.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                items(hours) { hour ->
-                    val selected = hour == current
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (selected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.clickable { onSelect(hour) }
-                    ) {
-                        Text(
-                            text = "%02d:00".format(hour),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selected) MaterialTheme.colorScheme.onPrimary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            textAlign = TextAlign.Center
-                        )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // ── Horas ──────────────────────────────────────
+                Text(
+                    "Hora",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.height(160.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items((0..23).toList()) { hour ->
+                        val selected = hour == selectedHour
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.clickable { selectedHour = hour }
+                        ) {
+                            Text(
+                                text = "%02d".format(hour),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+                // ── Minutos ─────────────────────────────────────
+                Text(
+                    "Minuto",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.height(80.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(minutes) { minute ->
+                        val selected = minute == selectedMinute
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.clickable { selectedMinute = minute }
+                        ) {
+                            Text(
+                                text = ":%02d".format(minute),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
         },
-        confirmButton = {},
+        confirmButton = {
+            Button(onClick = { onSelect(selectedHour, selectedMinute) }) {
+                Text("Aceptar")
+            }
+        },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_cancel)) }
         }

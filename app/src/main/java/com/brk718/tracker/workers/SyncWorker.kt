@@ -60,7 +60,7 @@ class SyncWorker @AssistedInject constructor(
                                 if (newStatus.lowercase().contains(ShipmentStatus.DELIVERED)) {
                                     prefsRepository.incrementDeliveredCount()
                                 }
-                                if (prefs.notificationsEnabled && !isInQuietHours(prefs.quietHoursEnabled, prefs.quietHoursStart, prefs.quietHoursEnd)) {
+                                if (prefs.notificationsEnabled && !isInQuietHours(prefs.quietHoursEnabled, prefs.quietHoursStart, prefs.quietHoursStartMinute, prefs.quietHoursEnd, prefs.quietHoursEndMinute)) {
                                     val shouldNotify = if (prefs.onlyImportantEvents) {
                                         isImportantStatus(newStatus)
                                     } else {
@@ -126,17 +126,17 @@ class SyncWorker @AssistedInject constructor(
      * Devuelve true si la hora actual está dentro del rango de silencio.
      * Maneja rangos que cruzan medianoche (ej. 23:00 → 07:00).
      */
-    private fun isInQuietHours(enabled: Boolean, startHour: Int, endHour: Int): Boolean {
+    private fun isInQuietHours(enabled: Boolean, startHour: Int, startMinute: Int, endHour: Int, endMinute: Int): Boolean {
         if (!enabled) return false
         val cal = Calendar.getInstance()
         val currentMin = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
-        val startMin   = startHour * 60
-        val endMin     = endHour   * 60
+        val startMin   = startHour * 60 + startMinute
+        val endMin     = endHour   * 60 + endMinute
         return if (startMin <= endMin) {
-            // Rango dentro del mismo día (ej. 02:00 → 08:00)
+            // Rango dentro del mismo día (ej. 02:30 → 08:00)
             currentMin in startMin until endMin
         } else {
-            // Rango cruzando medianoche (ej. 23:00 → 07:00)
+            // Rango cruzando medianoche (ej. 23:30 → 07:00)
             currentMin >= startMin || currentMin < endMin
         }
     }
