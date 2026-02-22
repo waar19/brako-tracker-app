@@ -124,8 +124,8 @@ class ShipmentRepository @Inject constructor(
                 "ups"                 -> "https://www.ups.com/track?loc=es&tracknum=$encoded"
                 "usps"                -> "https://tools.usps.com/go/TrackConfirmAction?tLabels=$encoded"
                 "dhl"                 -> "https://www.dhl.com/es-co-en/home/tracking.html?tracking-id=$encoded"
-                "coordinadora"        -> "https://www.coordinadora.com/portafolio-de-servicios/servicios-en-linea/rastrear-guias/?guia=$encoded"
-                "servientrega"        -> "https://www.servientrega.com/wps/portal/colombia/rastreo-de-envios?tracking=$encoded"
+                "coordinadora"        -> "https://coordinadora.com/rastreo/rastreo-de-guia/detalle-de-rastreo-de-guia/?guia=$encoded"
+                "servientrega"        -> "https://www.servientrega.com/wps/portal/rastreo-envio?tracking=$encoded"
                 "interrapidisimo-scraper", "inter-rapidisimo"
                                       -> "https://www.interrapidisimo.com/rastreo/?tracking=$encoded"
                 "envia-co"            -> "https://www.envia.co/rastreo?guia=$encoded"
@@ -332,7 +332,40 @@ class ShipmentRepository @Inject constructor(
         }
 
         try {
-            val response = api.getTrackingInfo(effectiveSlug, shipment.trackingNumber)
+            // GET al API de AfterShip.
+            // Si devuelve 404 el tracking no existe todavía → crearlo y reintentar una vez.
+            val response = try {
+                api.getTrackingInfo(effectiveSlug, shipment.trackingNumber)
+            } catch (e404: retrofit2.HttpException) {
+                if (e404.code() == 404) {
+                    android.util.Log.w("ShipmentRepository",
+                        "AfterShip 404 — auto-creando tracking $effectiveSlug/${shipment.trackingNumber}")
+                    try {
+                        api.createTracking(
+                            CreateTrackingRequest(
+                                tracking = CreateTrackingBody(
+                                    tracking_number = shipment.trackingNumber,
+                                    slug = effectiveSlug
+                                )
+                            )
+                        )
+                        android.util.Log.d("ShipmentRepository", "Auto-creado OK, reintentando GET…")
+                    } catch (createEx: retrofit2.HttpException) {
+                        // 409 / 4009 = el tracking ya existe en AfterShip → ok, continuar con el GET
+                        if (createEx.code() != 409 && createEx.code() != 4009) {
+                            android.util.Log.w("ShipmentRepository",
+                                "Auto-create falló HTTP ${createEx.code()}: ${createEx.message()}")
+                            return@withLock
+                        }
+                        android.util.Log.d("ShipmentRepository",
+                            "Tracking ya existía en AfterShip (${createEx.code()}), reintentando GET…")
+                    }
+                    // Reintento GET tras crear (o confirmar que ya existía)
+                    api.getTrackingInfo(effectiveSlug, shipment.trackingNumber)
+                } else {
+                    throw e404   // Re-lanzar otros errores HTTP al catch externo
+                }
+            }
             val tracking = response.data?.tracking ?: return@withLock
 
             // Traducir el tag principal al español; si el subtag_message aporta más detalle,

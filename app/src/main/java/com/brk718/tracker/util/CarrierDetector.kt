@@ -52,11 +52,13 @@ object CarrierDetector {
             t.matches(Regex("24\\d{10}")) -> "Interrapidísimo"   // 12 dígitos, empieza con 24
             t.matches(Regex("134\\d{8}")) -> "Avianca Cargo"     // 11 dígitos, empieza con 134
             t.matches(Regex("1\\d{12}")) -> "Envía"               // 13 dígitos, empieza con 1 (FedEx usa 12)
+            t.matches(Regex("0\\d{11}")) -> "Envía"               // 12 dígitos, empieza con 0 (formato nuevo Envía)
             t.matches(Regex("7\\d{9,11}")) -> "TCC"              // 10-12 dígitos, empieza con 7
             t.matches(Regex("3\\d{8,9}")) -> "Saferbo"           // 9-10 dígitos, empieza con 3
             t.matches(Regex("20\\d{6,7}")) -> "Deprisa"          // 8-9 dígitos, empieza con 20
-            t.matches(Regex("[5-8]\\d{9}")) -> "Coordinadora"    // 10 dígitos, empieza con 5-8
+            t.matches(Regex("[5-8]\\d{9,10}")) -> "Coordinadora"  // 10-11 dígitos, empieza con 5-8
             t.matches(Regex("9\\d{9,10}")) -> "Servientrega"     // 10-11 dígitos, empieza con 9
+            t.matches(Regex("22\\d{8}")) -> "Servientrega"       // 10 dígitos, empieza con 22 (formato alternativo)
 
             // ── DHL (catch-all 10 dígitos genérico) ───────────────────────────
             t.matches(Regex("\\d{10}")) -> "DHL"
