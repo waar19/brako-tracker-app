@@ -7,6 +7,8 @@ import com.brk718.tracker.data.local.ShipmentEntity
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.local.TrackingEventEntity
 import com.brk718.tracker.data.remote.AmazonTrackingService
+import com.brk718.tracker.data.remote.CarrierScraperFactory
+import com.brk718.tracker.data.remote.ColombianCarrierScraper
 import com.brk718.tracker.data.remote.InterrapidisimoScraper
 import com.brk718.tracker.data.remote.CreateTrackingBody
 import com.brk718.tracker.data.remote.CreateTrackingRequest
@@ -37,7 +39,8 @@ class ShipmentRepository @Inject constructor(
     private val dao: ShipmentDao,
     private val api: TrackingApi,
     private val amazonService: AmazonTrackingService,
-    private val interrapidisimoScraper: InterrapidisimoScraper
+    private val interrapidisimoScraper: InterrapidisimoScraper,
+    private val scraperFactory: CarrierScraperFactory
 ) {
     companion object {
         // ── SimpleDateFormat cacheados (ThreadLocal = thread-safe con Dispatchers.IO) ───────────
@@ -366,7 +369,16 @@ class ShipmentRepository @Inject constructor(
                     throw e404   // Re-lanzar otros errores HTTP al catch externo
                 }
             }
-            val tracking = response.data?.tracking ?: return@withLock
+            val tracking = response.data?.tracking
+            if (tracking == null) {
+                // AfterShip no tiene datos — intentar scraper directo como fallback
+                scraperFactory.getFor(effectiveSlug)?.let {
+                    android.util.Log.d("ShipmentRepository",
+                        "AfterShip sin datos para $effectiveSlug/${shipment.trackingNumber}, usando scraper")
+                    refreshShipmentWithScraper(id, shipment, it)
+                }
+                return@withLock
+            }
 
             // Traducir el tag principal al español; si el subtag_message aporta más detalle,
             // intentar traducirlo también y usar el más descriptivo (el subtag es más específico).
@@ -414,8 +426,64 @@ class ShipmentRepository @Inject constructor(
 
         } catch (e: Exception) {
             android.util.Log.e("ShipmentRepository", "Error al refrescar envío AfterShip: ${e.message}", e)
+            // Intentar scraper directo como fallback si AfterShip lanzó excepción
+            scraperFactory.getFor(effectiveSlug)?.let {
+                android.util.Log.d("ShipmentRepository",
+                    "AfterShip falló para $effectiveSlug/${shipment.trackingNumber}, usando scraper")
+                refreshShipmentWithScraper(id, shipment, it)
+            }
         }
         } // lock.withLock
+    }
+
+    /**
+     * Fallback: obtiene datos de rastreo directamente del sitio del carrier cuando
+     * AfterShip no retorna datos o falla.
+     *
+     * Solo se activa para carriers que tienen un [ColombianCarrierScraper] registrado
+     * en [CarrierScraperFactory] (Servientrega, Coordinadora, TCC, Deprisa).
+     */
+    private suspend fun refreshShipmentWithScraper(
+        id: String,
+        shipment: ShipmentEntity,
+        scraper: ColombianCarrierScraper
+    ) = withContext(Dispatchers.IO) {
+        try {
+            val result = scraper.getTracking(shipment.trackingNumber)
+
+            if (result.error != null || result.status == null) {
+                android.util.Log.w("ShipmentRepository",
+                    "Scraper sin datos para ${shipment.trackingNumber}: ${result.error}")
+                return@withContext
+            }
+
+            dao.insertShipment(shipment.copy(
+                status = result.status,
+                lastUpdate = System.currentTimeMillis()
+            ))
+
+            if (result.events.isNotEmpty()) {
+                val events = result.events.mapIndexed { index, event ->
+                    TrackingEventEntity(
+                        id = 0L,
+                        shipmentId = id,
+                        timestamp = System.currentTimeMillis() - (index * 3_600_000L),
+                        description = event.description,
+                        location = event.location,
+                        status = ""
+                    )
+                }
+                dao.clearEventsForShipment(id)
+                dao.insertEvents(events)
+            }
+
+            android.util.Log.d("ShipmentRepository",
+                "Scraper OK: ${shipment.trackingNumber} → ${result.status}, ${result.events.size} eventos")
+
+        } catch (e: Exception) {
+            android.util.Log.e("ShipmentRepository",
+                "Scraper falló para ${shipment.trackingNumber}: ${e.message}", e)
+        }
     }
 
     private suspend fun refreshShipmentAmazon(id: String) = withContext(Dispatchers.IO) {
