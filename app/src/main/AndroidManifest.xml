@@ -67,6 +67,17 @@
                 android:resource="@xml/file_provider_paths" />
         </provider>
 
+        <!-- Servicio FCM: recibe push notifications desde el backend y tokens de renovación.
+             Sin un backend que use la FCM API, los mensajes no llegan automáticamente;
+             este service deja la infraestructura lista para la integración futura. -->
+        <service
+            android:name=".service.TrackerFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- Desactivar el inicializador automático de WorkManager para que
              Configuration.Provider de TrackerApp (con HiltWorkerFactory) tome efecto.
              Sin esto, WorkManager se auto-inicializa con DefaultWorkerFactory y

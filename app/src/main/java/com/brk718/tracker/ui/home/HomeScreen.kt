@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +59,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.repository.ShipmentRepository
+import com.brk718.tracker.util.ShipmentStatus
 import com.brk718.tracker.ui.add.FREE_SHIPMENT_LIMIT
 import com.brk718.tracker.ui.ads.AdManager
 import com.brk718.tracker.BuildConfig
@@ -85,6 +87,7 @@ fun HomeScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val refreshError by viewModel.refreshError.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val activeStatusFilter by viewModel.activeStatusFilter.collectAsState()
     val shouldShowRating by viewModel.shouldShowRatingRequest.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
     val selectedIds by viewModel.selectedIds.collectAsState()
@@ -376,6 +379,29 @@ fun HomeScreen(
                                 unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                             )
                         )
+                    }
+                }
+
+                // ── Chips de filtro por estado ────────────────────────────
+                // Solo visibles cuando hay envíos y no estamos en modo selección
+                if (shipments.isNotEmpty() && !isSelectionMode) {
+                    val filterOptions = listOf(
+                        stringResource(R.string.home_filter_all)              to null,
+                        stringResource(R.string.home_filter_in_transit)       to ShipmentStatus.IN_TRANSIT,
+                        stringResource(R.string.home_filter_out_for_delivery) to ShipmentStatus.OUT_FOR_DELIVERY,
+                        stringResource(R.string.home_filter_exception)        to ShipmentStatus.EXCEPTION,
+                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        items(filterOptions) { (label, filter) ->
+                            FilterChip(
+                                selected = activeStatusFilter == filter,
+                                onClick = { viewModel.setStatusFilter(filter) },
+                                label = { Text(label, style = MaterialTheme.typography.labelMedium) }
+                            )
+                        }
                     }
                 }
             }

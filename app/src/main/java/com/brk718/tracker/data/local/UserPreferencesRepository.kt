@@ -34,6 +34,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_TOTAL_TRACKED          = intPreferencesKey("total_tracked")
         val KEY_LAST_SEEN_VERSION_CODE = intPreferencesKey("last_seen_version_code")
         val KEY_LAST_SYNC_TIMESTAMP    = longPreferencesKey("last_sync_timestamp")
+        val KEY_FCM_TOKEN              = stringPreferencesKey("fcm_token")
     }
 
     val preferences: Flow<UserPreferences> = dataStore.data.map { prefs ->
@@ -54,7 +55,8 @@ class UserPreferencesRepository @Inject constructor(
             deliveredCount          = prefs[KEY_DELIVERED_COUNT] ?: 0,
             totalTracked            = prefs[KEY_TOTAL_TRACKED] ?: 0,
             lastSeenVersionCode     = prefs[KEY_LAST_SEEN_VERSION_CODE] ?: 0,
-            lastSyncTimestamp       = prefs[KEY_LAST_SYNC_TIMESTAMP] ?: 0L
+            lastSyncTimestamp       = prefs[KEY_LAST_SYNC_TIMESTAMP] ?: 0L,
+            fcmToken                = prefs[KEY_FCM_TOKEN] ?: ""
         )
     }
 
@@ -137,6 +139,10 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setLastSyncTimestamp(epochMs: Long) {
         dataStore.edit { it[KEY_LAST_SYNC_TIMESTAMP] = epochMs }
+    }
+
+    suspend fun setFcmToken(token: String) {
+        dataStore.edit { it[KEY_FCM_TOKEN] = token }
     }
 
     /** Backfills stats from Room if both counters are still 0 (first launch after feature addition). */

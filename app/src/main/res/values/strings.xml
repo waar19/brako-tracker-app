@@ -224,6 +224,10 @@
     <string name="home_search_placeholder">Buscar por título, número, transportista…</string>
     <string name="home_search_clear">Limpiar</string>
     <string name="home_search_no_results">No se encontraron envíos para \"%s\"</string>
+    <string name="home_filter_all">Todos</string>
+    <string name="home_filter_in_transit">En tránsito</string>
+    <string name="home_filter_out_for_delivery">En reparto</string>
+    <string name="home_filter_exception">Incidencia</string>
     <string name="home_empty_subtitle_extended">Añade un número de seguimiento o importa\nautomáticamente desde Gmail</string>
     <string name="home_limit_chip_count" formatted="false">%d / %d envíos activos</string>
     <string name="home_limit_chip_upgrade">Ampliar →</string>

@@ -4,7 +4,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import java.util.Calendar
 import androidx.core.app.NotificationCompat
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.hilt.work.HiltWorker
@@ -17,6 +16,7 @@ import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.ui.widget.TrackerWidget
 import com.brk718.tracker.util.CrashReporter
+import com.brk718.tracker.util.QuietHoursUtil
 import com.brk718.tracker.util.ShipmentStatus
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -126,23 +126,10 @@ class SyncWorker @AssistedInject constructor(
     }
 
     /**
-     * Devuelve true si la hora actual está dentro del rango de silencio.
-     * Maneja rangos que cruzan medianoche (ej. 23:00 → 07:00).
+     * Delega en [QuietHoursUtil] para mantener la lógica testeable sin dependencias de Android.
      */
-    private fun isInQuietHours(enabled: Boolean, startHour: Int, startMinute: Int, endHour: Int, endMinute: Int): Boolean {
-        if (!enabled) return false
-        val cal = Calendar.getInstance()
-        val currentMin = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
-        val startMin   = startHour * 60 + startMinute
-        val endMin     = endHour   * 60 + endMinute
-        return if (startMin <= endMin) {
-            // Rango dentro del mismo día (ej. 02:30 → 08:00)
-            currentMin in startMin until endMin
-        } else {
-            // Rango cruzando medianoche (ej. 23:30 → 07:00)
-            currentMin >= startMin || currentMin < endMin
-        }
-    }
+    private fun isInQuietHours(enabled: Boolean, startHour: Int, startMinute: Int, endHour: Int, endMinute: Int): Boolean =
+        QuietHoursUtil.isInQuietHours(enabled, startHour, startMinute, endHour, endMinute)
 
     private fun isImportantStatus(status: String): Boolean {
         val lower = status.lowercase()

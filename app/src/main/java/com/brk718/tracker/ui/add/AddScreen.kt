@@ -20,60 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
 import com.brk718.tracker.ui.add.FREE_SHIPMENT_LIMIT
-
-// Detecta el transportista en base al formato del número de tracking
-private fun detectCarrier(tracking: String): String? {
-    val t = tracking.trim()
-    return when {
-        // Amazon: 111-XXXXXXX-XXXXXXX o TBA + dígitos
-        t.matches(Regex("\\d{3}-\\d{7}-\\d{7}")) -> "Amazon"
-        t.startsWith("TBA", ignoreCase = true) && t.length >= 12 -> "Amazon"
-        // UPS: empieza con 1Z + 16 caracteres alfanuméricos
-        t.startsWith("1Z", ignoreCase = true) && t.length >= 18 -> "UPS"
-        // FedEx: 12 dígitos, 15 dígitos o empieza con 96/94
-        t.matches(Regex("\\d{12}")) -> "FedEx"
-        t.matches(Regex("\\d{15}")) -> "FedEx"
-        t.startsWith("96") && t.length >= 20 -> "FedEx"
-        t.startsWith("94") && t.length >= 20 -> "USPS"
-        // USPS: 20-22 dígitos o empieza con 9400/9205/9361
-        t.matches(Regex("\\d{20,22}")) -> "USPS"
-        t.startsWith("9400") || t.startsWith("9205") || t.startsWith("9361") -> "USPS"
-        // DHL: empieza con JD o tiene exactamente 10 dígitos
-        t.startsWith("JD", ignoreCase = true) && t.length >= 10 -> "DHL"
-        t.matches(Regex("\\d{10}")) -> "DHL"
-        // Carriers colombianos — guías numéricas típicas
-        // Interrapidísimo: 12 dígitos que comienzan con 24
-        t.matches(Regex("24\\d{10}")) -> "Interrapidísimo"
-        // Coordinadora: 10 dígitos que comienzan con 5, 6, 7 u 8
-        t.matches(Regex("[5-8]\\d{9}")) -> "Coordinadora"
-        // Servientrega: 10-11 dígitos que comienzan con 9
-        t.matches(Regex("9\\d{9,10}")) -> "Servientrega"
-        // Envía / Colvanes: 12-13 dígitos que comienzan con 1
-        t.matches(Regex("1\\d{11,12}")) -> "Envía"
-        // Listo: empieza con L + 8-12 dígitos
-        t.matches(Regex("L\\d{8,12}", RegexOption.IGNORE_CASE)) -> "Listo"
-        // Treda: empieza con T + 9 dígitos
-        t.matches(Regex("T\\d{9}", RegexOption.IGNORE_CASE)) -> "Treda"
-        // Speed Colombia: empieza con S + 10 dígitos
-        t.matches(Regex("S\\d{10}", RegexOption.IGNORE_CASE)) -> "Speed"
-        // Castores: empieza con C + 9-10 dígitos
-        t.matches(Regex("C\\d{9,10}", RegexOption.IGNORE_CASE)) -> "Castores"
-        // Avianca Cargo: 11 dígitos que comienzan con 134
-        t.matches(Regex("134\\d{8}")) -> "Avianca Cargo"
-        // TCC: 10-12 dígitos que comienzan con 7
-        t.matches(Regex("7\\d{9,11}")) -> "TCC"
-        // Saferbo: 9-10 dígitos que comienzan con 3
-        t.matches(Regex("3\\d{8,9}")) -> "Saferbo"
-        // Deprisa: empieza con "DEP" o dígitos que comienzan con 20
-        t.startsWith("DEP", ignoreCase = true) -> "Deprisa"
-        t.matches(Regex("20\\d{6,7}")) -> "Deprisa"
-        // Picap: empieza con "PIC" o "PKP"
-        t.startsWith("PIC", ignoreCase = true) || t.startsWith("PKP", ignoreCase = true) -> "Picap"
-        // Mensajeros Urbanos: empieza con "MU" + dígitos
-        t.matches(Regex("MU\\d{6,10}", RegexOption.IGNORE_CASE)) -> "Mensajeros Urbanos"
-        else -> null
-    }
-}
+import com.brk718.tracker.util.CarrierDetector
 
 private fun carrierColor(carrier: String): Color = when (carrier.lowercase()) {
     "amazon"          -> Color(0xFFFF9900)
@@ -151,7 +98,7 @@ fun AddScreen(
 
     // Detección automática del transportista al escribir
     val detectedCarrier by remember(trackingNumber) {
-        derivedStateOf { detectCarrier(trackingNumber) }
+        derivedStateOf { CarrierDetector.detect(trackingNumber) }
     }
 
     LaunchedEffect(uiState) {

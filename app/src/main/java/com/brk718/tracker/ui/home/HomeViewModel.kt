@@ -7,6 +7,7 @@ import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.util.NetworkMonitor
+import com.brk718.tracker.util.ShipmentStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -51,11 +52,21 @@ class HomeViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    // ── Filtro por estado ─────────────────────────────────────────────────────
+    // null = sin filtro; valor = substring a buscar en status (lowercase)
+    private val _activeStatusFilter = MutableStateFlow<String?>(null)
+    val activeStatusFilter: StateFlow<String?> = _activeStatusFilter.asStateFlow()
+
+    fun setStatusFilter(filter: String?) {
+        _activeStatusFilter.value = if (_activeStatusFilter.value == filter) null else filter
+    }
+
     val shipments: StateFlow<List<ShipmentWithEvents>> = combine(
         repository.activeShipments,
-        _searchQuery
-    ) { all, query ->
-        if (query.isBlank()) all
+        _searchQuery,
+        _activeStatusFilter
+    ) { all, query, statusFilter ->
+        var result = if (query.isBlank()) all
         else {
             val q = query.lowercase().trim()
             all.filter { item ->
@@ -65,6 +76,10 @@ class HomeViewModel @Inject constructor(
                 item.shipment.status.lowercase().contains(q)
             }
         }
+        if (statusFilter != null) {
+            result = result.filter { it.shipment.status.lowercase().contains(statusFilter) }
+        }
+        result
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
