@@ -91,3 +91,12 @@
 -dontwarn org.ietf.jgss.GSSName
 -dontwarn org.ietf.jgss.Oid
 -dontwarn org.jspecify.annotations.NullMarked
+
+# ── MSAL / NimbusDS — clases opcionales no presentes en Android (generado por AGP) ──
+-dontwarn com.google.crypto.tink.subtle.Ed25519Sign$KeyPair
+-dontwarn com.google.crypto.tink.subtle.Ed25519Sign
+-dontwarn com.google.crypto.tink.subtle.Ed25519Verify
+-dontwarn com.google.crypto.tink.subtle.X25519
+-dontwarn edu.umd.cs.findbugs.annotations.NonNull
+-dontwarn edu.umd.cs.findbugs.annotations.Nullable
+-dontwarn edu.umd.cs.findbugs.annotations.SuppressFBWarnings
