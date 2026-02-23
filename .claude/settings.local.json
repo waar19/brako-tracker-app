@@ -114,7 +114,14 @@
       "WebFetch(domain:rastreov2.coordinadora.com)",
       "WebFetch(domain:www.trackingmore.com)",
       "WebFetch(domain:sandbox.coordinadora.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(__NEW_LINE_f91a09829a5b7b11__ curl -s -m 15 -L -A \"Mozilla/5.0 \\(Linux; Android 14; Pixel 8\\) AppleWebKit/537.36\" \"https://envia.com/rastreo/1000000000001\" -o /dev/null -w \"%{http_code} %{url_effective}\\\\n\")",
+      "Bash(__NEW_LINE_1d9538d84e8a6d3b__ curl -s -m 10 -A \"Mozilla/5.0\" -H \"Content-Type: application/json\" -H \"Accept: application/json\" \"https://api.envia.com/ship/tracking/1000000000001\" -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(# Fetch the landing page JS util.js which may contain tracking fetch calls curl -s -m 15 \"\"https://envia.com/assets/js/util.js?v=1770837009\"\" \\\\)",
+      "Bash(# Get the full raw tracking.js and look for the actual HTTP call around \"\"tracking\"\" curl -s -m 20 \"\"https://envia.com/assets/js/tracking.js?v=1770837009\"\" \\\\)",
+      "Bash(# Extract lines 570-640 of tracking.js to see the full fetch call and request structure curl -s -m 20 \"\"https://envia.com/assets/js/tracking.js?v=1770837009\"\" \\\\)",
+      "Bash(awk:*)",
+      "Bash(# Also get lines around it for full context - the response handling curl -s -m 20 \"\"https://envia.com/assets/js/tracking.js?v=1770837009\"\" \\\\)"
     ]
   }
 }
