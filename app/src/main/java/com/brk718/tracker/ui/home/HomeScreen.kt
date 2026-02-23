@@ -77,6 +77,7 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     onShipmentClick: (String) -> Unit,
     onGmailClick: () -> Unit = {},
+    onOutlookClick: () -> Unit = {},
     onAmazonAuthClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onUpgradeClick: () -> Unit = {},
@@ -94,9 +95,32 @@ fun HomeScreen(
     val selectedIds by viewModel.selectedIds.collectAsState()
     val isSelectionMode by viewModel.isSelectionMode.collectAsState()
     val showWhatsNew by viewModel.showWhatsNew.collectAsState()
+    val isGmailConnected by viewModel.isGmailConnected.collectAsState()
+    val isOutlookConnected by viewModel.isOutlookConnected.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val canAddMore = isPremium || shipments.size < FREE_SHIPMENT_LIMIT
+
+    // Menús para la selección de cuenta de correo
+    var showEmailMenuTopBar by remember { mutableStateOf(false) }
+    var showEmailMenuEmpty by remember { mutableStateOf(false) }
+
+    // Lógica inteligente: navega directo si solo hay una cuenta conectada,
+    // o muestra menú de selección si hay ambas o ninguna.
+    val onEmailClickTopBar: () -> Unit = {
+        when {
+            isGmailConnected && !isOutlookConnected -> onGmailClick()
+            !isGmailConnected && isOutlookConnected -> onOutlookClick()
+            else -> showEmailMenuTopBar = true
+        }
+    }
+    val onEmailClickEmpty: () -> Unit = {
+        when {
+            isGmailConnected && !isOutlookConnected -> onGmailClick()
+            !isGmailConnected && isOutlookConnected -> onOutlookClick()
+            else -> showEmailMenuEmpty = true
+        }
+    }
 
     // Diálogo de confirmación para eliminar seleccionados
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
@@ -244,8 +268,25 @@ fun HomeScreen(
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.home_refresh_all))
                             }
-                            IconButton(onClick = onGmailClick) {
-                                Icon(Icons.Default.Email, contentDescription = stringResource(R.string.home_import_gmail))
+                            Box {
+                                IconButton(onClick = onEmailClickTopBar) {
+                                    Icon(Icons.Default.Email, contentDescription = stringResource(R.string.home_import_gmail))
+                                }
+                                DropdownMenu(
+                                    expanded = showEmailMenuTopBar,
+                                    onDismissRequest = { showEmailMenuTopBar = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Gmail") },
+                                        onClick = { showEmailMenuTopBar = false; onGmailClick() },
+                                        leadingIcon = { Icon(Icons.Default.Email, null, modifier = Modifier.size(18.dp)) }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Outlook / Hotmail") },
+                                        onClick = { showEmailMenuTopBar = false; onOutlookClick() },
+                                        leadingIcon = { Icon(Icons.Default.Email, null, modifier = Modifier.size(18.dp)) }
+                                    )
+                                }
                             }
                             IconButton(onClick = onSettingsClick) {
                                 Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
@@ -503,13 +544,30 @@ fun HomeScreen(
                                 Text(stringResource(R.string.home_new_shipment))
                             }
                             Spacer(Modifier.height(12.dp))
-                            OutlinedButton(
-                                onClick = onGmailClick,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.home_import_gmail))
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(
+                                    onClick = onEmailClickEmpty,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Importar desde correo")
+                                }
+                                DropdownMenu(
+                                    expanded = showEmailMenuEmpty,
+                                    onDismissRequest = { showEmailMenuEmpty = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Gmail") },
+                                        onClick = { showEmailMenuEmpty = false; onGmailClick() },
+                                        leadingIcon = { Icon(Icons.Default.Email, null, modifier = Modifier.size(18.dp)) }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Outlook / Hotmail") },
+                                        onClick = { showEmailMenuEmpty = false; onOutlookClick() },
+                                        leadingIcon = { Icon(Icons.Default.Email, null, modifier = Modifier.size(18.dp)) }
+                                    )
+                                }
                             }
                         }
                     }

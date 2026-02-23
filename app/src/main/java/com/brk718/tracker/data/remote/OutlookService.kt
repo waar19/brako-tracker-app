@@ -66,6 +66,10 @@ class OutlookService @Inject constructor(
     private var currentAccount: IAccount? = null
     private var accessToken: String? = null
 
+    // Guard: solo intentar restaurar la sesión una vez por ciclo de vida del proceso.
+    // Evita llamadas MSAL redundantes cuando múltiples ViewModels llaman a connect().
+    @Volatile private var sessionRestoreAttempted = false
+
     // ─── Inicialización MSAL ───────────────────────────────────────────────────
 
     /**
@@ -167,6 +171,9 @@ class OutlookService @Inject constructor(
      * Se llama al iniciar la app para restaurar sesiones previas.
      */
     override suspend fun connect() {
+        // No-op si ya hay token activo o si ya se intentó la restauración en este proceso
+        if (accessToken != null || sessionRestoreAttempted) return
+        sessionRestoreAttempted = true
         try {
             val restored = tryRestoreSession()
             android.util.Log.d(TAG, "connect() → sesión restaurada=$restored, " +
@@ -225,6 +232,7 @@ class OutlookService @Inject constructor(
     }
 
     override suspend fun disconnect() {
+        sessionRestoreAttempted = false   // permite restaurar sesión si vuelve a conectar
         try {
             val app = msalApp ?: return
             suspendCancellableCoroutine<Unit> { cont ->

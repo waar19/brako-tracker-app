@@ -99,6 +99,9 @@ class SettingsViewModel @Inject constructor(
                     }
                 }
         }
+
+        // Restaurar sesión de Outlook al arrancar (token MSAL cacheado → no pide credenciales)
+        viewModelScope.launch { outlookService.connect() }
     }
 
     // Uri del CSV exportado (null = sin exportar, Unit = exportado, String = error)

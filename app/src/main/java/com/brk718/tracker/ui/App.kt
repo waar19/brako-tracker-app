@@ -120,6 +120,7 @@ fun App(
                     onAddClick        = { navController.navigate(Routes.ADD) },
                     onShipmentClick   = { id -> navController.navigate(Routes.detail(id)) },
                     onGmailClick      = { navController.navigate(Routes.GMAIL) },
+                    onOutlookClick    = { navController.navigate(Routes.OUTLOOK) },
                     onAmazonAuthClick = { navController.navigate(Routes.AMAZON_AUTH) },
                     onSettingsClick   = { navController.navigate(Routes.SETTINGS) },
                     onUpgradeClick    = { navController.navigate(Routes.PAYWALL) },

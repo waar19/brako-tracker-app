@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.brk718.tracker.BuildConfig
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.local.UserPreferencesRepository
+import com.brk718.tracker.data.remote.EmailService
+import com.brk718.tracker.data.remote.OutlookService
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.util.NetworkMonitor
 import com.brk718.tracker.util.ShipmentStatus
@@ -12,12 +14,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -29,8 +33,15 @@ private const val RATING_TRIGGER_COUNT = 3
 class HomeViewModel @Inject constructor(
     private val repository: ShipmentRepository,
     private val prefsRepository: UserPreferencesRepository,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val emailService: EmailService,         // GmailService vía DI
+    private val outlookService: OutlookService
 ) : ViewModel() {
+
+    init {
+        // Restaurar sesión de Outlook al arrancar para que isOutlookConnected refleje el estado real
+        viewModelScope.launch { outlookService.connect() }
+    }
 
     val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
         .stateIn(
@@ -38,6 +49,16 @@ class HomeViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = true
         )
+
+    /** true si hay una sesión de Gmail activa (se comprueba cada 2 s) */
+    val isGmailConnected: StateFlow<Boolean> = flow {
+        while (true) { emit(emailService.isConnected()); delay(2_000) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** true si hay un token de Outlook activo (se comprueba cada 2 s) */
+    val isOutlookConnected: StateFlow<Boolean> = flow {
+        while (true) { emit(outlookService.isConnected()); delay(2_000) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /** true cuando el usuario ha tenido >= RATING_TRIGGER_COUNT entregas exitosas */
     val shouldShowRatingRequest: StateFlow<Boolean> = prefsRepository.preferences
