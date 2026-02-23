@@ -50,6 +50,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val activity = context as android.app.Activity
     val exportResult by viewModel.exportResult.collectAsState()
+    val isGmailConnected by viewModel.isGmailConnected.collectAsState()
     val isOutlookConnected by viewModel.isOutlookConnected.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -90,6 +91,7 @@ fun SettingsScreen(
     var showQuietHoursStartDialog by remember { mutableStateOf(false) }
     var showQuietHoursEndDialog by remember { mutableStateOf(false) }
     var showDisconnectAmazonDialog by remember { mutableStateOf(false) }
+    var showDisconnectGmailDialog by remember { mutableStateOf(false) }
     var showDisconnectOutlookDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showPremiumSyncDialog by remember { mutableStateOf(false) }
@@ -418,11 +420,30 @@ fun SettingsScreen(
                         trailingContent = amazonTrailing
                     )
                     SettingsItemDivider()
-                    SettingsNavigationItem(
+                    // Tile Gmail
+                    val gmailSubtitle = if (isGmailConnected)
+                        "Cuenta conectada"
+                    else
+                        stringResource(R.string.settings_gmail_subtitle)
+                    val gmailTrailing: @Composable () -> Unit = {
+                        if (isGmailConnected) {
+                            TextButton(
+                                onClick = { showDisconnectGmailDialog = true },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) { Text(stringResource(R.string.settings_amazon_disconnect)) }
+                        } else {
+                            TextButton(onClick = onGmailClick) {
+                                Text(stringResource(R.string.settings_amazon_connect))
+                            }
+                        }
+                    }
+                    SettingsCustomTrailingItem(
                         title = stringResource(R.string.settings_gmail_title),
-                        subtitle = stringResource(R.string.settings_gmail_subtitle),
+                        subtitle = gmailSubtitle,
                         icon = Icons.Default.Email,
-                        onClick = onGmailClick
+                        trailingContent = gmailTrailing
                     )
                     SettingsItemDivider()
                     // Tile Outlook / Hotmail
@@ -629,6 +650,29 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDisconnectAmazonDialog = false }) { Text(stringResource(R.string.dialog_cancel)) }
+            }
+        )
+    }
+
+    if (showDisconnectGmailDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisconnectGmailDialog = false },
+            icon = { Icon(Icons.Default.LinkOff, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(stringResource(R.string.settings_gmail_title)) },
+            text = { Text("Se cerrará la sesión de Gmail. Puedes volver a conectarla cuando quieras.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.disconnectGmail()
+                        showDisconnectGmailDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text(stringResource(R.string.settings_amazon_disconnect)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisconnectGmailDialog = false }) {
+                    Text(stringResource(R.string.dialog_cancel))
+                }
             }
         )
     }

@@ -19,6 +19,7 @@ import com.brk718.tracker.data.billing.BillingState
 import com.brk718.tracker.data.local.AmazonSessionManager
 import com.brk718.tracker.data.local.UserPreferences
 import com.brk718.tracker.data.local.UserPreferencesRepository
+import com.brk718.tracker.data.remote.EmailService
 import com.brk718.tracker.data.remote.OutlookService
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.util.CsvExporter
@@ -60,7 +61,8 @@ class SettingsViewModel @Inject constructor(
     private val amazonSessionManager: AmazonSessionManager,
     private val billingRepository: BillingRepository,
     private val shipmentRepository: ShipmentRepository,
-    private val outlookService: OutlookService
+    private val outlookService: OutlookService,
+    private val emailService: EmailService          // GmailService vía DI
 ) : ViewModel() {
 
     init {
@@ -263,6 +265,24 @@ class SettingsViewModel @Inject constructor(
     // === Amazon ===
     fun disconnectAmazon() {
         amazonSessionManager.clearSession()
+    }
+
+    // === Gmail ===
+
+    /** Emite true si hay una sesión de Gmail activa, comprobando cada 2 s. */
+    val isGmailConnected: StateFlow<Boolean> = flow {
+        while (true) {
+            emit(emailService.isConnected())
+            delay(2_000)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = false
+    )
+
+    fun disconnectGmail() {
+        viewModelScope.launch { emailService.disconnect() }
     }
 
     // === Outlook / Hotmail ===
