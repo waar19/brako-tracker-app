@@ -110,7 +110,11 @@
       "Bash(powershell -File:*)",
       "Bash(powershell -ExecutionPolicy Bypass -File:*)",
       "Bash(del \"C:\\\\Users\\\\waar1\\\\sha1tobase64.ps1\")",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "WebFetch(domain:rastreov2.coordinadora.com)",
+      "WebFetch(domain:www.trackingmore.com)",
+      "WebFetch(domain:sandbox.coordinadora.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
