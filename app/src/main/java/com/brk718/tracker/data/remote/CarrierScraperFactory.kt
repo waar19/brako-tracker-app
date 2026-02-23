@@ -20,12 +20,14 @@ class CarrierScraperFactory @Inject constructor(
     private val coordinadoraScraper: CoordinadoraScraper,
     private val tccScraper: TccScraper,
     private val deprisaScraper: DeprisaScraper,
+    private val enviaScraper: EnviaScraper,
 ) {
     private val scraperMap: Map<String, ColombianCarrierScraper> = mapOf(
         "servientrega" to servientregaScraper,
         "coordinadora" to coordinadoraScraper,
         "tcc-co"       to tccScraper,
         "deprisa"      to deprisaScraper,
+        "envia-co"     to enviaScraper,
     )
 
     /**

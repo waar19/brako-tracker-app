@@ -121,7 +121,8 @@
       "Bash(# Get the full raw tracking.js and look for the actual HTTP call around \"\"tracking\"\" curl -s -m 20 \"\"https://envia.com/assets/js/tracking.js?v=1770837009\"\" \\\\)",
       "Bash(# Extract lines 570-640 of tracking.js to see the full fetch call and request structure curl -s -m 20 \"\"https://envia.com/assets/js/tracking.js?v=1770837009\"\" \\\\)",
       "Bash(awk:*)",
-      "Bash(# Also get lines around it for full context - the response handling curl -s -m 20 \"\"https://envia.com/assets/js/tracking.js?v=1770837009\"\" \\\\)"
+      "Bash(# Also get lines around it for full context - the response handling curl -s -m 20 \"\"https://envia.com/assets/js/tracking.js?v=1770837009\"\" \\\\)",
+      "Bash(gradlew compileDebugKotlin:*)"
     ]
   }
 }

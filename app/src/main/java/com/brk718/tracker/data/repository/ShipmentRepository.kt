@@ -75,7 +75,8 @@ class ShipmentRepository @Inject constructor(
          */
         private val SCRAPER_ONLY_SLUGS = setOf(
             "servientrega",
-            "coordinadora"   // AfterShip siempre devuelve 404 para coordinadora
+            "coordinadora",  // AfterShip siempre devuelve 404 para coordinadora
+            "envia-co"       // API directa: queries.envia.com/shipments/generaltrack
         )
 
         // Mapeo conocido: nombre del carrier → slug de AfterShip
@@ -622,7 +623,7 @@ class ShipmentRepository @Inject constructor(
                             val cached = geocodeCache[cacheKey]!!
                             lat = cached.first; lon = cached.second
                         } else {
-                            val coords = geocodingService.getCoordinates("${event.location}, Colombia")
+                            val coords = geocodingService.getCoordinates(normalizeLocationQuery(event.location))
                             lat = coords?.lat; lon = coords?.lon
                             geocodeCache[cacheKey] = Pair(lat, lon)
                         }
@@ -658,6 +659,23 @@ class ShipmentRepository @Inject constructor(
                 ))
             }
         }
+    }
+
+    /**
+     * Normaliza el string de ciudad devuelto por el carrier para mejorar
+     * el hit rate de Nominatim.
+     *  "Medellin (Antioquia)"  → "Medellin, Colombia"
+     *  "BOGOTA - CENTRO"       → "Bogota, Colombia"
+     *  "CALI"                  → "Cali, Colombia"
+     */
+    private fun normalizeLocationQuery(raw: String): String {
+        var s = raw.trim()
+        s = s.replace(Regex("\\s*\\(.*?\\)"), "").trim()  // strip "(Antioquia)"
+        s = s.replace(Regex("\\s*-.*$"), "").trim()        // strip "- CENTRO"
+        if (s.isNotBlank() && s.filter { it.isLetter() }.all { it.isUpperCase() }) {
+            s = s.lowercase().replaceFirstChar { it.uppercaseChar() }  // BOGOTA → Bogota
+        }
+        return "$s, Colombia"
     }
 
     private suspend fun refreshShipmentAmazon(id: String) = withContext(Dispatchers.IO) {

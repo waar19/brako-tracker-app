@@ -86,6 +86,9 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import com.brk718.tracker.util.ShipmentStatus
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.ui.text.style.TextAlign
 
 // Tile source minimalista de CartoDB Positron (fondo claro, sin ruido visual)
 private val CARTO_POSITRON = object : OnlineTileSourceBase(
@@ -95,6 +98,24 @@ private val CARTO_POSITRON = object : OnlineTileSourceBase(
         "https://a.basemaps.cartocdn.com/light_all/",
         "https://b.basemaps.cartocdn.com/light_all/",
         "https://c.basemaps.cartocdn.com/light_all/"
+    )
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        return baseUrl +
+            MapTileIndex.getZoom(pMapTileIndex) + "/" +
+            MapTileIndex.getX(pMapTileIndex) + "/" +
+            MapTileIndex.getY(pMapTileIndex) + mImageFilenameEnding
+    }
+}
+
+// Tile source oscuro de CartoDB Dark Matter (fondo oscuro para dark theme)
+private val CARTO_DARK_MATTER = object : OnlineTileSourceBase(
+    "CartoDB.DarkMatter",
+    0, 19, 256, ".png",
+    arrayOf(
+        "https://a.basemaps.cartocdn.com/dark_all/",
+        "https://b.basemaps.cartocdn.com/dark_all/",
+        "https://c.basemaps.cartocdn.com/dark_all/"
     )
 ) {
     override fun getTileURLString(pMapTileIndex: Long): String {
@@ -542,6 +563,7 @@ fun DetailScreen(
 
                     // ===== MAPA =====
                     val eventsWithLoc = events.filter { it.latitude != null && it.longitude != null }
+                    val tileSource = if (isSystemInDarkTheme()) CARTO_DARK_MATTER else CARTO_POSITRON
                     if (eventsWithLoc.isNotEmpty()) {
                         val orderedEvents = eventsWithLoc.reversed()
                         val uniqueEvents = orderedEvents.distinctBy { Pair(it.latitude, it.longitude) }
@@ -565,7 +587,7 @@ fun DetailScreen(
                                             ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
                                         )
                                         MapView(ctx).apply {
-                                            setTileSource(CARTO_POSITRON)
+                                            setTileSource(tileSource)
                                             setMultiTouchControls(false) // desactivado en preview
                                             controller.setZoom(5.0)
                                             isTilesScaledToDpi = true
@@ -659,7 +681,7 @@ fun DetailScreen(
                                                     ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
                                                 )
                                                 MapView(ctx).apply {
-                                                    setTileSource(CARTO_POSITRON)
+                                                    setTileSource(tileSource)
                                                     setMultiTouchControls(true)
                                                     controller.setZoom(5.0)
                                                     isTilesScaledToDpi = true
@@ -741,6 +763,46 @@ fun DetailScreen(
                                 }
                             }
                         }
+                    } else if (events.isNotEmpty()) {
+                        // Empty state: hay eventos pero ninguno tiene coordenadas
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 28.dp, horizontal = 20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(36.dp),
+                                    tint = MaterialTheme.colorScheme.outlineVariant
+                                )
+                                Text(
+                                    text = "Sin datos de ubicación",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "El carrier no proporcionó coordenadas",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
                     }
 
                     // ===== HISTORIAL =====
