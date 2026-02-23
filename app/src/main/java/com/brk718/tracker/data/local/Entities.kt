@@ -17,7 +17,9 @@ data class ShipmentEntity(
     val isArchived: Boolean = false,
     val estimatedDelivery: Long? = null, // Timestamp de entrega estimada (null si no disponible)
     val subCarrierName: String? = null,        // Carrier de última milla (ej. "PASAREX")
-    val subCarrierTrackingId: String? = null   // ID de rastreo del carrier (ej. "AMZPSR021419193")
+    val subCarrierTrackingId: String? = null,  // ID de rastreo del carrier (ej. "AMZPSR021419193")
+    val isMuted: Boolean = false,              // Silenciar notificaciones para este envío
+    val reminderSent: Boolean = false          // Ya se envió el recordatorio de entrega inminente
 )
 
 @Entity(

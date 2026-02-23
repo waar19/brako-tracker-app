@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 6,
-    "identityHash": "6ebad2732da85db3b393475cadb8899e",
+    "identityHash": "43a52683a117c6f766b682a67165092f",
     "entities": [
       {
         "tableName": "shipments",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `trackingNumber` TEXT NOT NULL, `carrier` TEXT NOT NULL, `title` TEXT NOT NULL, `status` TEXT NOT NULL, `lastUpdate` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `estimatedDelivery` INTEGER, `subCarrierName` TEXT, `subCarrierTrackingId` TEXT, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `trackingNumber` TEXT NOT NULL, `carrier` TEXT NOT NULL, `title` TEXT NOT NULL, `status` TEXT NOT NULL, `lastUpdate` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `estimatedDelivery` INTEGER, `subCarrierName` TEXT, `subCarrierTrackingId` TEXT, `isMuted` INTEGER NOT NULL, `reminderSent` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -67,6 +67,18 @@
             "columnName": "subCarrierTrackingId",
             "affinity": "TEXT",
             "notNull": false
+          },
+          {
+            "fieldPath": "isMuted",
+            "columnName": "isMuted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reminderSent",
+            "columnName": "reminderSent",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -178,7 +190,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6ebad2732da85db3b393475cadb8899e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '43a52683a117c6f766b682a67165092f')"
     ]
   }
 }

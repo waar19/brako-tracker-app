@@ -28,15 +28,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.brk718.tracker.BuildConfig
 import com.brk718.tracker.R
 import com.brk718.tracker.data.billing.BillingState
+import com.google.android.play.core.review.ReviewManagerFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
     onGmailClick: () -> Unit,
+    onOutlookClick: () -> Unit = {},
     onAmazonAuthClick: () -> Unit,
     onArchivedClick: () -> Unit,
     onStatsClick: () -> Unit = {},
@@ -48,6 +53,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val activity = context as android.app.Activity
     val exportResult by viewModel.exportResult.collectAsState()
+    val isGmailConnected by viewModel.isGmailConnected.collectAsState()
+    val isOutlookConnected by viewModel.isOutlookConnected.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Reaccionar al resultado de exportación
@@ -62,7 +69,7 @@ fun SettingsScreen(
                     putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.settings_csv_share_subject))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                context.startActivity(Intent.createChooser(shareIntent, "Guardar o compartir CSV"))
+                context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.settings_csv_chooser_title)))
             }
             is ExportResult.Error -> {
                 viewModel.clearExportResult()
@@ -87,6 +94,8 @@ fun SettingsScreen(
     var showQuietHoursStartDialog by remember { mutableStateOf(false) }
     var showQuietHoursEndDialog by remember { mutableStateOf(false) }
     var showDisconnectAmazonDialog by remember { mutableStateOf(false) }
+    var showDisconnectGmailDialog by remember { mutableStateOf(false) }
+    var showDisconnectOutlookDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showPremiumSyncDialog by remember { mutableStateOf(false) }
     var cacheCleared by remember { mutableStateOf(false) }
@@ -278,14 +287,14 @@ fun SettingsScreen(
                         SettingsItemDivider()
                         SettingsNavigationItem(
                             title = stringResource(R.string.settings_quiet_hours_start_title),
-                            subtitle = "%02d:00".format(prefs.quietHoursStart),
+                            subtitle = "%02d:%02d".format(prefs.quietHoursStart, prefs.quietHoursStartMinute),
                             icon = Icons.Default.NightsStay,
                             onClick = { showQuietHoursStartDialog = true }
                         )
                         SettingsItemDivider()
                         SettingsNavigationItem(
                             title = stringResource(R.string.settings_quiet_hours_end_title),
-                            subtitle = "%02d:00".format(prefs.quietHoursEnd),
+                            subtitle = "%02d:%02d".format(prefs.quietHoursEnd, prefs.quietHoursEndMinute),
                             icon = Icons.Default.WbSunny,
                             onClick = { showQuietHoursEndDialog = true }
                         )
@@ -348,6 +357,36 @@ fun SettingsScreen(
                             }
                         }
                     )
+                    SettingsItemDivider()
+                    // Tile "Segundo plano": re-evalúa al volver de la pantalla del sistema (ON_RESUME)
+                    val lifecycleOwner = LocalLifecycleOwner.current
+                    var batteryOk by remember { mutableStateOf(viewModel.isBatteryOptimizationIgnored()) }
+                    DisposableEffect(lifecycleOwner) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            if (event == Lifecycle.Event.ON_RESUME) {
+                                batteryOk = viewModel.isBatteryOptimizationIgnored()
+                            }
+                        }
+                        lifecycleOwner.lifecycle.addObserver(observer)
+                        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                    }
+                    SettingsCustomTrailingItem(
+                        title = "Segundo plano",
+                        subtitle = if (batteryOk)
+                            "Notificaciones sin restricciones ✓"
+                        else
+                            "Optimización activa — puede perder notificaciones",
+                        icon = Icons.Default.BatteryAlert,
+                        trailingContent = {
+                            if (!batteryOk) {
+                                TextButton(
+                                    onClick = { viewModel.requestBatteryOptimizationExemption() }
+                                ) {
+                                    Text("Corregir")
+                                }
+                            }
+                        }
+                    )
                 }
             }
 
@@ -369,8 +408,8 @@ fun SettingsScreen(
                     SettingsNavigationItem(
                         title = stringResource(R.string.settings_csv_export_title),
                         subtitle = when {
-                            !isPremium                           -> "✦ Solo Premium"
-                            exportResult is ExportResult.Loading -> "Exportando..."
+                            !isPremium                           -> stringResource(R.string.settings_premium_only_badge)
+                            exportResult is ExportResult.Loading -> stringResource(R.string.settings_csv_exporting)
                             else                                 -> stringResource(R.string.settings_csv_export_subtitle)
                         },
                         icon = Icons.Default.FileDownload,
@@ -414,11 +453,51 @@ fun SettingsScreen(
                         trailingContent = amazonTrailing
                     )
                     SettingsItemDivider()
-                    SettingsNavigationItem(
+                    // Tile Gmail
+                    val gmailSubtitle = if (isGmailConnected)
+                        "Cuenta conectada"
+                    else
+                        stringResource(R.string.settings_gmail_subtitle)
+                    val gmailTrailing: @Composable () -> Unit = {
+                        if (isGmailConnected) {
+                            TextButton(
+                                onClick = { showDisconnectGmailDialog = true },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) { Text(stringResource(R.string.settings_amazon_disconnect)) }
+                        } else {
+                            TextButton(onClick = onGmailClick) {
+                                Text(stringResource(R.string.settings_amazon_connect))
+                            }
+                        }
+                    }
+                    SettingsCustomTrailingItem(
                         title = stringResource(R.string.settings_gmail_title),
-                        subtitle = stringResource(R.string.settings_gmail_subtitle),
+                        subtitle = gmailSubtitle,
                         icon = Icons.Default.Email,
-                        onClick = onGmailClick
+                        trailingContent = gmailTrailing
+                    )
+                    SettingsItemDivider()
+                    // Tile Outlook / Hotmail
+                    val outlookSubtitle = if (isOutlookConnected) "Cuenta conectada" else "Importar guías desde Outlook u Hotmail"
+                    val outlookTrailing: @Composable () -> Unit = {
+                        if (isOutlookConnected) {
+                            TextButton(
+                                onClick = { showDisconnectOutlookDialog = true },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) { Text("Desconectar") }
+                        } else {
+                            TextButton(onClick = onOutlookClick) { Text("Conectar") }
+                        }
+                    }
+                    SettingsCustomTrailingItem(
+                        title = "Outlook / Hotmail",
+                        subtitle = outlookSubtitle,
+                        icon = Icons.Default.Email,
+                        trailingContent = outlookTrailing
                     )
                 }
             }
@@ -485,6 +564,31 @@ fun SettingsScreen(
                         icon = Icons.Default.DeleteSweep,
                         onClick = { showClearCacheDialog = true }
                     )
+                    SettingsItemDivider()
+                    SettingsNavigationItem(
+                        title = stringResource(R.string.settings_rate_app_title),
+                        subtitle = stringResource(R.string.settings_rate_app_subtitle),
+                        icon = Icons.Default.Star,
+                        onClick = {
+                            val reviewManager = ReviewManagerFactory.create(activity)
+                            reviewManager.requestReviewFlow().addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    reviewManager.launchReviewFlow(activity, task.result)
+                                } else {
+                                    // Fallback: abrir Play Store directamente
+                                    try {
+                                        activity.startActivity(
+                                            Intent(Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${activity.packageName}"))
+                                        )
+                                    } catch (e: Exception) {
+                                        activity.startActivity(
+                                            Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=${activity.packageName}"))
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    )
                 }
             }
 
@@ -493,15 +597,15 @@ fun SettingsScreen(
                 item { Spacer(Modifier.height(8.dp)) }
                 item {
                     SettingsSectionHeader(
-                        title = "Developer",
+                        title = stringResource(R.string.settings_debug_section),
                         icon = Icons.Default.BugReport
                     )
                 }
                 item {
                     SettingsCardGroup {
                         SettingsSwitchItem(
-                            title = "Simular Premium",
-                            subtitle = if (prefs.isPremium) "Modo Premium activo" else "Modo Free activo",
+                            title = stringResource(R.string.settings_debug_simulate_premium),
+                            subtitle = if (prefs.isPremium) stringResource(R.string.settings_debug_premium_active) else stringResource(R.string.settings_debug_free_active),
                             icon = Icons.Default.AdminPanelSettings,
                             checked = prefs.isPremium,
                             onCheckedChange = { viewModel.setIsPremiumDebug(it) }
@@ -525,19 +629,29 @@ fun SettingsScreen(
     }
 
     if (showQuietHoursStartDialog) {
-        HourPickerDialog(
+        HourMinutePickerDialog(
             title = stringResource(R.string.settings_quiet_hours_start_title),
-            current = prefs.quietHoursStart,
-            onSelect = { viewModel.setQuietHoursStart(it); showQuietHoursStartDialog = false },
+            currentHour = prefs.quietHoursStart,
+            currentMinute = prefs.quietHoursStartMinute,
+            onSelect = { h, m ->
+                viewModel.setQuietHoursStart(h)
+                viewModel.setQuietHoursStartMinute(m)
+                showQuietHoursStartDialog = false
+            },
             onDismiss = { showQuietHoursStartDialog = false }
         )
     }
 
     if (showQuietHoursEndDialog) {
-        HourPickerDialog(
+        HourMinutePickerDialog(
             title = stringResource(R.string.settings_quiet_hours_end_title),
-            current = prefs.quietHoursEnd,
-            onSelect = { viewModel.setQuietHoursEnd(it); showQuietHoursEndDialog = false },
+            currentHour = prefs.quietHoursEnd,
+            currentMinute = prefs.quietHoursEndMinute,
+            onSelect = { h, m ->
+                viewModel.setQuietHoursEnd(h)
+                viewModel.setQuietHoursEndMinute(m)
+                showQuietHoursEndDialog = false
+            },
             onDismiss = { showQuietHoursEndDialog = false }
         )
     }
@@ -569,6 +683,50 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDisconnectAmazonDialog = false }) { Text(stringResource(R.string.dialog_cancel)) }
+            }
+        )
+    }
+
+    if (showDisconnectGmailDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisconnectGmailDialog = false },
+            icon = { Icon(Icons.Default.LinkOff, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(stringResource(R.string.settings_gmail_title)) },
+            text = { Text("Se cerrará la sesión de Gmail. Puedes volver a conectarla cuando quieras.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.disconnectGmail()
+                        showDisconnectGmailDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text(stringResource(R.string.settings_amazon_disconnect)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisconnectGmailDialog = false }) {
+                    Text(stringResource(R.string.dialog_cancel))
+                }
+            }
+        )
+    }
+
+    if (showDisconnectOutlookDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisconnectOutlookDialog = false },
+            icon = { Icon(Icons.Default.LinkOff, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Desconectar Outlook") },
+            text = { Text("Se cerrará la sesión de Outlook. Puedes volver a conectarla cuando quieras.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.disconnectOutlook()
+                        showDisconnectOutlookDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Desconectar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisconnectOutlookDialog = false }) { Text("Cancelar") }
             }
         )
     }
@@ -890,7 +1048,7 @@ private fun SyncIntervalDialog(
     // 30 min = valor -1 (usamos -1 internamente para "30 min", WorkManager acepta 15 min como mínimo)
     data class SyncOption(val value: Int, val label: String, val premiumOnly: Boolean = false)
     val options = listOf(
-        SyncOption(-1, "Cada 30 min", premiumOnly = true),
+        SyncOption(-1, stringResource(R.string.settings_sync_30min), premiumOnly = true),
         SyncOption(1,  stringResource(R.string.settings_sync_1h)),
         SyncOption(2,  stringResource(R.string.settings_sync_2h)),
         SyncOption(6,  stringResource(R.string.settings_sync_6h)),
@@ -937,7 +1095,7 @@ private fun SyncIntervalDialog(
                                 color = Color(0xFFFFB400).copy(alpha = 0.2f)
                             ) {
                                 Text(
-                                    "✦ Premium",
+                                    stringResource(R.string.settings_premium_badge),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color(0xFFB8860B),
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -956,46 +1114,96 @@ private fun SyncIntervalDialog(
 }
 
 @Composable
-private fun HourPickerDialog(
+private fun HourMinutePickerDialog(
     title: String,
-    current: Int,
-    onSelect: (Int) -> Unit,
+    currentHour: Int,
+    currentMinute: Int,
+    onSelect: (hour: Int, minute: Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val hours = (0..23).toList()
+    var selectedHour   by remember { mutableStateOf(currentHour) }
+    var selectedMinute by remember { mutableStateOf(currentMinute) }
+    val minutes = listOf(0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Schedule, null) },
         title = { Text(title) },
         text = {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                modifier = Modifier.height(240.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                items(hours) { hour ->
-                    val selected = hour == current
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (selected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.clickable { onSelect(hour) }
-                    ) {
-                        Text(
-                            text = "%02d:00".format(hour),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selected) MaterialTheme.colorScheme.onPrimary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            textAlign = TextAlign.Center
-                        )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // ── Horas ──────────────────────────────────────
+                Text(
+                    stringResource(R.string.dialog_hour_label),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.height(160.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items((0..23).toList()) { hour ->
+                        val selected = hour == selectedHour
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.clickable { selectedHour = hour }
+                        ) {
+                            Text(
+                                text = "%02d".format(hour),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+                // ── Minutos ─────────────────────────────────────
+                Text(
+                    stringResource(R.string.dialog_minute_label),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.height(80.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(minutes) { minute ->
+                        val selected = minute == selectedMinute
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.clickable { selectedMinute = minute }
+                        ) {
+                            Text(
+                                text = ":%02d".format(minute),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
         },
-        confirmButton = {},
+        confirmButton = {
+            Button(onClick = { onSelect(selectedHour, selectedMinute) }) {
+                Text(stringResource(R.string.dialog_confirm))
+            }
+        },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_cancel)) }
         }

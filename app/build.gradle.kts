@@ -32,6 +32,7 @@ android {
         }
         buildConfigField("String", "AFTERSHIP_API_KEY", "\"${localProperties["AFTERSHIP_API_KEY"] ?: ""}\"")
         buildConfigField("String", "GMAIL_CLIENT_ID", "\"${localProperties["GMAIL_CLIENT_ID"] ?: ""}\"")
+        buildConfigField("String", "OUTLOOK_CLIENT_ID", "\"${localProperties["OUTLOOK_CLIENT_ID"] ?: ""}\"")
     }
 
     signingConfigs {
@@ -137,6 +138,15 @@ dependencies {
     // Confetti animation
     implementation("nl.dionsegijn:konfetti-compose:2.0.4")
 
+    // Microsoft Authentication Library (Outlook/Hotmail OAuth2 + Graph API)
+    // MSAL 4.x usa OpenTelemetry en runtime. El BOM no puede resolverse como librería
+    // en Android Gradle → se excluye el BOM, pero se añade la API directamente.
+    implementation("com.microsoft.identity.client:msal:4.9.0") {
+        exclude(group = "io.opentelemetry", module = "opentelemetry-bom")
+    }
+    // Clases de OpenTelemetry que MSAL necesita en runtime (SpanContext, etc.)
+    implementation("io.opentelemetry:opentelemetry-api:1.18.0")
+
     // Play Services Auth (Gmail)
     implementation(libs.play.services.auth)
     implementation(libs.google.api.client.android)
@@ -162,12 +172,17 @@ dependencies {
     implementation(libs.camerax.view)
     implementation(libs.mlkit.barcode)
 
-    // Firebase (Crashlytics + Analytics)
+    // Firebase (Crashlytics + Analytics + FCM)
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-crashlytics-ktx")
     implementation("com.google.firebase:firebase-analytics-ktx")
+    // FCM: infraestructura lista para push desde backend (token almacenado en DataStore)
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
     testImplementation(libs.junit)
+    testImplementation("io.mockk:mockk:1.13.9")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+    testImplementation("app.cash.turbine:turbine:1.1.0")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

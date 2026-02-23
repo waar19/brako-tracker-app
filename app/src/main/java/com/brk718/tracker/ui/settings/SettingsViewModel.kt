@@ -19,11 +19,14 @@ import com.brk718.tracker.data.billing.BillingState
 import com.brk718.tracker.data.local.AmazonSessionManager
 import com.brk718.tracker.data.local.UserPreferences
 import com.brk718.tracker.data.local.UserPreferencesRepository
+import com.brk718.tracker.data.remote.EmailService
+import com.brk718.tracker.data.remote.OutlookService
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.util.CsvExporter
 import com.brk718.tracker.workers.SyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +35,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -56,7 +60,9 @@ class SettingsViewModel @Inject constructor(
     private val prefsRepo: UserPreferencesRepository,
     private val amazonSessionManager: AmazonSessionManager,
     private val billingRepository: BillingRepository,
-    private val shipmentRepository: ShipmentRepository
+    private val shipmentRepository: ShipmentRepository,
+    private val outlookService: OutlookService,
+    private val emailService: EmailService          // GmailService vía DI
 ) : ViewModel() {
 
     init {
@@ -65,6 +71,20 @@ class SettingsViewModel @Inject constructor(
             val total = shipmentRepository.countAllShipments()
             val delivered = shipmentRepository.countDeliveredShipments()
             prefsRepo.syncStatsFromRoom(total, delivered)
+        }
+
+        // Al arrancar la app, programar el worker si autoSync está activo y no hay trabajo previo.
+        // Usa KEEP para no interferir con un worker ya en ejecución.
+        viewModelScope.launch {
+            val prefs = prefsRepo.preferences.first()
+            if (prefs.autoSync && prefs.syncIntervalHours != 0) {
+                scheduleSyncWorker(
+                    intervalHours = prefs.syncIntervalHours,
+                    onlyWifi      = prefs.syncOnlyOnWifi,
+                    isPremium     = prefs.isPremium,
+                    policy        = ExistingPeriodicWorkPolicy.KEEP
+                )
+            }
         }
 
         // Al perder premium, re-programar el worker con el intervalo free (ya reseteado a 2h)
@@ -76,10 +96,13 @@ class SettingsViewModel @Inject constructor(
                 .collect { isPremium ->
                     if (!isPremium) {
                         val prefs = prefsRepo.preferences.first()
-                        if (prefs.autoSync) scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi)
+                        if (prefs.autoSync) scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi, prefs.isPremium)
                     }
                 }
         }
+
+        // Restaurar sesión de Outlook al arrancar (token MSAL cacheado → no pide credenciales)
+        viewModelScope.launch { outlookService.connect() }
     }
 
     // Uri del CSV exportado (null = sin exportar, Unit = exportado, String = error)
@@ -109,7 +132,7 @@ class SettingsViewModel @Inject constructor(
         billingRepository.productDetails,
         billingRepository.billingState
     ) { prefs, workInfo, productDetails, billingState ->
-        val lastSyncText = workInfo?.let { formatLastSync(it) } ?: "Nunca"
+        val lastSyncText = formatSyncStatus(workInfo, prefs.lastSyncTimestamp)
         SettingsUiState(
             preferences = prefs,
             preferencesLoaded = true,
@@ -129,17 +152,36 @@ class SettingsViewModel @Inject constructor(
         )
     )
 
-    private fun formatLastSync(workInfo: WorkInfo): String {
-        // WorkManager no expone directamente el último tiempo de ejecución en la API pública,
-        // pero podemos usar el estado para dar retroalimentación útil
-        return when (workInfo.state) {
-            WorkInfo.State.RUNNING   -> "Sincronizando ahora..."
-            WorkInfo.State.ENQUEUED  -> "En cola"
-            WorkInfo.State.SUCCEEDED -> "Completado recientemente"
-            WorkInfo.State.FAILED    -> "Falló la última sincronización"
-            WorkInfo.State.CANCELLED -> "Cancelada"
-            WorkInfo.State.BLOCKED   -> "Esperando condiciones"
-            else                     -> "Desconocido"
+    /**
+     * Muestra el estado de sincronización de forma útil para el usuario:
+     * - Si está sincronizando ahora → "Sincronizando ahora..."
+     * - Si falló → "Falló la última sincronización"
+     * - Si hay timestamp guardado → "Hace X min" / "Hoy a las HH:mm" / fecha
+     * - Si nunca ha sincronizado → "Nunca"
+     */
+    private fun formatSyncStatus(workInfo: WorkInfo?, lastSyncTimestamp: Long): String {
+        if (workInfo?.state == WorkInfo.State.RUNNING) return "Sincronizando ahora..."
+        if (workInfo?.state == WorkInfo.State.FAILED)  return "Falló la última sincronización"
+        if (workInfo?.state == WorkInfo.State.BLOCKED) return "Esperando conexión..."
+
+        if (lastSyncTimestamp == 0L) return "Nunca sincronizado"
+
+        val diff = System.currentTimeMillis() - lastSyncTimestamp
+        return when {
+            diff < 60_000L     -> "Hace un momento"
+            diff < 3_600_000L  -> "Hace ${diff / 60_000} min"
+            diff < 86_400_000L -> {
+                val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                "Hoy a las ${sdf.format(java.util.Date(lastSyncTimestamp))}"
+            }
+            diff < 172_800_000L -> {
+                val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                "Ayer a las ${sdf.format(java.util.Date(lastSyncTimestamp))}"
+            }
+            else -> {
+                val sdf = java.text.SimpleDateFormat("dd MMM HH:mm", java.util.Locale.getDefault())
+                sdf.format(java.util.Date(lastSyncTimestamp))
+            }
         }
     }
 
@@ -160,8 +202,16 @@ class SettingsViewModel @Inject constructor(
         prefsRepo.setQuietHoursStart(hour)
     }
 
+    fun setQuietHoursStartMinute(minute: Int) = viewModelScope.launch {
+        prefsRepo.setQuietHoursStartMinute(minute)
+    }
+
     fun setQuietHoursEnd(hour: Int) = viewModelScope.launch {
         prefsRepo.setQuietHoursEnd(hour)
+    }
+
+    fun setQuietHoursEndMinute(minute: Int) = viewModelScope.launch {
+        prefsRepo.setQuietHoursEndMinute(minute)
     }
 
     fun syncNow() {
@@ -183,7 +233,7 @@ class SettingsViewModel @Inject constructor(
         // Re-encolar el trabajo periódico con UPDATE para resetear su estado FAILED
         val prefs = uiState.value.preferences
         if (prefs.autoSync) {
-            scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi)
+            scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi, prefs.isPremium)
         }
     }
 
@@ -191,7 +241,8 @@ class SettingsViewModel @Inject constructor(
     fun setAutoSync(value: Boolean) = viewModelScope.launch {
         prefsRepo.setAutoSync(value)
         if (value) {
-            scheduleSyncWorker(uiState.value.preferences.syncIntervalHours, uiState.value.preferences.syncOnlyOnWifi)
+            val p = uiState.value.preferences
+            scheduleSyncWorker(p.syncIntervalHours, p.syncOnlyOnWifi, p.isPremium)
         } else {
             workManager.cancelUniqueWork("TrackerSync")
         }
@@ -200,14 +251,16 @@ class SettingsViewModel @Inject constructor(
     fun setSyncIntervalHours(hours: Int) = viewModelScope.launch {
         prefsRepo.setSyncIntervalHours(hours)
         if (uiState.value.preferences.autoSync) {
-            scheduleSyncWorker(hours, uiState.value.preferences.syncOnlyOnWifi)
+            val p = uiState.value.preferences
+            scheduleSyncWorker(hours, p.syncOnlyOnWifi, p.isPremium)
         }
     }
 
     fun setSyncOnlyOnWifi(value: Boolean) = viewModelScope.launch {
         prefsRepo.setSyncOnlyOnWifi(value)
         if (uiState.value.preferences.autoSync) {
-            scheduleSyncWorker(uiState.value.preferences.syncIntervalHours, value)
+            val p = uiState.value.preferences
+            scheduleSyncWorker(p.syncIntervalHours, value, p.isPremium)
         }
     }
 
@@ -219,6 +272,75 @@ class SettingsViewModel @Inject constructor(
     // === Amazon ===
     fun disconnectAmazon() {
         amazonSessionManager.clearSession()
+    }
+
+    // === Gmail ===
+
+    /** Emite true si hay una sesión de Gmail activa, comprobando cada 2 s. */
+    val isGmailConnected: StateFlow<Boolean> = flow {
+        while (true) {
+            emit(emailService.isConnected())
+            delay(2_000)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = false
+    )
+
+    fun disconnectGmail() {
+        viewModelScope.launch { emailService.disconnect() }
+    }
+
+    // === Outlook / Hotmail ===
+
+    /** Emite true si hay un token de Outlook activo, comprobando cada 2 s. */
+    val isOutlookConnected: StateFlow<Boolean> = flow {
+        while (true) {
+            emit(outlookService.isConnected())
+            delay(2_000)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = false
+    )
+
+    fun disconnectOutlook() {
+        viewModelScope.launch { outlookService.disconnect() }
+    }
+
+    // === Segundo plano ===
+
+    /** Devuelve true si la app está eximida de la optimización de batería del sistema. */
+    fun isBatteryOptimizationIgnored(): Boolean {
+        val pm = context.getSystemService(android.content.Context.POWER_SERVICE)
+                as android.os.PowerManager
+        return pm.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    /**
+     * Abre el diálogo del sistema para solicitar la exención de optimización de batería.
+     * En la mayoría de OEMs esto desbloquea WorkManager para ejecutarse en segundo plano.
+     * Fallback: si el intent directo falla (raro en algunos OEMs), abre la pantalla general
+     * de optimización de batería.
+     */
+    fun requestBatteryOptimizationExemption() {
+        try {
+            val intent = android.content.Intent(
+                android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+            ).apply {
+                data = android.net.Uri.parse("package:${context.packageName}")
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback: abre la pantalla general de optimización de batería
+            val fallback = android.content.Intent(
+                android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
+            ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+            context.startActivity(fallback)
+        }
     }
 
     // === Suscripción Premium ===
@@ -263,9 +385,13 @@ class SettingsViewModel @Inject constructor(
     }
 
     // === Helpers ===
-    private fun scheduleSyncWorker(intervalHours: Int, onlyWifi: Boolean) {
+    private fun scheduleSyncWorker(
+        intervalHours: Int,
+        onlyWifi: Boolean,
+        isPremium: Boolean,                                                      // pasado explícitamente para no leer uiState desde init
+        policy: ExistingPeriodicWorkPolicy = ExistingPeriodicWorkPolicy.UPDATE
+    ) {
         // Guard defensivo: si el usuario no es premium, nunca encolar worker de 30 min
-        val isPremium = uiState.value.preferences.isPremium
         val effectiveInterval = if (intervalHours == -1 && !isPremium) 2 else intervalHours
         if (effectiveInterval == 0) return  // manual — no programar
         val networkType = if (onlyWifi) NetworkType.UNMETERED else NetworkType.CONNECTED
@@ -282,11 +408,7 @@ class SettingsViewModel @Inject constructor(
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10L, TimeUnit.MINUTES)
                 .build()
         }
-        workManager.enqueueUniquePeriodicWork(
-            "TrackerSync",
-            ExistingPeriodicWorkPolicy.UPDATE,
-            request
-        )
+        workManager.enqueueUniquePeriodicWork("TrackerSync", policy, request)
     }
 }
 

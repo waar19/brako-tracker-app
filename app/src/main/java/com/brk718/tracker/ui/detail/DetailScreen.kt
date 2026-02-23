@@ -79,8 +79,16 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
+import com.brk718.tracker.util.ShipmentStatus
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.ui.text.style.TextAlign
 
 // Tile source minimalista de CartoDB Positron (fondo claro, sin ruido visual)
 private val CARTO_POSITRON = object : OnlineTileSourceBase(
@@ -90,6 +98,24 @@ private val CARTO_POSITRON = object : OnlineTileSourceBase(
         "https://a.basemaps.cartocdn.com/light_all/",
         "https://b.basemaps.cartocdn.com/light_all/",
         "https://c.basemaps.cartocdn.com/light_all/"
+    )
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        return baseUrl +
+            MapTileIndex.getZoom(pMapTileIndex) + "/" +
+            MapTileIndex.getX(pMapTileIndex) + "/" +
+            MapTileIndex.getY(pMapTileIndex) + mImageFilenameEnding
+    }
+}
+
+// Tile source oscuro de CartoDB Dark Matter (fondo oscuro para dark theme)
+private val CARTO_DARK_MATTER = object : OnlineTileSourceBase(
+    "CartoDB.DarkMatter",
+    0, 19, 256, ".png",
+    arrayOf(
+        "https://a.basemaps.cartocdn.com/dark_all/",
+        "https://b.basemaps.cartocdn.com/dark_all/",
+        "https://c.basemaps.cartocdn.com/dark_all/"
     )
 ) {
     override fun getTileURLString(pMapTileIndex: Long): String {
@@ -183,6 +209,34 @@ private fun setupMapOverlays(
         }
     }
     mapView.invalidate()
+}
+
+/**
+ * Formatea la fecha estimada de entrega en un texto relativo amigable:
+ * "Llega hoy", "Llega mañana", "Llega el lun 3 mar", "Esperado el 25 ene"
+ */
+private fun formatEstimatedDelivery(eta: Long): String {
+    val nowCal = Calendar.getInstance()
+    val etaCal = Calendar.getInstance().apply { timeInMillis = eta }
+    val tomorrowCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
+
+    val isSameDay = nowCal.get(Calendar.YEAR) == etaCal.get(Calendar.YEAR) &&
+                    nowCal.get(Calendar.DAY_OF_YEAR) == etaCal.get(Calendar.DAY_OF_YEAR)
+    val isTomorrow = tomorrowCal.get(Calendar.YEAR) == etaCal.get(Calendar.YEAR) &&
+                     tomorrowCal.get(Calendar.DAY_OF_YEAR) == etaCal.get(Calendar.DAY_OF_YEAR)
+
+    return when {
+        eta < System.currentTimeMillis() -> {
+            val fmt = SimpleDateFormat("d MMM", Locale("es"))
+            "Esperado el ${fmt.format(Date(eta))}"
+        }
+        isSameDay  -> "Llega hoy"
+        isTomorrow -> "Llega mañana"
+        else -> {
+            val fmt = SimpleDateFormat("EEE d MMM", Locale("es"))
+            "Llega el ${fmt.format(Date(eta))}"
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -312,7 +366,7 @@ fun DetailScreen(
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
-                            // Título + ícono de editar
+                            // Título + íconos de acción (mute + editar)
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth()
@@ -324,6 +378,21 @@ fun DetailScreen(
                                     color = headerContentColor,
                                     modifier = Modifier.weight(1f)
                                 )
+                                // Botón silenciar / activar notificaciones
+                                IconButton(
+                                    onClick = { viewModel.toggleMute() },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (shipment.isMuted) Icons.Default.NotificationsOff else Icons.Default.Notifications,
+                                        contentDescription = if (shipment.isMuted) "Activar notificaciones" else "Silenciar notificaciones",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = if (shipment.isMuted)
+                                            MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                                        else
+                                            headerContentColor.copy(alpha = 0.7f)
+                                    )
+                                }
                                 IconButton(
                                     onClick = {
                                         editTitleText = shipment.title
@@ -459,6 +528,33 @@ fun DetailScreen(
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                     )
                                 }
+                                // Fecha estimada de entrega (solo si está disponible y no es "entregado")
+                                val eta = shipment.estimatedDelivery
+                                if (eta != null && !statusLower.contains(ShipmentStatus.DELIVERED)) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = headerContentColor.copy(alpha = 0.12f)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.DateRange,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(14.dp),
+                                                tint = headerContentColor
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                            Text(
+                                                text = formatEstimatedDelivery(eta),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = headerContentColor
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -467,6 +563,7 @@ fun DetailScreen(
 
                     // ===== MAPA =====
                     val eventsWithLoc = events.filter { it.latitude != null && it.longitude != null }
+                    val tileSource = if (isSystemInDarkTheme()) CARTO_DARK_MATTER else CARTO_POSITRON
                     if (eventsWithLoc.isNotEmpty()) {
                         val orderedEvents = eventsWithLoc.reversed()
                         val uniqueEvents = orderedEvents.distinctBy { Pair(it.latitude, it.longitude) }
@@ -490,7 +587,7 @@ fun DetailScreen(
                                             ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
                                         )
                                         MapView(ctx).apply {
-                                            setTileSource(CARTO_POSITRON)
+                                            setTileSource(tileSource)
                                             setMultiTouchControls(false) // desactivado en preview
                                             controller.setZoom(5.0)
                                             isTilesScaledToDpi = true
@@ -584,7 +681,7 @@ fun DetailScreen(
                                                     ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
                                                 )
                                                 MapView(ctx).apply {
-                                                    setTileSource(CARTO_POSITRON)
+                                                    setTileSource(tileSource)
                                                     setMultiTouchControls(true)
                                                     controller.setZoom(5.0)
                                                     isTilesScaledToDpi = true
@@ -666,6 +763,46 @@ fun DetailScreen(
                                 }
                             }
                         }
+                    } else if (events.isNotEmpty()) {
+                        // Empty state: hay eventos pero ninguno tiene coordenadas
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 28.dp, horizontal = 20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(36.dp),
+                                    tint = MaterialTheme.colorScheme.outlineVariant
+                                )
+                                Text(
+                                    text = "Sin datos de ubicación",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "El carrier no proporcionó coordenadas",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
                     }
 
                     // ===== HISTORIAL =====

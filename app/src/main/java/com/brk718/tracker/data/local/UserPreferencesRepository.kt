@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -19,8 +20,10 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_NOTIFICATIONS_ENABLED  = booleanPreferencesKey("notifications_enabled")
         val KEY_ONLY_IMPORTANT_EVENTS  = booleanPreferencesKey("only_important_events")
         val KEY_QUIET_HOURS_ENABLED    = booleanPreferencesKey("quiet_hours_enabled")
-        val KEY_QUIET_HOURS_START      = intPreferencesKey("quiet_hours_start")
-        val KEY_QUIET_HOURS_END        = intPreferencesKey("quiet_hours_end")
+        val KEY_QUIET_HOURS_START        = intPreferencesKey("quiet_hours_start")
+        val KEY_QUIET_HOURS_START_MINUTE = intPreferencesKey("quiet_hours_start_minute")
+        val KEY_QUIET_HOURS_END          = intPreferencesKey("quiet_hours_end")
+        val KEY_QUIET_HOURS_END_MINUTE   = intPreferencesKey("quiet_hours_end_minute")
         val KEY_AUTO_SYNC              = booleanPreferencesKey("auto_sync")
         val KEY_SYNC_INTERVAL_HOURS    = intPreferencesKey("sync_interval_hours")
         val KEY_SYNC_ONLY_WIFI         = booleanPreferencesKey("sync_only_wifi")
@@ -29,6 +32,9 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_ONBOARDING_DONE        = booleanPreferencesKey("onboarding_done")
         val KEY_DELIVERED_COUNT        = intPreferencesKey("delivered_count")
         val KEY_TOTAL_TRACKED          = intPreferencesKey("total_tracked")
+        val KEY_LAST_SEEN_VERSION_CODE = intPreferencesKey("last_seen_version_code")
+        val KEY_LAST_SYNC_TIMESTAMP    = longPreferencesKey("last_sync_timestamp")
+        val KEY_FCM_TOKEN              = stringPreferencesKey("fcm_token")
     }
 
     val preferences: Flow<UserPreferences> = dataStore.data.map { prefs ->
@@ -36,16 +42,21 @@ class UserPreferencesRepository @Inject constructor(
             notificationsEnabled = prefs[KEY_NOTIFICATIONS_ENABLED] ?: true,
             onlyImportantEvents  = prefs[KEY_ONLY_IMPORTANT_EVENTS] ?: false,
             quietHoursEnabled    = prefs[KEY_QUIET_HOURS_ENABLED] ?: false,
-            quietHoursStart      = prefs[KEY_QUIET_HOURS_START] ?: 23,
-            quietHoursEnd        = prefs[KEY_QUIET_HOURS_END] ?: 7,
+            quietHoursStart        = prefs[KEY_QUIET_HOURS_START] ?: 23,
+            quietHoursStartMinute  = prefs[KEY_QUIET_HOURS_START_MINUTE] ?: 0,
+            quietHoursEnd          = prefs[KEY_QUIET_HOURS_END] ?: 7,
+            quietHoursEndMinute    = prefs[KEY_QUIET_HOURS_END_MINUTE] ?: 0,
             autoSync             = prefs[KEY_AUTO_SYNC] ?: true,
             syncIntervalHours    = prefs[KEY_SYNC_INTERVAL_HOURS] ?: 2,
             syncOnlyOnWifi       = prefs[KEY_SYNC_ONLY_WIFI] ?: false,
             theme                = prefs[KEY_THEME] ?: "system",
             isPremium            = prefs[KEY_IS_PREMIUM] ?: false,
             onboardingDone       = prefs[KEY_ONBOARDING_DONE] ?: false,
-            deliveredCount       = prefs[KEY_DELIVERED_COUNT] ?: 0,
-            totalTracked         = prefs[KEY_TOTAL_TRACKED] ?: 0
+            deliveredCount          = prefs[KEY_DELIVERED_COUNT] ?: 0,
+            totalTracked            = prefs[KEY_TOTAL_TRACKED] ?: 0,
+            lastSeenVersionCode     = prefs[KEY_LAST_SEEN_VERSION_CODE] ?: 0,
+            lastSyncTimestamp       = prefs[KEY_LAST_SYNC_TIMESTAMP] ?: 0L,
+            fcmToken                = prefs[KEY_FCM_TOKEN] ?: ""
         )
     }
 
@@ -68,8 +79,16 @@ class UserPreferencesRepository @Inject constructor(
         dataStore.edit { it[KEY_QUIET_HOURS_START] = hour }
     }
 
+    suspend fun setQuietHoursStartMinute(minute: Int) {
+        dataStore.edit { it[KEY_QUIET_HOURS_START_MINUTE] = minute }
+    }
+
     suspend fun setQuietHoursEnd(hour: Int) {
         dataStore.edit { it[KEY_QUIET_HOURS_END] = hour }
+    }
+
+    suspend fun setQuietHoursEndMinute(minute: Int) {
+        dataStore.edit { it[KEY_QUIET_HOURS_END_MINUTE] = minute }
     }
 
     suspend fun setAutoSync(value: Boolean) {
@@ -112,6 +131,18 @@ class UserPreferencesRepository @Inject constructor(
         dataStore.edit { prefs ->
             prefs[KEY_TOTAL_TRACKED] = (prefs[KEY_TOTAL_TRACKED] ?: 0) + 1
         }
+    }
+
+    suspend fun setLastSeenVersionCode(versionCode: Int) {
+        dataStore.edit { it[KEY_LAST_SEEN_VERSION_CODE] = versionCode }
+    }
+
+    suspend fun setLastSyncTimestamp(epochMs: Long) {
+        dataStore.edit { it[KEY_LAST_SYNC_TIMESTAMP] = epochMs }
+    }
+
+    suspend fun setFcmToken(token: String) {
+        dataStore.edit { it[KEY_FCM_TOKEN] = token }
     }
 
     /** Backfills stats from Room if both counters are still 0 (first launch after feature addition). */

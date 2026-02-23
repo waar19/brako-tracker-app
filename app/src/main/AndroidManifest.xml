@@ -2,7 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- MSAL: permite lanzar Custom Tabs para el flujo OAuth de Microsoft (Android 11+) -->
+    <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
     <!-- Notificaciones push (requerido en Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Cámara para escanear códigos de barras en la pantalla Añadir -->
@@ -11,6 +21,10 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- Segundo plano confiable: solicitar exención de optimización de batería del OEM -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- BootReceiver: re-encolar WorkManager tras reinicio del dispositivo -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".TrackerApp"
@@ -44,6 +58,30 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- MSAL: BrowserTabActivity para el flujo OAuth2 de Microsoft (Outlook/Hotmail) -->
+        <activity
+            android:name="com.microsoft.identity.client.BrowserTabActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="msauth"
+                    android:host="com.brk718.tracker" />
+            </intent-filter>
+        </activity>
+
+        <!-- BootReceiver: re-encola WorkManager tras reinicio o actualización de la app -->
+        <receiver
+            android:name=".receivers.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Widget Brako Tracker (Jetpack Glance) — solo premium -->
         <receiver
             android:name=".ui.widget.TrackerWidgetReceiver"
@@ -66,6 +104,17 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_provider_paths" />
         </provider>
+
+        <!-- Servicio FCM: recibe push notifications desde el backend y tokens de renovación.
+             Sin un backend que use la FCM API, los mensajes no llegan automáticamente;
+             este service deja la infraestructura lista para la integración futura. -->
+        <service
+            android:name=".service.TrackerFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <!-- Desactivar el inicializador automático de WorkManager para que
              Configuration.Provider de TrackerApp (con HiltWorkerFactory) tome efecto.

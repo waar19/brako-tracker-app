@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +20,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
 import com.brk718.tracker.domain.ParsedShipment
@@ -29,6 +31,7 @@ import com.brk718.tracker.ui.add.FREE_SHIPMENT_LIMIT
 @Composable
 fun GmailScreen(
     onBack: () -> Unit,
+    onNavigateToPaywall: () -> Unit = {},
     viewModel: GmailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -39,6 +42,45 @@ fun GmailScreen(
         if (result.resultCode == Activity.RESULT_OK) {
             viewModel.handleSignInResult(result.data)
         }
+    }
+
+    // Lanzar OAuth cuando el ViewModel lo indique (después de pasar el gate premium)
+    LaunchedEffect(uiState.shouldLaunchOAuth) {
+        if (uiState.shouldLaunchOAuth) {
+            signInLauncher.launch(viewModel.getSignInIntent())
+            viewModel.onOAuthLaunched()
+        }
+    }
+
+    // Dialog gate premium: Outlook ya conectado + usuario free
+    if (uiState.showMultiEmailPremiumGate) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissPremiumGate() },
+            icon = {
+                Icon(
+                    Icons.Default.WorkspacePremium,
+                    contentDescription = null,
+                    tint = Color(0xFFFFC107)
+                )
+            },
+            title = { Text("Función Premium") },
+            text = {
+                Text("Conectar Gmail y Outlook a la vez está disponible solo para usuarios Premium.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.dismissPremiumGate()
+                    onNavigateToPaywall()
+                }) {
+                    Text("Ver Premium")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissPremiumGate() }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -57,8 +99,8 @@ fun GmailScreen(
                         }
                         IconButton(onClick = { viewModel.disconnect() }) {
                             Icon(
-                                Icons.Default.Logout,
-                                contentDescription = "Desconectar cuenta",
+                                Icons.AutoMirrored.Filled.Logout,
+                                contentDescription = stringResource(R.string.gmail_disconnect),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -97,7 +139,7 @@ fun GmailScreen(
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
-                    onClick = { signInLauncher.launch(viewModel.getSignInIntent()) }
+                    onClick = { viewModel.onConnectClicked() }
                 ) {
                     Text(stringResource(R.string.gmail_connect_button))
                 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
+import com.brk718.tracker.util.CarrierDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,15 +37,15 @@ class AddShipmentViewModel @Inject constructor(
                 }
             }
 
-            val carrier = manualCarrier ?: detectCarrier(trackingNumber)
+            val detectedCarrier = manualCarrier ?: CarrierDetector.detect(trackingNumber)
 
-            if (carrier == "Desconocido" && manualCarrier == null) {
+            if (detectedCarrier == null) {
                 _uiState.value = AddUiState.Error("No se pudo detectar el transportista. Seleccione uno manualmente.")
                 return@launch
             }
 
             try {
-                repository.addShipment(trackingNumber, carrier, title.ifBlank { trackingNumber })
+                repository.addShipment(trackingNumber, detectedCarrier, title.ifBlank { trackingNumber })
                 prefsRepository.incrementTotalTracked()
                 _uiState.value = AddUiState.Success
             } catch (e: Exception) {
@@ -57,15 +58,6 @@ class AddShipmentViewModel @Inject constructor(
         _uiState.value = AddUiState.Idle
     }
 
-    private fun detectCarrier(tracking: String): String {
-        return when {
-            tracking.startsWith("1Z") -> "UPS"
-            tracking.length == 12 && tracking.all { it.isDigit() } -> "FedEx" // Simplificado
-            tracking.length == 22 && tracking.startsWith("9") -> "USPS"
-            tracking.startsWith("TBA") -> "Amazon Logistics"
-            else -> "Desconocido"
-        }
-    }
 }
 
 sealed class AddUiState {

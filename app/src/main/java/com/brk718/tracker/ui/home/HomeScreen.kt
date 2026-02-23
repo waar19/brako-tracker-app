@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
@@ -58,8 +60,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.brk718.tracker.R
 import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.repository.ShipmentRepository
+import com.brk718.tracker.util.ShipmentStatus
 import com.brk718.tracker.ui.add.FREE_SHIPMENT_LIMIT
 import com.brk718.tracker.ui.ads.AdManager
+import com.brk718.tracker.BuildConfig
 import com.google.android.play.core.review.ReviewManagerFactory
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -73,6 +77,7 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     onShipmentClick: (String) -> Unit,
     onGmailClick: () -> Unit = {},
+    onOutlookClick: () -> Unit = {},
     onAmazonAuthClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onUpgradeClick: () -> Unit = {},
@@ -84,13 +89,38 @@ fun HomeScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val refreshError by viewModel.refreshError.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val activeStatusFilter by viewModel.activeStatusFilter.collectAsState()
     val shouldShowRating by viewModel.shouldShowRatingRequest.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
     val selectedIds by viewModel.selectedIds.collectAsState()
     val isSelectionMode by viewModel.isSelectionMode.collectAsState()
+    val showWhatsNew by viewModel.showWhatsNew.collectAsState()
+    val isGmailConnected by viewModel.isGmailConnected.collectAsState()
+    val isOutlookConnected by viewModel.isOutlookConnected.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val canAddMore = isPremium || shipments.size < FREE_SHIPMENT_LIMIT
+
+    // Menús para la selección de cuenta de correo
+    var showEmailMenuTopBar by remember { mutableStateOf(false) }
+    var showEmailMenuEmpty by remember { mutableStateOf(false) }
+
+    // Lógica inteligente: navega directo si solo hay una cuenta conectada,
+    // o muestra menú de selección si hay ambas o ninguna.
+    val onEmailClickTopBar: () -> Unit = {
+        when {
+            isGmailConnected && !isOutlookConnected -> onGmailClick()
+            !isGmailConnected && isOutlookConnected -> onOutlookClick()
+            else -> showEmailMenuTopBar = true
+        }
+    }
+    val onEmailClickEmpty: () -> Unit = {
+        when {
+            isGmailConnected && !isOutlookConnected -> onGmailClick()
+            !isGmailConnected && isOutlookConnected -> onOutlookClick()
+            else -> showEmailMenuEmpty = true
+        }
+    }
 
     // Diálogo de confirmación para eliminar seleccionados
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
@@ -208,7 +238,7 @@ fun HomeScreen(
                                 }) {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "Cerrar búsqueda"
+                                        contentDescription = stringResource(R.string.home_search_close)
                                     )
                                 }
                             }
@@ -218,7 +248,7 @@ fun HomeScreen(
                                 IconButton(onClick = onUpgradeClick) {
                                     Icon(
                                         Icons.Default.WorkspacePremium,
-                                        contentDescription = "Premium",
+                                        contentDescription = stringResource(R.string.home_premium_icon),
                                         tint = Color(0xFFFFB400)
                                     )
                                 }
@@ -227,7 +257,7 @@ fun HomeScreen(
                             IconButton(onClick = { searchVisible = !searchVisible }) {
                                 Icon(
                                     Icons.Default.Search,
-                                    contentDescription = "Buscar",
+                                    contentDescription = stringResource(R.string.home_search_icon),
                                     tint = if (searchVisible) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurface
                                 )
@@ -238,8 +268,25 @@ fun HomeScreen(
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.home_refresh_all))
                             }
-                            IconButton(onClick = onGmailClick) {
-                                Icon(Icons.Default.Email, contentDescription = stringResource(R.string.home_import_gmail))
+                            Box {
+                                IconButton(onClick = onEmailClickTopBar) {
+                                    Icon(Icons.Default.Email, contentDescription = stringResource(R.string.home_import_gmail))
+                                }
+                                DropdownMenu(
+                                    expanded = showEmailMenuTopBar,
+                                    onDismissRequest = { showEmailMenuTopBar = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Gmail") },
+                                        onClick = { showEmailMenuTopBar = false; onGmailClick() },
+                                        leadingIcon = { Icon(Icons.Default.Email, null, modifier = Modifier.size(18.dp)) }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Outlook / Hotmail") },
+                                        onClick = { showEmailMenuTopBar = false; onOutlookClick() },
+                                        leadingIcon = { Icon(Icons.Default.Email, null, modifier = Modifier.size(18.dp)) }
+                                    )
+                                }
                             }
                             IconButton(onClick = onSettingsClick) {
                                 Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
@@ -376,6 +423,29 @@ fun HomeScreen(
                         )
                     }
                 }
+
+                // ── Chips de filtro por estado ────────────────────────────
+                // Solo visibles cuando hay envíos y no estamos en modo selección
+                if (shipments.isNotEmpty() && !isSelectionMode) {
+                    val filterOptions = listOf(
+                        stringResource(R.string.home_filter_all)              to null,
+                        stringResource(R.string.home_filter_in_transit)       to ShipmentStatus.IN_TRANSIT,
+                        stringResource(R.string.home_filter_out_for_delivery) to ShipmentStatus.OUT_FOR_DELIVERY,
+                        stringResource(R.string.home_filter_exception)        to ShipmentStatus.EXCEPTION,
+                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        items(filterOptions) { (label, filter) ->
+                            FilterChip(
+                                selected = activeStatusFilter == filter,
+                                onClick = { viewModel.setStatusFilter(filter) },
+                                label = { Text(label, style = MaterialTheme.typography.labelMedium) }
+                            )
+                        }
+                    }
+                }
             }
         },
         floatingActionButton = {
@@ -474,13 +544,30 @@ fun HomeScreen(
                                 Text(stringResource(R.string.home_new_shipment))
                             }
                             Spacer(Modifier.height(12.dp))
-                            OutlinedButton(
-                                onClick = onGmailClick,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.home_import_gmail))
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(
+                                    onClick = onEmailClickEmpty,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Importar desde correo")
+                                }
+                                DropdownMenu(
+                                    expanded = showEmailMenuEmpty,
+                                    onDismissRequest = { showEmailMenuEmpty = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Gmail") },
+                                        onClick = { showEmailMenuEmpty = false; onGmailClick() },
+                                        leadingIcon = { Icon(Icons.Default.Email, null, modifier = Modifier.size(18.dp)) }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Outlook / Hotmail") },
+                                        onClick = { showEmailMenuEmpty = false; onOutlookClick() },
+                                        leadingIcon = { Icon(Icons.Default.Email, null, modifier = Modifier.size(18.dp)) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -546,6 +633,14 @@ fun HomeScreen(
                 }
             }
         }
+    // ── What's New BottomSheet ────────────────────────────────────────────────
+    if (showWhatsNew) {
+        WhatsNewBottomSheet(
+            versionName = BuildConfig.VERSION_NAME,
+            onDismiss   = { viewModel.dismissWhatsNew() }
+        )
+    }
+
     // ── Diálogo confirmar eliminación en bloque ───────────────────────────────
     if (showDeleteConfirmDialog) {
         AlertDialog(
@@ -838,13 +933,27 @@ fun ShipmentCard(
                         )
                     }
 
-                    // Último evento (tiempo relativo)
-                    if (lastEvent != null) {
-                        Text(
-                            text = relativeTime(lastEvent.timestamp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Indicador de silenciado
+                        if (item.shipment.isMuted) {
+                            Icon(
+                                Icons.Default.NotificationsOff,
+                                contentDescription = "Notificaciones silenciadas",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        }
+                        // Último evento (tiempo relativo)
+                        if (lastEvent != null) {
+                            Text(
+                                text = relativeTime(lastEvent.timestamp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
                 }
 

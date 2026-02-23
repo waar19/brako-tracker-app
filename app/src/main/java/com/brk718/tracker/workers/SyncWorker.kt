@@ -4,7 +4,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import java.util.Calendar
 import androidx.core.app.NotificationCompat
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.hilt.work.HiltWorker
@@ -17,6 +16,7 @@ import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.ui.widget.TrackerWidget
 import com.brk718.tracker.util.CrashReporter
+import com.brk718.tracker.util.QuietHoursUtil
 import com.brk718.tracker.util.ShipmentStatus
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -60,7 +60,9 @@ class SyncWorker @AssistedInject constructor(
                                 if (newStatus.lowercase().contains(ShipmentStatus.DELIVERED)) {
                                     prefsRepository.incrementDeliveredCount()
                                 }
-                                if (prefs.notificationsEnabled && !isInQuietHours(prefs.quietHoursEnabled, prefs.quietHoursStart, prefs.quietHoursEnd)) {
+                                // Saltar notificación si el envío está silenciado
+                                if (updated.shipment.isMuted) return@async
+                                if (prefs.notificationsEnabled && !isInQuietHours(prefs.quietHoursEnabled, prefs.quietHoursStart, prefs.quietHoursStartMinute, prefs.quietHoursEnd, prefs.quietHoursEndMinute)) {
                                     val shouldNotify = if (prefs.onlyImportantEvents) {
                                         isImportantStatus(newStatus)
                                     } else {
@@ -88,6 +90,29 @@ class SyncWorker @AssistedInject constructor(
                 return Result.success()
             }
 
+            // === Recordatorio de entrega inminente (una sola vez por estimatedDelivery) ===
+            val nowMs = System.currentTimeMillis()
+            val in24h = nowMs + 24L * 60 * 60 * 1000L
+            // Re-leer el estado fresco de cada envío (los refresh ya se completaron arriba)
+            val freshShipments = repository.activeShipments.first()
+            freshShipments.forEach { swe ->
+                val s = swe.shipment
+                val eta = s.estimatedDelivery ?: return@forEach
+                if (s.isMuted) return@forEach
+                if (s.reminderSent) return@forEach
+                if (s.status.lowercase().contains(ShipmentStatus.DELIVERED)) return@forEach
+                if (eta in nowMs..in24h) {
+                    val isToday = isSameDay(eta, nowMs)
+                    val title = appContext.getString(R.string.notif_reminder_title)
+                    val body = if (isToday)
+                        appContext.getString(R.string.notif_reminder_today, s.title)
+                    else
+                        appContext.getString(R.string.notif_reminder_tomorrow, s.title)
+                    sendReminderNotification(s.id, title, body)
+                    repository.markReminderSent(s.id)
+                }
+            }
+
             // Enviar notificaciones: individual si hay 1, agrupada si hay 2+
             when {
                 updates.size == 1 -> {
@@ -98,6 +123,9 @@ class SyncWorker @AssistedInject constructor(
                     sendGroupedNotification(updates.map { Triple(it.title, it.newStatus, it.id) })
                 }
             }
+
+            // Registrar el timestamp del último sync exitoso
+            prefsRepository.setLastSyncTimestamp(System.currentTimeMillis())
 
             // Actualizar el widget con los datos frescos
             updateWidgetIfInstalled()
@@ -123,23 +151,10 @@ class SyncWorker @AssistedInject constructor(
     }
 
     /**
-     * Devuelve true si la hora actual está dentro del rango de silencio.
-     * Maneja rangos que cruzan medianoche (ej. 23:00 → 07:00).
+     * Delega en [QuietHoursUtil] para mantener la lógica testeable sin dependencias de Android.
      */
-    private fun isInQuietHours(enabled: Boolean, startHour: Int, endHour: Int): Boolean {
-        if (!enabled) return false
-        val cal = Calendar.getInstance()
-        val currentMin = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
-        val startMin   = startHour * 60
-        val endMin     = endHour   * 60
-        return if (startMin <= endMin) {
-            // Rango dentro del mismo día (ej. 02:00 → 08:00)
-            currentMin in startMin until endMin
-        } else {
-            // Rango cruzando medianoche (ej. 23:00 → 07:00)
-            currentMin >= startMin || currentMin < endMin
-        }
-    }
+    private fun isInQuietHours(enabled: Boolean, startHour: Int, startMinute: Int, endHour: Int, endMinute: Int): Boolean =
+        QuietHoursUtil.isInQuietHours(enabled, startHour, startMinute, endHour, endMinute)
 
     private fun isImportantStatus(status: String): Boolean {
         val lower = status.lowercase()
@@ -243,6 +258,41 @@ class SyncWorker @AssistedInject constructor(
             .build()
 
         notificationManager.notify(SUMMARY_NOTIFICATION_ID, summaryNotification)
+    }
+
+    /** Devuelve true si dos timestamps caen en el mismo día calendario. */
+    private fun isSameDay(ts1: Long, ts2: Long): Boolean {
+        val cal1 = java.util.Calendar.getInstance().apply { timeInMillis = ts1 }
+        val cal2 = java.util.Calendar.getInstance().apply { timeInMillis = ts2 }
+        return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR) &&
+               cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR)
+    }
+
+    private fun sendReminderNotification(shipmentId: String, title: String, body: String) {
+        val notificationManager =
+            appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val intent = Intent(appContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("shipmentId", shipmentId)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            appContext,
+            "reminder_$shipmentId".hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(appContext, TrackerApp.CHANNEL_SHIPMENT_UPDATES)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify("reminder_$shipmentId".hashCode(), notification)
     }
 
     companion object {

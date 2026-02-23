@@ -108,15 +108,32 @@ class AdManager @Inject constructor(
     /**
      * Devuelve un AdView de banner configurado y listo para usar en un AndroidView.
      * Crear una nueva instancia cada vez (no reutilizar entre composables).
+     *
+     * Si el WebView interno de AdMob está roto (error 0 = Unable to obtain JavascriptEngine),
+     * se destruye el AdView para evitar el ciclo de crash+retry cada ~60 segundos que
+     * genera spam en Logcat y gasta batería.
      */
     fun createBannerAdView(): AdView {
+        var consecutiveFailures = 0
         return AdView(context).apply {
             setAdSize(AdSize.BANNER)
             adUnitId = BANNER_AD_UNIT_ID
             adListener = object : AdListener() {
-                override fun onAdLoaded() { Log.d(TAG, "Banner cargado") }
+                override fun onAdLoaded() {
+                    consecutiveFailures = 0
+                    Log.d(TAG, "Banner cargado")
+                }
                 override fun onAdFailedToLoad(error: LoadAdError) {
+                    consecutiveFailures++
                     Log.w(TAG, "Banner falló: ${error.message}")
+                    // error.code == 0 → ERROR_CODE_INTERNAL_ERROR (WebView/Chromium caído)
+                    // Si el WebView está roto o llevamos 3+ fallos seguidos, detener retries.
+                    if (error.code == 0 || consecutiveFailures >= 3) {
+                        Log.w(TAG,
+                            "Banner detenido (fallos=$consecutiveFailures, code=${error.code})" +
+                            " — WebView posiblemente no disponible en este dispositivo")
+                        this@apply.destroy()
+                    }
                 }
             }
             loadAd(AdRequest.Builder().build())
