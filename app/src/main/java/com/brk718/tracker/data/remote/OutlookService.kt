@@ -110,10 +110,13 @@ class OutlookService @Inject constructor(
      */
     private fun writeMsalConfigFile(): File {
         val sigHash = computeSignatureHash()
+        // MSAL compara el redirect_uri con la versión URL-encoded del hash (= → %3D).
+        // Si pasamos el hash sin encodear, MSAL falla con "redirect_uri doesn't match".
+        val encodedHash = java.net.URLEncoder.encode(sigHash, "UTF-8")
         val json = JSONObject()
             .put("client_id", BuildConfig.OUTLOOK_CLIENT_ID)
             .put("authorization_user_agent", "DEFAULT")
-            .put("redirect_uri", "msauth://com.brk718.tracker/$sigHash")
+            .put("redirect_uri", "msauth://com.brk718.tracker/$encodedHash")
             .put("account_mode", "SINGLE")
             .put("authorities", JSONArray().put(
                 JSONObject()
@@ -165,34 +168,59 @@ class OutlookService @Inject constructor(
      */
     override suspend fun connect() {
         try {
+            val restored = tryRestoreSession()
+            android.util.Log.d(TAG, "connect() → sesión restaurada=$restored, " +
+                "account=${currentAccount?.username}")
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "connect() excepción: ${e.message}")
+        }
+    }
+
+    /**
+     * Consulta a MSAL si hay una cuenta guardada y obtiene el token silenciosamente.
+     * Clave para restaurar sesiones tras reinicio de la app o muerte del proceso.
+     *
+     * NOTA: el bug común de MSAL con Custom Tabs es que [signIn] puede devolver false
+     * (onCancel) aunque el login fue exitoso — en ese caso los tokens SÍ están guardados
+     * y esta función los recupera.
+     */
+    suspend fun tryRestoreSession(): Boolean {
+        return try {
             val app = getOrCreateApp()
-            suspendCancellableCoroutine<Unit> { cont ->
+            suspendCancellableCoroutine { cont ->
                 app.getCurrentAccountAsync(
                     object : ISingleAccountPublicClientApplication.CurrentAccountCallback {
                         override fun onAccountLoaded(activeAccount: IAccount?) {
                             if (activeAccount != null) {
                                 currentAccount = activeAccount
+                                // Esperar al token ANTES de resumir el coroutine
                                 acquireTokenSilentlyAsync(app, activeAccount) { token ->
                                     accessToken = token
+                                    android.util.Log.d(TAG,
+                                        "tryRestoreSession: token=${if (token != null) "OK" else "null"}")
+                                    cont.resume(token != null)
                                 }
+                            } else {
+                                cont.resume(false)
                             }
-                            cont.resume(Unit)
                         }
                         override fun onAccountChanged(
                             priorAccount: IAccount?,
                             currentActiveAccount: IAccount?
                         ) {
-                            cont.resume(Unit)
+                            cont.resume(false)
                         }
                         override fun onError(exception: MsalException) {
-                            android.util.Log.w(TAG, "connect() error: ${exception.message}")
-                            cont.resume(Unit)
+                            android.util.Log.w(TAG,
+                                "tryRestoreSession error: ${exception.message}")
+                            cont.resume(false)
                         }
                     }
                 )
             }
         } catch (e: Exception) {
-            android.util.Log.w(TAG, "connect() excepción: ${e.message}")
+            android.util.Log.w(TAG, "tryRestoreSession excepción: ${e.message}")
+            false
         }
     }
 

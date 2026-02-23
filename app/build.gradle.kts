@@ -139,9 +139,13 @@ dependencies {
     implementation("nl.dionsegijn:konfetti-compose:2.0.4")
 
     // Microsoft Authentication Library (Outlook/Hotmail OAuth2 + Graph API)
+    // MSAL 4.x usa OpenTelemetry en runtime. El BOM no puede resolverse como librería
+    // en Android Gradle → se excluye el BOM, pero se añade la API directamente.
     implementation("com.microsoft.identity.client:msal:4.9.0") {
-        exclude(group = "io.opentelemetry")
+        exclude(group = "io.opentelemetry", module = "opentelemetry-bom")
     }
+    // Clases de OpenTelemetry que MSAL necesita en runtime (SpanContext, etc.)
+    implementation("io.opentelemetry:opentelemetry-api:1.18.0")
 
     // Play Services Auth (Gmail)
     implementation(libs.play.services.auth)

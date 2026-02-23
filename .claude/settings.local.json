@@ -108,7 +108,8 @@
       "WebFetch(domain:tracking.servientrega.us)",
       "Bash(curl:*)",
       "Bash(powershell -File:*)",
-      "Bash(powershell -ExecutionPolicy Bypass -File:*)"
+      "Bash(powershell -ExecutionPolicy Bypass -File:*)",
+      "Bash(del \"C:\\\\Users\\\\waar1\\\\sha1tobase64.ps1\")"
     ]
   }
 }

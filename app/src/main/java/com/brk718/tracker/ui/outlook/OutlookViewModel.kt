@@ -42,6 +42,8 @@ class OutlookViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            // Restaurar sesión previa desde el caché de MSAL (sobrevive reinicios del proceso)
+            outlookService.connect()
             val connected = outlookService.isConnected()
             _uiState.update {
                 it.copy(
@@ -61,7 +63,13 @@ class OutlookViewModel @Inject constructor(
             _uiState.update { it.copy(isConnecting = true, error = null) }
             try {
                 val ok = outlookService.signIn(activity)
-                if (ok) {
+
+                // Bug conocido de MSAL con Chrome Custom Tabs: puede llamar onCancel
+                // aunque el login fue exitoso (la Activity va a background y el callback
+                // se pierde). Siempre verificar el estado real con MSAL después.
+                val isConnected = ok || outlookService.tryRestoreSession()
+
+                if (isConnected) {
                     _uiState.update {
                         it.copy(
                             isConnected = true,
@@ -69,18 +77,30 @@ class OutlookViewModel @Inject constructor(
                             isConnecting = false
                         )
                     }
-                    // Escanear automáticamente al conectarse
                     scanEmails()
                 } else {
-                    // Usuario canceló el flujo
                     _uiState.update { it.copy(isConnecting = false) }
                 }
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isConnecting = false,
-                        error = "Error al conectar: ${e.message}"
-                    )
+                // Algunos errores de MSAL (ej. MsalDeclinedScopeException) no impiden
+                // que los tokens se hayan guardado. Intentar restaurar de todas formas.
+                val isConnected = outlookService.tryRestoreSession()
+                if (isConnected) {
+                    _uiState.update {
+                        it.copy(
+                            isConnected = true,
+                            accountEmail = outlookService.getAccountEmail(),
+                            isConnecting = false
+                        )
+                    }
+                    scanEmails()
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isConnecting = false,
+                            error = "Error al conectar: ${e.localizedMessage ?: e.message}"
+                        )
+                    }
                 }
             }
         }
