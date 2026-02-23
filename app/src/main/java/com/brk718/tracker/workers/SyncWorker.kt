@@ -17,8 +17,12 @@ import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.ui.widget.TrackerWidget
 import com.brk718.tracker.util.CrashReporter
+import com.brk718.tracker.util.ShipmentStatus
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 
 @HiltWorker
@@ -38,36 +42,50 @@ class SyncWorker @AssistedInject constructor(
             data class ShipmentUpdate(val title: String, val newStatus: String, val id: String)
             val updates = mutableListOf<ShipmentUpdate>()
 
-            activeShipments.forEach { shipmentWithEvents ->
-                val oldStatus = shipmentWithEvents.shipment.status
-                try {
-                    repository.refreshShipment(shipmentWithEvents.shipment.id)
+            // Refrescar todos los envíos en paralelo (coroutineScope garantiza que se esperan todos)
+            coroutineScope {
+                activeShipments.map { shipmentWithEvents ->
+                    async {
+                        val oldStatus = shipmentWithEvents.shipment.status
+                        try {
+                            repository.refreshShipment(shipmentWithEvents.shipment.id)
 
-                    // Leer el nuevo estado tras el refresh
-                    val updated = repository.getShipment(shipmentWithEvents.shipment.id).first()
-                    val newStatus = updated?.shipment?.status ?: return@forEach
+                            // Leer el nuevo estado tras el refresh
+                            val updated = repository.getShipment(shipmentWithEvents.shipment.id).first()
+                            val newStatus = updated?.shipment?.status ?: return@async
 
-                    // Acumular actualizaciones de estado
-                    if (newStatus != oldStatus) {
-                        // Contar entregas exitosas para el rating dialog
-                        if (newStatus.lowercase().contains("entregado")) {
-                            prefsRepository.incrementDeliveredCount()
-                        }
-                        if (prefs.notificationsEnabled && !isInQuietHours(prefs.quietHoursEnabled, prefs.quietHoursStart, prefs.quietHoursEnd)) {
-                            val shouldNotify = if (prefs.onlyImportantEvents) {
-                                isImportantStatus(newStatus)
-                            } else {
-                                true
+                            // Acumular actualizaciones de estado
+                            if (newStatus != oldStatus) {
+                                // Contar entregas exitosas para el rating dialog
+                                if (newStatus.lowercase().contains(ShipmentStatus.DELIVERED)) {
+                                    prefsRepository.incrementDeliveredCount()
+                                }
+                                if (prefs.notificationsEnabled && !isInQuietHours(prefs.quietHoursEnabled, prefs.quietHoursStart, prefs.quietHoursEnd)) {
+                                    val shouldNotify = if (prefs.onlyImportantEvents) {
+                                        isImportantStatus(newStatus)
+                                    } else {
+                                        true
+                                    }
+                                    if (shouldNotify) {
+                                        synchronized(updates) {
+                                            updates.add(ShipmentUpdate(updated.shipment.title, newStatus, updated.shipment.id))
+                                        }
+                                    }
+                                }
                             }
-                            if (shouldNotify) {
-                                updates.add(ShipmentUpdate(updated.shipment.title, newStatus, updated.shipment.id))
-                            }
+                        } catch (e: Exception) {
+                            // Continuar con los demás envíos aunque uno falle
+                            CrashReporter.recordException(e)
                         }
                     }
-                } catch (e: Exception) {
-                    // Continuar con los demás envíos aunque uno falle
-                    CrashReporter.recordException(e)
-                }
+                }.awaitAll()
+            }
+
+            // Verificar que el sistema permite notificaciones antes de intentar enviarlas
+            if (!androidx.core.app.NotificationManagerCompat.from(appContext).areNotificationsEnabled()) {
+                android.util.Log.w("SyncWorker", "Notificaciones bloqueadas a nivel sistema — saltando envío")
+                updateWidgetIfInstalled()
+                return Result.success()
             }
 
             // Enviar notificaciones: individual si hay 1, agrupada si hay 2+
@@ -110,27 +128,30 @@ class SyncWorker @AssistedInject constructor(
      */
     private fun isInQuietHours(enabled: Boolean, startHour: Int, endHour: Int): Boolean {
         if (!enabled) return false
-        val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        return if (startHour <= endHour) {
+        val cal = Calendar.getInstance()
+        val currentMin = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+        val startMin   = startHour * 60
+        val endMin     = endHour   * 60
+        return if (startMin <= endMin) {
             // Rango dentro del mismo día (ej. 02:00 → 08:00)
-            currentHour in startHour until endHour
+            currentMin in startMin until endMin
         } else {
             // Rango cruzando medianoche (ej. 23:00 → 07:00)
-            currentHour >= startHour || currentHour < endHour
+            currentMin >= startMin || currentMin < endMin
         }
     }
 
     private fun isImportantStatus(status: String): Boolean {
         val lower = status.lowercase()
-        return lower.contains("entregado") ||
-            lower.contains("en camino") ||
-            lower.contains("en tránsito") ||
-            lower.contains("en transito") ||
-            lower.contains("en reparto") ||
-            lower.contains("incidencia") ||
-            lower.contains("problema") ||
-            lower.contains("intento fallido") ||
-            lower.contains("exception")
+        return lower.contains(ShipmentStatus.DELIVERED) ||
+            lower.contains(ShipmentStatus.ON_THE_WAY) ||
+            lower.contains(ShipmentStatus.IN_TRANSIT) ||
+            lower.contains(ShipmentStatus.IN_TRANSIT_ALT) ||
+            lower.contains(ShipmentStatus.OUT_FOR_DELIVERY) ||
+            lower.contains(ShipmentStatus.EXCEPTION) ||
+            lower.contains(ShipmentStatus.PROBLEM) ||
+            lower.contains(ShipmentStatus.FAILED_ATTEMPT) ||
+            lower.contains("exception")   // status de AfterShip en inglés
     }
 
     private fun sendIndividualNotification(title: String, newStatus: String, shipmentId: String) {
@@ -152,7 +173,7 @@ class SyncWorker @AssistedInject constructor(
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(newStatus)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setGroup(NOTIFICATION_GROUP_KEY)
@@ -193,7 +214,7 @@ class SyncWorker @AssistedInject constructor(
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(status)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .setGroup(NOTIFICATION_GROUP_KEY)
@@ -213,7 +234,7 @@ class SyncWorker @AssistedInject constructor(
             .setContentTitle("${updates.size} envíos actualizados")
             .setContentText(updates.joinToString(", ") { it.first })
             .setStyle(inboxStyle)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(summaryPendingIntent)
             .setAutoCancel(true)
             .setGroup(NOTIFICATION_GROUP_KEY)

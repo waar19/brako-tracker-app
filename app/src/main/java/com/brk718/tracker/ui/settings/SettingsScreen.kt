@@ -59,7 +59,7 @@ fun SettingsScreen(
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/csv"
                     putExtra(Intent.EXTRA_STREAM, result.uri)
-                    putExtra(Intent.EXTRA_SUBJECT, "Mis envíos — Tracker")
+                    putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.settings_csv_share_subject))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 context.startActivity(Intent.createChooser(shareIntent, "Guardar o compartir CSV"))
@@ -116,12 +116,10 @@ fun SettingsScreen(
                 .fillMaxSize()
         ) {
 
-            // ──────────────────────────────────────────────
-            // PREMIUM
-            // ──────────────────────────────────────────────
+            // ── PREMIUM ──────────────────────────────────────────────
             item {
                 SettingsSectionHeader(
-                    title = "Premium",
+                    title = stringResource(R.string.settings_section_premium),
                     icon = Icons.Default.WorkspacePremium
                 )
             }
@@ -136,7 +134,8 @@ fun SettingsScreen(
                             MaterialTheme.colorScheme.primaryContainer
                         else
                             MaterialTheme.colorScheme.surface
-                    )
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         if (prefs.isPremium) {
@@ -150,7 +149,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    "Plan Premium activo",
+                                    stringResource(R.string.settings_premium_active_title),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -158,7 +157,7 @@ fun SettingsScreen(
                             }
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                "✓ Sin anuncios  ✓ Envíos ilimitados  ✓ Historial completo  ✓ Sync cada 30 min  ✓ Exportar CSV",
+                                stringResource(R.string.settings_premium_active_benefits),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -167,7 +166,7 @@ fun SettingsScreen(
                                 onClick = { viewModel.restorePurchases() },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Restaurar compra")
+                                Text(stringResource(R.string.settings_premium_restore))
                             }
                         } else {
                             // Oferta premium
@@ -180,14 +179,14 @@ fun SettingsScreen(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    "Hazte Premium",
+                                    stringResource(R.string.settings_premium_cta_title),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                "✓ Sin anuncios  ✓ Envíos ilimitados\n✓ Historial completo  ✓ Sync cada 30 min  ✓ Exportar CSV",
+                                stringResource(R.string.settings_premium_free_benefits),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -215,8 +214,8 @@ fun SettingsScreen(
                                 } else {
                                     val price = state.subscriptionPriceText
                                     Text(
-                                        if (price == "—") "Suscribirse — anual"
-                                        else "Suscribirse — $price / año"
+                                        if (price == "—") stringResource(R.string.settings_premium_subscribe_no_price)
+                                        else stringResource(R.string.settings_premium_subscribe_price, price)
                                     )
                                 }
                             }
@@ -226,7 +225,7 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    "Restaurar compra anterior",
+                                    stringResource(R.string.settings_premium_restore_alt),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.outline
                                 )
@@ -236,173 +235,165 @@ fun SettingsScreen(
                 }
             }
 
-            item { SettingsDivider() }
+            item { Spacer(Modifier.height(8.dp)) }
 
-            // ──────────────────────────────────────────────
-            // NOTIFICACIONES
-            // ──────────────────────────────────────────────
+            // ── NOTIFICACIONES ───────────────────────────────────────
             item {
                 SettingsSectionHeader(title = stringResource(R.string.settings_section_notifications), icon = Icons.Default.Notifications)
             }
             item {
-                SettingsSwitchItem(
-                    title = stringResource(R.string.settings_notifications_title),
-                    subtitle = stringResource(R.string.settings_notifications_subtitle),
-                    icon = Icons.Default.NotificationsActive,
-                    checked = prefs.notificationsEnabled,
-                    onCheckedChange = { enable ->
-                        if (enable && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            // Android 13+ requiere solicitar el permiso explícitamente
-                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            viewModel.setNotificationsEnabled(enable)
+                SettingsCardGroup {
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_notifications_title),
+                        subtitle = stringResource(R.string.settings_notifications_subtitle),
+                        icon = Icons.Default.NotificationsActive,
+                        checked = prefs.notificationsEnabled,
+                        onCheckedChange = { enable ->
+                            if (enable && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                viewModel.setNotificationsEnabled(enable)
+                            }
                         }
+                    )
+                    SettingsItemDivider()
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_important_only_title),
+                        subtitle = stringResource(R.string.settings_important_only_subtitle),
+                        icon = Icons.Default.FilterList,
+                        checked = prefs.onlyImportantEvents,
+                        enabled = prefs.notificationsEnabled,
+                        onCheckedChange = { viewModel.setOnlyImportantEvents(it) }
+                    )
+                    SettingsItemDivider()
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_quiet_hours_title),
+                        subtitle = stringResource(R.string.settings_quiet_hours_subtitle),
+                        icon = Icons.Default.BedtimeOff,
+                        checked = prefs.quietHoursEnabled,
+                        enabled = prefs.notificationsEnabled,
+                        onCheckedChange = { viewModel.setQuietHoursEnabled(it) }
+                    )
+                    if (prefs.quietHoursEnabled && prefs.notificationsEnabled) {
+                        SettingsItemDivider()
+                        SettingsNavigationItem(
+                            title = stringResource(R.string.settings_quiet_hours_start_title),
+                            subtitle = "%02d:00".format(prefs.quietHoursStart),
+                            icon = Icons.Default.NightsStay,
+                            onClick = { showQuietHoursStartDialog = true }
+                        )
+                        SettingsItemDivider()
+                        SettingsNavigationItem(
+                            title = stringResource(R.string.settings_quiet_hours_end_title),
+                            subtitle = "%02d:00".format(prefs.quietHoursEnd),
+                            icon = Icons.Default.WbSunny,
+                            onClick = { showQuietHoursEndDialog = true }
+                        )
                     }
-                )
-            }
-            item {
-                SettingsSwitchItem(
-                    title = stringResource(R.string.settings_important_only_title),
-                    subtitle = stringResource(R.string.settings_important_only_subtitle),
-                    icon = Icons.Default.FilterList,
-                    checked = prefs.onlyImportantEvents,
-                    enabled = prefs.notificationsEnabled,
-                    onCheckedChange = { viewModel.setOnlyImportantEvents(it) }
-                )
-            }
-            item {
-                SettingsSwitchItem(
-                    title = "Horas de silencio",
-                    subtitle = "No enviar notificaciones en el rango horario indicado",
-                    icon = Icons.Default.BedtimeOff,
-                    checked = prefs.quietHoursEnabled,
-                    enabled = prefs.notificationsEnabled,
-                    onCheckedChange = { viewModel.setQuietHoursEnabled(it) }
-                )
-            }
-            if (prefs.quietHoursEnabled && prefs.notificationsEnabled) {
-                item {
-                    SettingsNavigationItem(
-                        title = "Inicio del silencio",
-                        subtitle = "%02d:00".format(prefs.quietHoursStart),
-                        icon = Icons.Default.NightsStay,
-                        onClick = { showQuietHoursStartDialog = true }
-                    )
-                }
-                item {
-                    SettingsNavigationItem(
-                        title = "Fin del silencio",
-                        subtitle = "%02d:00".format(prefs.quietHoursEnd),
-                        icon = Icons.Default.WbSunny,
-                        onClick = { showQuietHoursEndDialog = true }
-                    )
                 }
             }
 
-            item { SettingsDivider() }
+            item { Spacer(Modifier.height(8.dp)) }
 
-            // ──────────────────────────────────────────────
-            // SINCRONIZACIÓN
-            // ──────────────────────────────────────────────
+            // ── SINCRONIZACIÓN ───────────────────────────────────────
             item {
                 SettingsSectionHeader(title = stringResource(R.string.settings_section_sync), icon = Icons.Default.Sync)
             }
             item {
-                SettingsSwitchItem(
-                    title = stringResource(R.string.settings_autosync_title),
-                    subtitle = stringResource(R.string.settings_autosync_subtitle),
-                    icon = Icons.Default.Autorenew,
-                    checked = prefs.autoSync,
-                    onCheckedChange = { viewModel.setAutoSync(it) }
-                )
-            }
-            item {
-                val intervalLabel = when (prefs.syncIntervalHours) {
-                    -1   -> "Cada 30 min ✦"
-                    0    -> stringResource(R.string.settings_sync_manual)
-                    1    -> stringResource(R.string.settings_sync_1h)
-                    2    -> stringResource(R.string.settings_sync_2h)
-                    6    -> stringResource(R.string.settings_sync_6h)
-                    12   -> stringResource(R.string.settings_sync_12h)
-                    else -> stringResource(R.string.settings_sync_nh, prefs.syncIntervalHours)
-                }
-                SettingsNavigationItem(
-                    title = stringResource(R.string.settings_sync_interval_title),
-                    subtitle = intervalLabel,
-                    icon = Icons.Default.Schedule,
-                    enabled = prefs.autoSync,
-                    onClick = { showSyncIntervalDialog = true }
-                )
-            }
-            item {
-                SettingsSwitchItem(
-                    title = stringResource(R.string.settings_sync_wifi_title),
-                    subtitle = stringResource(R.string.settings_sync_wifi_subtitle),
-                    icon = Icons.Default.Wifi,
-                    checked = prefs.syncOnlyOnWifi,
-                    enabled = prefs.autoSync,
-                    onCheckedChange = { viewModel.setSyncOnlyOnWifi(it) }
-                )
-            }
-            item {
-                val syncFailed = state.lastSyncText == "Falló la última sincronización"
-                SettingsCustomTrailingItem(
-                    title = stringResource(R.string.settings_sync_status_title),
-                    subtitle = state.lastSyncText,
-                    icon = if (syncFailed) Icons.Default.CloudOff else Icons.Default.CloudDone,
-                    trailingContent = {
-                        if (syncFailed) {
-                            TextButton(onClick = { viewModel.syncNow() }) {
-                                Text("Reintentar")
+                SettingsCardGroup {
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_autosync_title),
+                        subtitle = stringResource(R.string.settings_autosync_subtitle),
+                        icon = Icons.Default.Autorenew,
+                        checked = prefs.autoSync,
+                        onCheckedChange = { viewModel.setAutoSync(it) }
+                    )
+                    SettingsItemDivider()
+                    val intervalLabel = when (prefs.syncIntervalHours) {
+                        -1   -> stringResource(R.string.settings_sync_30min_premium)
+                        0    -> stringResource(R.string.settings_sync_manual)
+                        1    -> stringResource(R.string.settings_sync_1h)
+                        2    -> stringResource(R.string.settings_sync_2h)
+                        6    -> stringResource(R.string.settings_sync_6h)
+                        12   -> stringResource(R.string.settings_sync_12h)
+                        else -> stringResource(R.string.settings_sync_nh, prefs.syncIntervalHours)
+                    }
+                    SettingsNavigationItem(
+                        title = stringResource(R.string.settings_sync_interval_title),
+                        subtitle = intervalLabel,
+                        icon = Icons.Default.Schedule,
+                        enabled = prefs.autoSync,
+                        onClick = { showSyncIntervalDialog = true }
+                    )
+                    SettingsItemDivider()
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_sync_wifi_title),
+                        subtitle = stringResource(R.string.settings_sync_wifi_subtitle),
+                        icon = Icons.Default.Wifi,
+                        checked = prefs.syncOnlyOnWifi,
+                        enabled = prefs.autoSync,
+                        onCheckedChange = { viewModel.setSyncOnlyOnWifi(it) }
+                    )
+                    SettingsItemDivider()
+                    val syncFailed = state.lastSyncText == "Falló la última sincronización"
+                    SettingsCustomTrailingItem(
+                        title = stringResource(R.string.settings_sync_status_title),
+                        subtitle = state.lastSyncText,
+                        icon = if (syncFailed) Icons.Default.CloudOff else Icons.Default.CloudDone,
+                        trailingContent = {
+                            if (syncFailed) {
+                                TextButton(onClick = { viewModel.syncNow() }) {
+                                    Text(stringResource(R.string.settings_sync_retry))
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
 
-            item { SettingsDivider() }
+            item { Spacer(Modifier.height(8.dp)) }
 
-            // ──────────────────────────────────────────────
-            // ENVÍOS
-            // ──────────────────────────────────────────────
+            // ── ENVÍOS ───────────────────────────────────────────────
             item {
                 SettingsSectionHeader(title = stringResource(R.string.settings_section_shipments), icon = Icons.Default.Inventory2)
             }
             item {
-                SettingsNavigationItem(
-                    title = stringResource(R.string.settings_archived_title),
-                    subtitle = stringResource(R.string.settings_archived_subtitle),
-                    icon = Icons.Default.Archive,
-                    onClick = onArchivedClick
-                )
-            }
-            item {
-                SettingsNavigationItem(
-                    title = "Exportar envíos a CSV",
-                    subtitle = when {
-                        !isPremium               -> "✦ Solo Premium"
-                        exportResult is ExportResult.Loading -> "Exportando..."
-                        else                     -> "Descarga un archivo con todos tus envíos"
-                    },
-                    icon = Icons.Default.FileDownload,
-                    enabled = isPremium && exportResult !is ExportResult.Loading,
-                    onClick = {
-                        if (isPremium) viewModel.exportCsv()
-                        else showPremiumSyncDialog = true
-                    }
-                )
+                SettingsCardGroup {
+                    SettingsNavigationItem(
+                        title = stringResource(R.string.settings_archived_title),
+                        subtitle = stringResource(R.string.settings_archived_subtitle),
+                        icon = Icons.Default.Archive,
+                        onClick = onArchivedClick
+                    )
+                    SettingsItemDivider()
+                    SettingsNavigationItem(
+                        title = stringResource(R.string.settings_csv_export_title),
+                        subtitle = when {
+                            !isPremium                           -> "✦ Solo Premium"
+                            exportResult is ExportResult.Loading -> "Exportando..."
+                            else                                 -> stringResource(R.string.settings_csv_export_subtitle)
+                        },
+                        icon = Icons.Default.FileDownload,
+                        enabled = isPremium && exportResult !is ExportResult.Loading,
+                        onClick = {
+                            if (isPremium) viewModel.exportCsv()
+                            else showPremiumSyncDialog = true
+                        }
+                    )
+                }
             }
 
-            item { SettingsDivider() }
+            item { Spacer(Modifier.height(8.dp)) }
 
-            // ──────────────────────────────────────────────
-            // INTEGRACIONES
-            // ──────────────────────────────────────────────
+            // ── INTEGRACIONES ────────────────────────────────────────
             item {
                 SettingsSectionHeader(title = stringResource(R.string.settings_section_integrations), icon = Icons.Default.Link)
             }
             item {
-                val amazonSubtitle = if (state.isAmazonConnected) stringResource(R.string.settings_amazon_session_active) else stringResource(R.string.settings_amazon_not_connected)
+                val amazonSubtitle = if (state.isAmazonConnected)
+                    stringResource(R.string.settings_amazon_session_active)
+                else
+                    stringResource(R.string.settings_amazon_not_connected)
                 val amazonTrailing: @Composable () -> Unit = {
                     if (state.isAmazonConnected) {
                         TextButton(
@@ -415,90 +406,91 @@ fun SettingsScreen(
                         TextButton(onClick = onAmazonAuthClick) { Text(stringResource(R.string.settings_amazon_connect)) }
                     }
                 }
-                SettingsCustomTrailingItem(
-                    title = "Amazon",
-                    subtitle = amazonSubtitle,
-                    icon = Icons.Default.ShoppingCart,
-                    trailingContent = amazonTrailing
-                )
-            }
-            item {
-                SettingsNavigationItem(
-                    title = stringResource(R.string.settings_gmail_title),
-                    subtitle = stringResource(R.string.settings_gmail_subtitle),
-                    icon = Icons.Default.Email,
-                    onClick = onGmailClick
-                )
+                SettingsCardGroup {
+                    SettingsCustomTrailingItem(
+                        title = stringResource(R.string.settings_amazon_section_title),
+                        subtitle = amazonSubtitle,
+                        icon = Icons.Default.ShoppingCart,
+                        trailingContent = amazonTrailing
+                    )
+                    SettingsItemDivider()
+                    SettingsNavigationItem(
+                        title = stringResource(R.string.settings_gmail_title),
+                        subtitle = stringResource(R.string.settings_gmail_subtitle),
+                        icon = Icons.Default.Email,
+                        onClick = onGmailClick
+                    )
+                }
             }
 
-            item { SettingsDivider() }
+            item { Spacer(Modifier.height(8.dp)) }
 
-            // ──────────────────────────────────────────────
-            // APARIENCIA
-            // ──────────────────────────────────────────────
+            // ── APARIENCIA ───────────────────────────────────────────
             item {
                 SettingsSectionHeader(title = stringResource(R.string.settings_section_appearance), icon = Icons.Default.Palette)
             }
             item {
-                val themeLabel = when (prefs.theme) {
-                    "light"  -> stringResource(R.string.settings_theme_light)
-                    "dark"   -> stringResource(R.string.settings_theme_dark)
-                    else     -> stringResource(R.string.settings_theme_system)
+                SettingsCardGroup {
+                    val themeLabel = when (prefs.theme) {
+                        "light"  -> stringResource(R.string.settings_theme_light)
+                        "dark"   -> stringResource(R.string.settings_theme_dark)
+                        else     -> stringResource(R.string.settings_theme_system)
+                    }
+                    SettingsNavigationItem(
+                        title = stringResource(R.string.settings_theme_title),
+                        subtitle = themeLabel,
+                        icon = Icons.Default.DarkMode,
+                        onClick = { showThemeDialog = true }
+                    )
                 }
-                SettingsNavigationItem(
-                    title = stringResource(R.string.settings_theme_title),
-                    subtitle = themeLabel,
-                    icon = Icons.Default.DarkMode,
-                    onClick = { showThemeDialog = true }
-                )
             }
 
-            item { SettingsDivider() }
+            item { Spacer(Modifier.height(8.dp)) }
 
-            // ──────────────────────────────────────────────
-            // ESTADÍSTICAS
-            // ──────────────────────────────────────────────
+            // ── ESTADÍSTICAS ─────────────────────────────────────────
             item {
-                SettingsSectionHeader(title = "Mis estadísticas", icon = Icons.Default.BarChart)
+                SettingsSectionHeader(title = stringResource(R.string.settings_section_stats), icon = Icons.Default.BarChart)
             }
             item {
-                SettingsNavigationItem(
-                    title = "Ver estadísticas",
-                    subtitle = "Gráficas de envíos, transportistas y más",
-                    icon = Icons.Default.BarChart,
-                    onClick = onStatsClick
-                )
+                SettingsCardGroup {
+                    SettingsNavigationItem(
+                        title = stringResource(R.string.settings_stats_title),
+                        subtitle = stringResource(R.string.settings_stats_subtitle),
+                        icon = Icons.Default.BarChart,
+                        onClick = onStatsClick
+                    )
+                }
             }
 
-            item { SettingsDivider() }
+            item { Spacer(Modifier.height(8.dp)) }
 
-            // ──────────────────────────────────────────────
-            // ACERCA DE
-            // ──────────────────────────────────────────────
+            // ── ACERCA DE ────────────────────────────────────────────
             item {
                 SettingsSectionHeader(title = stringResource(R.string.settings_section_about), icon = Icons.Default.Info)
             }
             item {
-                SettingsInfoItem(
-                    title = stringResource(R.string.settings_version_title),
-                    subtitle = state.appVersion,
-                    icon = Icons.Default.Tag
-                )
-            }
-            item {
-                SettingsNavigationItem(
-                    title = stringResource(R.string.settings_clear_map_cache_title),
-                    subtitle = if (cacheCleared) stringResource(R.string.settings_map_cache_cleared) else stringResource(R.string.settings_clear_map_cache_subtitle),
-                    icon = Icons.Default.DeleteSweep,
-                    onClick = { showClearCacheDialog = true }
-                )
+                SettingsCardGroup {
+                    SettingsInfoItem(
+                        title = stringResource(R.string.settings_version_title),
+                        subtitle = state.appVersion,
+                        icon = Icons.Default.Tag
+                    )
+                    SettingsItemDivider()
+                    SettingsNavigationItem(
+                        title = stringResource(R.string.settings_clear_map_cache_title),
+                        subtitle = if (cacheCleared)
+                            stringResource(R.string.settings_map_cache_cleared)
+                        else
+                            stringResource(R.string.settings_clear_map_cache_subtitle),
+                        icon = Icons.Default.DeleteSweep,
+                        onClick = { showClearCacheDialog = true }
+                    )
+                }
             }
 
-            // ──────────────────────────────────────────────
-            // DEVELOPER (solo en builds DEBUG)
-            // ──────────────────────────────────────────────
+            // ── DEVELOPER (solo en builds DEBUG) ─────────────────────
             if (BuildConfig.DEBUG) {
-                item { SettingsDivider() }
+                item { Spacer(Modifier.height(8.dp)) }
                 item {
                     SettingsSectionHeader(
                         title = "Developer",
@@ -506,13 +498,15 @@ fun SettingsScreen(
                     )
                 }
                 item {
-                    SettingsSwitchItem(
-                        title = "Simular Premium",
-                        subtitle = if (prefs.isPremium) "Modo Premium activo" else "Modo Free activo",
-                        icon = Icons.Default.AdminPanelSettings,
-                        checked = prefs.isPremium,
-                        onCheckedChange = { viewModel.setIsPremiumDebug(it) }
-                    )
+                    SettingsCardGroup {
+                        SettingsSwitchItem(
+                            title = "Simular Premium",
+                            subtitle = if (prefs.isPremium) "Modo Premium activo" else "Modo Free activo",
+                            icon = Icons.Default.AdminPanelSettings,
+                            checked = prefs.isPremium,
+                            onCheckedChange = { viewModel.setIsPremiumDebug(it) }
+                        )
+                    }
                 }
             }
 
@@ -532,7 +526,7 @@ fun SettingsScreen(
 
     if (showQuietHoursStartDialog) {
         HourPickerDialog(
-            title = "Inicio del silencio",
+            title = stringResource(R.string.settings_quiet_hours_start_title),
             current = prefs.quietHoursStart,
             onSelect = { viewModel.setQuietHoursStart(it); showQuietHoursStartDialog = false },
             onDismiss = { showQuietHoursStartDialog = false }
@@ -541,7 +535,7 @@ fun SettingsScreen(
 
     if (showQuietHoursEndDialog) {
         HourPickerDialog(
-            title = "Fin del silencio",
+            title = stringResource(R.string.settings_quiet_hours_end_title),
             current = prefs.quietHoursEnd,
             onSelect = { viewModel.setQuietHoursEnd(it); showQuietHoursEndDialog = false },
             onDismiss = { showQuietHoursEndDialog = false }
@@ -610,13 +604,13 @@ fun SettingsScreen(
                     modifier = Modifier.size(32.dp)
                 )
             },
-            title = { Text("Función Premium") },
-            text = { Text("Esta función está disponible solo para suscriptores Premium.\n\n✓ Sin anuncios\n✓ Envíos ilimitados\n✓ Historial completo\n✓ Sync cada 30 min\n✓ Exportar CSV") },
+            title = { Text(stringResource(R.string.settings_premium_feature_title)) },
+            text = { Text(stringResource(R.string.settings_premium_feature_message)) },
             confirmButton = {
                 Button(onClick = {
                     showPremiumSyncDialog = false
                     viewModel.purchaseSubscription(activity)
-                }) { Text("Hazte Premium") }
+                }) { Text(stringResource(R.string.settings_premium_feature_cta)) }
             },
             dismissButton = {
                 TextButton(onClick = { showPremiumSyncDialog = false }) {
@@ -661,6 +655,32 @@ private fun SettingsDivider() {
     )
 }
 
+/** Card contenedor para un grupo de items de settings. */
+@Composable
+private fun SettingsCardGroup(content: @Composable () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column { content() }
+    }
+}
+
+/** Divisor fino entre items dentro de un SettingsCardGroup. */
+@Composable
+private fun SettingsItemDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 56.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    )
+}
+
 @Composable
 fun SettingsSwitchItem(
     title: String,
@@ -670,44 +690,39 @@ fun SettingsSwitchItem(
     enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = enabled) { onCheckedChange(!checked) }
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
-                       else MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(24.dp)
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+                   else MaterialTheme.colorScheme.outline,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.outline
             )
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.outline
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                enabled = enabled
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled
+        )
     }
 }
 
@@ -719,45 +734,40 @@ fun SettingsNavigationItem(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
-                       else MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(24.dp)
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+                   else MaterialTheme.colorScheme.outline,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.outline
             )
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.outline
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(20.dp)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -767,31 +777,26 @@ fun SettingsInfoItem(
     subtitle: String,
     icon: ImageVector
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 }
@@ -803,33 +808,28 @@ fun SettingsCustomTrailingItem(
     icon: ImageVector,
     trailingContent: @Composable () -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            trailingContent()
         }
+        trailingContent()
     }
 }
 

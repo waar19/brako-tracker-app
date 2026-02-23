@@ -19,7 +19,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -37,6 +40,29 @@ class ShipmentRepository @Inject constructor(
     private val interrapidisimoScraper: InterrapidisimoScraper
 ) {
     companion object {
+        // ── SimpleDateFormat cacheados (ThreadLocal = thread-safe con Dispatchers.IO) ───────────
+        /** ISO 8601 con hora: "yyyy-MM-dd'T'HH:mm:ss" */
+        private val FMT_ISO_DATETIME: ThreadLocal<SimpleDateFormat> = ThreadLocal.withInitial {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).also {
+                it.timeZone = TimeZone.getTimeZone("UTC")
+            }
+        }
+        /** ISO 8601 solo fecha: "yyyy-MM-dd" */
+        private val FMT_ISO_DATE: ThreadLocal<SimpleDateFormat> = ThreadLocal.withInitial {
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).also {
+                it.timeZone = TimeZone.getTimeZone("UTC")
+            }
+        }
+        /** Formatos de fecha usados por Interrapidísimo — lista inmutable, reutilizada entre llamadas */
+        private val INTERRAPIDISIMO_DATE_FORMATS: List<Pair<String, Locale>> = listOf(
+            Pair("dd/MM/yyyy HH:mm:ss", Locale.getDefault()),
+            Pair("dd/MM/yyyy HH:mm",    Locale.getDefault()),
+            Pair("dd/MM/yyyy",          Locale.getDefault()),
+            Pair("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
+            Pair("yyyy-MM-dd HH:mm:ss", Locale.US),
+            Pair("yyyy-MM-dd",          Locale.US)
+        )
+
         // Mapeo conocido: nombre del carrier → slug de AfterShip
         // AfterShip se encarga del scraping (incluyendo CAPTCHAs)
         private val CARRIER_SLUG_MAP = mapOf(
@@ -161,6 +187,10 @@ class ShipmentRepository @Inject constructor(
         }
     }
 
+    // Un Mutex por shipment ID — evita que SyncWorker y pull-to-refresh refresquen el mismo
+    // envío simultáneamente (race condition de escritura en la DB)
+    private val refreshLocks = ConcurrentHashMap<String, Mutex>()
+
     val activeShipments: Flow<List<ShipmentWithEvents>> = dao.getAllActiveShipments()
     val archivedShipments: Flow<List<ShipmentWithEvents>> = dao.getAllArchivedShipments()
     /** Todos los envíos (activos + archivados) — usado por StatsViewModel. */
@@ -268,7 +298,9 @@ class ShipmentRepository @Inject constructor(
     }
 
     suspend fun refreshShipment(id: String) = withContext(Dispatchers.IO) {
-        val shipmentWithEvents = dao.getShipmentById(id).first() ?: return@withContext
+        val lock = refreshLocks.getOrPut(id) { Mutex() }
+        lock.withLock {
+        val shipmentWithEvents = dao.getShipmentById(id).first() ?: return@withLock
         var shipment = shipmentWithEvents.shipment
 
         // Auto-corregir título genérico heredado de versiones anteriores
@@ -280,14 +312,14 @@ class ShipmentRepository @Inject constructor(
         // Si es un tracking de Amazon, usar el servicio de Amazon directamente
         if (amazonService.isAmazonTracking(shipment.trackingNumber)) {
             refreshShipmentAmazon(id)
-            return@withContext
+            return@withLock
         }
 
         // Si es Interrapidísimo, usar el scraper directo
         if (shipment.carrier == "interrapidisimo-scraper" ||
             InterrapidisimoScraper.isInterrapidisimoTracking(shipment.trackingNumber)) {
             refreshShipmentInterrapidisimo(id)
-            return@withContext
+            return@withLock
         }
 
         // Resolver el slug correcto: el carrier guardado puede ser el nombre (ej. "interrapidisimo")
@@ -301,7 +333,7 @@ class ShipmentRepository @Inject constructor(
 
         try {
             val response = api.getTrackingInfo(effectiveSlug, shipment.trackingNumber)
-            val tracking = response.data?.tracking ?: return@withContext
+            val tracking = response.data?.tracking ?: return@withLock
 
             // Traducir el tag principal al español; si el subtag_message aporta más detalle,
             // intentar traducirlo también y usar el más descriptivo (el subtag es más específico).
@@ -326,12 +358,6 @@ class ShipmentRepository @Inject constructor(
                 estimatedDelivery = estimatedDeliveryMs ?: shipment.estimatedDelivery
             ))
 
-            // Auto-archivar si el envío fue entregado
-            if (statusText == "Entregado") {
-                dao.archiveShipment(id)
-                android.util.Log.d("Tracking", "Auto-archivado envío entregado: $id")
-            }
-
             val events = tracking.checkpoints.mapIndexed { index, checkpoint ->
                 val rawDescription = checkpoint.message
                     ?: checkpoint.subtag_message
@@ -351,6 +377,7 @@ class ShipmentRepository @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("ShipmentRepository", "Error al refrescar envío AfterShip: ${e.message}", e)
         }
+        } // lock.withLock
     }
 
     private suspend fun refreshShipmentAmazon(id: String) = withContext(Dispatchers.IO) {
@@ -395,12 +422,6 @@ class ShipmentRepository @Inject constructor(
                 subCarrierName = result.subCarrierName ?: shipment.subCarrierName,
                 subCarrierTrackingId = result.subCarrierTrackingId ?: shipment.subCarrierTrackingId
             ))
-
-            // Auto-archivar si el envío fue entregado
-            if (status.lowercase().let { it.contains("entregado") || it.contains("delivered") }) {
-                dao.archiveShipment(id)
-                android.util.Log.d("Tracking", "Auto-archivado envío Amazon entregado: $id")
-            }
 
             // Guardar eventos
             if (result.events.isNotEmpty()) {
@@ -460,12 +481,6 @@ class ShipmentRepository @Inject constructor(
                 lastUpdate = System.currentTimeMillis()
             ))
 
-            // Auto-archivar si el envío fue entregado
-            if (displayStatus.lowercase().contains("entregado")) {
-                dao.archiveShipment(id)
-                android.util.Log.d("Tracking", "Auto-archivado envío Interrapidísimo entregado: $id")
-            }
-
             // Guardar eventos
             if (result.events.isNotEmpty()) {
                 val events = result.events.mapIndexed { index, event ->
@@ -497,18 +512,10 @@ class ShipmentRepository @Inject constructor(
 
     private fun parseInterrapidisimoDate(dateStr: String): Long? {
         if (dateStr.isBlank()) return null
-        // Formatos posibles: "dd/MM/yyyy HH:mm:ss", "dd/MM/yyyy", "yyyy-MM-dd HH:mm:ss"
-        val formats = listOf(
-            java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()),
-            java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()),
-            java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()),
-            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
-            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US),
-            java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        )
-        for (fmt in formats) {
+        // Reutilizar la lista de formatos cacheada — solo se crea SimpleDateFormat por iteración
+        for ((pattern, locale) in INTERRAPIDISIMO_DATE_FORMATS) {
             try {
-                return fmt.parse(dateStr.trim())?.time
+                return SimpleDateFormat(pattern, locale).parse(dateStr.trim())?.time
             } catch (_: Exception) {}
         }
         android.util.Log.w("ShipmentRepository", "No se pudo parsear fecha Inter: $dateStr")
@@ -553,14 +560,10 @@ class ShipmentRepository @Inject constructor(
     /** Parsea un string ISO 8601 (ej. "2025-02-28T00:00:00") a timestamp en milisegundos. */
     private fun parseIso8601Date(dateStr: String): Long? {
         return try {
-            val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-            fmt.timeZone = TimeZone.getTimeZone("UTC")
-            fmt.parse(dateStr.take(19))?.time
+            FMT_ISO_DATETIME.get()!!.parse(dateStr.take(19))?.time
         } catch (e: Exception) {
             try {
-                val fmtDate = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                fmtDate.timeZone = TimeZone.getTimeZone("UTC")
-                fmtDate.parse(dateStr.take(10))?.time
+                FMT_ISO_DATE.get()!!.parse(dateStr.take(10))?.time
             } catch (e2: Exception) {
                 null
             }
@@ -574,9 +577,7 @@ class ShipmentRepository @Inject constructor(
         try {
             if (dateStr.contains("T") && dateStr.endsWith("Z")) {
                 val cleanDate = if (dateStr.length > 19) dateStr.substring(0, 19) else dateStr.replace("Z", "")
-                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                isoFormat.timeZone = TimeZone.getTimeZone("UTC")
-                return isoFormat.parse(cleanDate)?.time
+                return FMT_ISO_DATETIME.get()!!.parse(cleanDate)?.time
             }
         } catch (e: Exception) {
             // Ignorar y seguir

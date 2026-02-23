@@ -7,10 +7,12 @@ import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
@@ -33,7 +35,14 @@ class DetailViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    // Error de refresh — se muestra como snackbar y se limpia tras mostrarse
+    private val _refreshError = MutableStateFlow<String?>(null)
+    val refreshError: StateFlow<String?> = _refreshError.asStateFlow()
+
+    fun clearRefreshError() { _refreshError.value = null }
+
     // Combina el estado raw con isPremium para aplicar el filtro de historial
+    // distinctUntilChanged evita recomposiciones cuando el contenido no cambia
     val uiState: StateFlow<DetailUiState> = combine(
         _rawState,
         prefsRepository.preferences
@@ -50,18 +59,24 @@ class DetailViewModel @Inject constructor(
         } else {
             state
         }
-    }.stateIn(
+    }.distinctUntilChanged()
+    .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = DetailUiState.Loading
     )
+
+    // Job para el colector de getShipment — se cancela antes de relanzar para evitar
+    // múltiples colectores activos si loadShipment() se llama más de una vez
+    private var loadJob: Job? = null
 
     init {
         loadShipment()
     }
 
     fun loadShipment() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             repository.getShipment(shipmentId).collect { shipment ->
                 if (shipment != null) {
                     _rawState.value = DetailUiState.Success(shipment)
@@ -79,6 +94,7 @@ class DetailViewModel @Inject constructor(
                 repository.refreshShipment(shipmentId)
             } catch (e: Exception) {
                 android.util.Log.e("DetailViewModel", "Error al refrescar: ${e.message}")
+                _refreshError.value = "No se pudo actualizar el envío"
             } finally {
                 _isRefreshing.value = false
             }

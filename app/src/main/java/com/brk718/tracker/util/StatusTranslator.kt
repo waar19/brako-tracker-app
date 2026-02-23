@@ -6,7 +6,7 @@ package com.brk718.tracker.util
  * AfterShip usa tags estándar para clasificar el estado general del envío,
  * y subtag_message / checkpoint.message como texto descriptivo más detallado.
  * Los carriers colombianos ya devuelven texto en español; los internacionales
- * (FedEx, UPS, USPS, DHL) y la propia API devuelven texto en inglés.
+ * (FedEx, UPS, USPS, DHL, Amazon) devuelven texto en inglés.
  */
 object StatusTranslator {
 
@@ -14,180 +14,194 @@ object StatusTranslator {
     // https://www.aftership.com/docs/tracking/quick-start/tracking-shipments/tracking-statuses
 
     fun translateTag(tag: String): String = when (tag) {
-        "Pending"         -> "Pendiente"
-        "InfoReceived"    -> "Información recibida"
-        "InTransit"       -> "En tránsito"
-        "OutForDelivery"  -> "En reparto"
-        "AttemptFail"     -> "Intento fallido"
-        "Delivered"       -> "Entregado"
+        "Pending"            -> "Pendiente"
+        "InfoReceived"       -> "Información recibida"
+        "InTransit"          -> "En tránsito"
+        "OutForDelivery"     -> "En reparto"
+        "AttemptFail"        -> "Intento fallido"
+        "Delivered"          -> "Entregado"
         "AvailableForPickup" -> "Disponible para recoger"
-        "Exception"       -> "Incidencia"
-        "Expired"         -> "Expirado"
-        else              -> tag
+        "Exception"          -> "Incidencia"
+        "Expired"            -> "Expirado"
+        // Amazon Logistics tags
+        "PickedUp"           -> "Recolectado"
+        "AtStation"          -> "En estación"
+        else                 -> tag
     }
 
     // ─── Mensajes comunes de AfterShip subtag_message / checkpoint.message ────
-    // Mapa de frases en inglés → español. La clave debe estar en minúsculas.
+    // IMPORTANTE: Las frases más largas deben ir primero para que el matching
+    // por contenido no quede bloqueado por una frase más corta que también coincide.
+    // Ej: "delivered to mailbox" debe estar antes que "delivered", si no siempre
+    // gana "delivered" aunque el texto completo sea "delivered to mailbox".
 
-    private val PHRASE_MAP: Map<String, String> = mapOf(
-        // Informativos / pre-envío
-        "shipping information received"        to "Información de envío recibida",
-        "shipment information received"        to "Información del envío recibida",
-        "label created"                        to "Etiqueta creada",
-        "order placed"                         to "Pedido realizado",
-        "order received"                       to "Pedido recibido",
-        "order confirmed"                      to "Pedido confirmado",
-        "package accepted"                     to "Paquete aceptado",
-        "package received"                     to "Paquete recibido",
-        "picked up"                            to "Recolectado",
-        "picked up by carrier"                 to "Recolectado por el transportista",
-        "shipment picked up"                   to "Envío recolectado",
+    private val PHRASES: List<Pair<String, String>> = listOf(
 
-        // En tránsito
-        "in transit"                           to "En tránsito",
-        "in transit to next facility"          to "En tránsito hacia la siguiente instalación",
-        "departed facility"                    to "Salió de instalación",
-        "arrived at facility"                  to "Llegó a instalación",
-        "arrived at sort facility"             to "Llegó a centro de clasificación",
-        "departed sort facility"               to "Salió del centro de clasificación",
-        "arrived at transit facility"          to "Llegó a instalación de tránsito",
-        "departed transit facility"            to "Salió de instalación de tránsito",
-        "arrived at destination facility"      to "Llegó a instalación de destino",
-        "arrived at hub"                       to "Llegó al hub",
-        "departed hub"                         to "Salió del hub",
-        "in customs"                           to "En aduana",
-        "customs clearance"                    to "Despacho aduanero",
-        "cleared customs"                      to "Aduanas despachado",
-        "customs cleared"                      to "Aduanas despachado",
-        "import customs"                       to "Aduana de importación",
-        "export customs"                       to "Aduana de exportación",
-        "on the way"                           to "En camino",
-        "package in transit"                   to "Paquete en tránsito",
-        "shipment in transit"                  to "Envío en tránsito",
-        "at local post office"                 to "En oficina postal local",
-        "with delivery courier"                to "Con el repartidor",
-
-        // En reparto
-        "out for delivery"                     to "En reparto",
-        "on vehicle for delivery"              to "En vehículo de reparto",
-        "with delivery agent"                  to "Con el agente de entrega",
-        "delivery in progress"                 to "Entrega en progreso",
-        "delivery attempted"                   to "Intento de entrega",
-
-        // Entregado
-        "delivered"                            to "Entregado",
-        "delivered to mailbox"                 to "Entregado en buzón",
-        "delivered to neighbor"                to "Entregado a vecino",
-        "delivered to reception"               to "Entregado en recepción",
-        "delivered to parcel locker"           to "Entregado en casillero",
-        "delivered - left at door"             to "Entregado - dejado en la puerta",
-        "package delivered"                    to "Paquete entregado",
-        "shipment delivered"                   to "Envío entregado",
-        "signed for by"                        to "Firmado por",
-
-        // Disponible para recoger
-        "available for pickup"                 to "Disponible para recoger",
-        "held at customs"                      to "Retenido en aduana",
-        "held at post office"                  to "Retenido en oficina postal",
-        "notice left"                          to "Aviso dejado",
-        "delivery notice left"                 to "Aviso de entrega dejado",
-
-        // Intentos fallidos
-        "delivery attempt failed"              to "Intento de entrega fallido",
-        "delivery failed"                      to "Entrega fallida",
-        "unable to deliver"                    to "No se pudo entregar",
-        "recipient not available"              to "Destinatario no disponible",
-        "no one home"                          to "Nadie en casa",
-        "wrong address"                        to "Dirección incorrecta",
-        "address issue"                        to "Problema con la dirección",
-        "insufficient address"                 to "Dirección insuficiente",
-        "incorrect address"                    to "Dirección incorrecta",
-
-        // Excepciones / incidencias
-        "exception"                            to "Incidencia",
-        "delay"                                to "Retraso",
-        "delayed"                              to "Retrasado",
-        "shipment delay"                       to "Retraso en el envío",
-        "weather delay"                        to "Retraso por clima",
-        "damaged"                              to "Dañado",
-        "package damaged"                      to "Paquete dañado",
-        "lost"                                 to "Perdido",
-        "package lost"                         to "Paquete perdido",
-        "return to sender"                     to "Devuelto al remitente",
-        "returning to sender"                  to "Devolviendo al remitente",
-        "returned to sender"                   to "Devuelto al remitente",
-        "refused by recipient"                 to "Rechazado por el destinatario",
-
-        // Expirado
-        "expired"                              to "Expirado",
-        "shipment expired"                     to "Envío expirado",
-
-        // FedEx específico
-        "shipment information sent to fedex"   to "Información enviada a FedEx",
+        // ── Informativos / pre-envío ─────────────────────────────────────────
+        "shipping information sent to fedex"          to "Información enviada a FedEx",
+        "shipment information received"               to "Información del envío recibida",
+        "shipping information received"               to "Información de envío recibida",
         "picked up - package available for clearance" to "Recolectado – disponible para despacho",
-        "on fedex vehicle for delivery"        to "En vehículo FedEx para entrega",
-        "international shipment release"       to "Envío internacional liberado",
+        "picked up by carrier"                        to "Recolectado por el transportista",
+        "shipment picked up"                          to "Envío recolectado",
+        "package accepted"                            to "Paquete aceptado",
+        "package received"                            to "Paquete recibido",
+        "order confirmed"                             to "Pedido confirmado",
+        "order received"                              to "Pedido recibido",
+        "order placed"                                to "Pedido realizado",
+        "order shipped"                               to "Pedido enviado",
+        "label created"                               to "Etiqueta creada",
+        "label printed"                               to "Etiqueta impresa",
+        "picked up"                                   to "Recolectado",
 
-        // UPS específico
-        "your package is on its way"           to "Tu paquete está en camino",
-        "package transferred to post office"   to "Paquete transferido a correo",
-        "destination scan"                     to "Escaneo en destino",
-        "origin scan"                          to "Escaneo en origen",
+        // ── En tránsito ──────────────────────────────────────────────────────
+        "in transit to next facility"                 to "En tránsito hacia la siguiente instalación",
+        "arrived at destination facility"             to "Llegó a instalación de destino",
+        "package transferred to destination facility" to "Paquete transferido a instalación de destino",
+        "package transferred to post office"          to "Paquete transferido a correo",
+        "arrived at transit facility"                 to "Llegó a instalación de tránsito",
+        "departed transit facility"                   to "Salió de instalación de tránsito",
+        "arrived at sort facility"                    to "Llegó a centro de clasificación",
+        "departed sort facility"                      to "Salió del centro de clasificación",
+        "processed at dhl facility"                   to "Procesado en instalación DHL",
+        "arrived at carrier facility"                 to "Llegó a instalación del transportista",
+        "arrived at facility"                         to "Llegó a instalación",
+        "departed facility"                           to "Salió de instalación",
+        "depart usps regional facility"               to "Salió de instalación regional USPS",
+        "arrive usps regional facility"               to "Llegó a instalación regional USPS",
+        "processed through facility"                  to "Procesado en instalación",
+        "international shipment release"              to "Envío internacional liberado",
+        "usps in possession of item"                  to "USPS tiene el artículo",
+        "on fedex vehicle for delivery"               to "En vehículo FedEx para entrega",
+        "your package is on its way"                  to "Tu paquete está en camino",
+        "your package has been shipped"               to "Tu paquete ha sido enviado",
+        "your shipment is on the way"                 to "Tu envío está en camino",
+        "shipment in transit"                         to "Envío en tránsito",
+        "package in transit"                          to "Paquete en tránsito",
+        "at local post office"                        to "En oficina postal local",
+        "with delivery courier"                       to "Con el repartidor",
+        "customs clearance"                           to "Despacho aduanero",
+        "cleared customs"                             to "Aduanas despachado",
+        "customs cleared"                             to "Aduanas despachado",
+        "import customs"                              to "Aduana de importación",
+        "export customs"                              to "Aduana de exportación",
+        "in customs"                                  to "En aduana",
+        "sorting complete"                            to "Clasificación completada",
+        "destination scan"                            to "Escaneo en destino",
+        "origin scan"                                 to "Escaneo en origen",
+        "departed hub"                                to "Salió del hub",
+        "arrived at hub"                              to "Llegó al hub",
+        "on the way"                                  to "En camino",
+        "in transit"                                  to "En tránsito",
+        "transit"                                     to "En tránsito",
+        "acceptance"                                  to "Aceptado",
 
-        // USPS específico
-        "usps in possession of item"           to "USPS tiene el artículo",
-        "acceptance"                           to "Aceptado",
-        "depart usps regional facility"        to "Salió de instalación regional USPS",
-        "arrive usps regional facility"        to "Llegó a instalación regional USPS",
-        "processed through facility"           to "Procesado en instalación",
-        "sorting complete"                     to "Clasificación completada",
+        // ── En reparto ───────────────────────────────────────────────────────
+        "on vehicle for delivery"                     to "En vehículo de reparto",
+        "with delivery agent"                         to "Con el agente de entrega",
+        "delivery in progress"                        to "Entrega en progreso",
+        "delivery attempted"                          to "Intento de entrega",
+        "out for delivery"                            to "En reparto",
 
-        // DHL específico
-        "shipment picked up"                   to "Envío recolectado",
-        "processed at dhl facility"            to "Procesado en instalación DHL",
-        "transit"                              to "En tránsito",
-        "delivered - signed"                   to "Entregado – firmado"
+        // ── Entregado ────────────────────────────────────────────────────────
+        "your package has been delivered"             to "Tu paquete ha sido entregado",
+        "delivered - left at door"                    to "Entregado – dejado en la puerta",
+        "delivered to parcel locker"                  to "Entregado en casillero",
+        "delivered to reception"                      to "Entregado en recepción",
+        "delivered to neighbor"                       to "Entregado a vecino",
+        "delivered to mailbox"                        to "Entregado en buzón",
+        "delivered - signed"                          to "Entregado – firmado",
+        "shipment delivered"                          to "Envío entregado",
+        "package delivered"                           to "Paquete entregado",
+        "signed for by"                               to "Firmado por",
+        "delivered"                                   to "Entregado",
+
+        // ── Disponible para recoger ──────────────────────────────────────────
+        "available for pickup"                        to "Disponible para recoger",
+        "delivery notice left"                        to "Aviso de entrega dejado",
+        "held at customs"                             to "Retenido en aduana",
+        "held at post office"                         to "Retenido en oficina postal",
+        "notice left"                                 to "Aviso dejado",
+
+        // ── Intentos fallidos ────────────────────────────────────────────────
+        "delivery attempt failed"                     to "Intento de entrega fallido",
+        "recipient not available"                     to "Destinatario no disponible",
+        "insufficient address"                        to "Dirección insuficiente",
+        "incorrect address"                           to "Dirección incorrecta",
+        "address issue"                               to "Problema con la dirección",
+        "wrong address"                               to "Dirección incorrecta",
+        "delivery failed"                             to "Entrega fallida",
+        "unable to deliver"                           to "No se pudo entregar",
+        "no one home"                                 to "Nadie en casa",
+
+        // ── Excepciones / incidencias ────────────────────────────────────────
+        "returning to sender"                         to "Devolviendo al remitente",
+        "returned to sender"                          to "Devuelto al remitente",
+        "return to sender"                            to "Devuelto al remitente",
+        "refused by recipient"                        to "Rechazado por el destinatario",
+        "package damaged"                             to "Paquete dañado",
+        "package lost"                                to "Paquete perdido",
+        "shipment delay"                              to "Retraso en el envío",
+        "weather delay"                               to "Retraso por clima",
+        "exception"                                   to "Incidencia",
+        "delayed"                                     to "Retrasado",
+        "damaged"                                     to "Dañado",
+        "delay"                                       to "Retraso",
+        "lost"                                        to "Perdido",
+
+        // ── Expirado ─────────────────────────────────────────────────────────
+        "shipment expired"                            to "Envío expirado",
+        "expired"                                     to "Expirado"
     )
+
+    // Mapa para búsqueda exacta O(1)
+    private val PHRASE_MAP: Map<String, String> = PHRASES.toMap()
 
     /**
      * Intenta traducir un mensaje de estado al español.
-     * Si no hay traducción exacta, busca si alguna frase conocida está contenida en el mensaje.
-     * Si no encuentra nada, devuelve el texto original.
+     * Estrategia:
+     * 1. Si parece español, devolver tal cual.
+     * 2. Búsqueda exacta en el mapa.
+     * 3. Búsqueda por prefijo (ej. "Delivered to John Smith" → "Entregado — John Smith").
+     * 4. Búsqueda por contenido en orden de longitud (frases más largas primero).
+     * 5. Devolver original si no hay traducción.
      */
     fun translateMessage(message: String): String {
         if (message.isBlank()) return message
-
-        // Si ya parece estar en español (contiene palabras comunes en español), devolver tal cual
         if (looksLikeSpanish(message)) return message
 
         val lower = message.lowercase().trim()
 
-        // Coincidencia exacta
+        // 1. Coincidencia exacta
         PHRASE_MAP[lower]?.let { return it }
 
-        // Coincidencia por prefijo (ej. "Delivered to John Smith" → "Entregado")
-        for ((key, translation) in PHRASE_MAP) {
+        // 2. Coincidencia por prefijo (ej. "Delivered to John Smith")
+        for ((key, translation) in PHRASES) {
             if (lower.startsWith(key)) {
                 val suffix = message.substring(key.length).trim()
                 return if (suffix.isBlank()) translation else "$translation — $suffix"
             }
         }
 
-        // Coincidencia por contenido (ej. "Package in transit to Miami" → detecta "in transit")
-        for ((key, translation) in PHRASE_MAP) {
+        // 3. Coincidencia por contenido (PHRASES ya está ordenada de mayor a menor longitud
+        //    dentro de cada categoría, así las frases específicas ganan a las genéricas)
+        for ((key, translation) in PHRASES) {
             if (lower.contains(key)) return translation
         }
 
-        // Sin traducción conocida: devolver original
         return message
     }
 
-    // ─── Heurística simple para detectar si el texto ya está en español ────────
+    // ─── Heurística para detectar si el texto ya está en español ──────────────
+    // Se usan palabras/frases de ≥4 caracteres para evitar falsos positivos con
+    // partículas como "de", "en" que también existen en inglés.
 
     private val SPANISH_MARKERS = setOf(
-        "en ", "de ", "del", "con ", "por ", "para ", "está", "llegó", "salió",
-        "entregado", "tránsito", "reparto", "pendiente", "incidencia", "recibido",
-        "envío", "paquete", "novedad", "clasificación", "instalación", "recolectado"
+        "entregado", "tránsito", "transito", "reparto", "pendiente", "incidencia",
+        "recibido", "enviado", "envío", "paquete", "novedad", "clasificación",
+        "instalación", "recolectado", "disponible", "retenido", "expirado",
+        "llegó", "salió", "está", "para recoger", "intento", "retrasado",
+        "devuelto", "remitente", "dañado", "perdido", "firmado"
     )
 
     private fun looksLikeSpanish(text: String): Boolean {

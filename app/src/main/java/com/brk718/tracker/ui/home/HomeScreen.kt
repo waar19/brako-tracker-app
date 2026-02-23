@@ -82,6 +82,7 @@ fun HomeScreen(
 ) {
     val shipments by viewModel.shipments.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val refreshError by viewModel.refreshError.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val shouldShowRating by viewModel.shouldShowRatingRequest.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
@@ -133,6 +134,14 @@ fun HomeScreen(
         }
     }
 
+    // Mostrar snackbar cuando falla el refresh
+    LaunchedEffect(refreshError) {
+        refreshError?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearRefreshError()
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -142,7 +151,10 @@ fun HomeScreen(
                     TopAppBar(
                         title = {
                             Text(
-                                "${selectedIds.size} seleccionado${if (selectedIds.size == 1) "" else "s"}",
+                                if (selectedIds.size == 1)
+                                    stringResource(R.string.home_selected_count, selectedIds.size)
+                                else
+                                    stringResource(R.string.home_selected_count_plural, selectedIds.size),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -152,23 +164,23 @@ fun HomeScreen(
                         ),
                         navigationIcon = {
                             IconButton(onClick = { viewModel.clearSelection() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Cancelar selección")
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.home_selection_cancel))
                             }
                         },
                         actions = {
                             // Seleccionar todos
                             IconButton(onClick = { viewModel.selectAll() }) {
-                                Icon(Icons.Default.SelectAll, contentDescription = "Seleccionar todos")
+                                Icon(Icons.Default.SelectAll, contentDescription = stringResource(R.string.home_selection_select_all))
                             }
                             // Archivar seleccionados
                             IconButton(onClick = { viewModel.archiveSelected() }) {
-                                Icon(Icons.Default.Archive, contentDescription = "Archivar seleccionados")
+                                Icon(Icons.Default.Archive, contentDescription = stringResource(R.string.home_selection_archive))
                             }
                             // Eliminar seleccionados (con confirmación)
                             IconButton(onClick = { showDeleteConfirmDialog = true }) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Eliminar seleccionados",
+                                    contentDescription = stringResource(R.string.home_selection_delete),
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -257,7 +269,7 @@ fun HomeScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                "Sin conexion — mostrando ultima informacion guardada",
+                                stringResource(R.string.home_offline_banner),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
@@ -302,7 +314,7 @@ fun HomeScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Text(
-                                    "${shipments.size} / $FREE_SHIPMENT_LIMIT envíos activos",
+                                    stringResource(R.string.home_limit_chip_count, shipments.size, FREE_SHIPMENT_LIMIT),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (shipments.size >= FREE_SHIPMENT_LIMIT)
@@ -312,7 +324,7 @@ fun HomeScreen(
                                 )
                             }
                             Text(
-                                "Ampliar →",
+                                stringResource(R.string.home_limit_chip_upgrade),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = if (shipments.size >= FREE_SHIPMENT_LIMIT)
@@ -338,7 +350,7 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                 .focusRequester(focusRequester),
-                            placeholder = { Text("Buscar por título, número, transportista…") },
+                            placeholder = { Text(stringResource(R.string.home_search_placeholder)) },
                             leadingIcon = {
                                 Icon(Icons.Default.Search, contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -346,7 +358,7 @@ fun HomeScreen(
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
                                     IconButton(onClick = { viewModel.clearSearch() }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Limpiar",
+                                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.home_search_clear),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
@@ -421,7 +433,7 @@ fun HomeScreen(
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                "No se encontraron envíos para \"$searchQuery\"",
+                                stringResource(R.string.home_search_no_results, searchQuery),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -447,7 +459,7 @@ fun HomeScreen(
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                "Añade un número de seguimiento o importa\nautomáticamente desde Gmail",
+                                stringResource(R.string.home_empty_subtitle_extended),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -539,8 +551,15 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
             icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("Eliminar ${selectedIds.size} envío${if (selectedIds.size == 1) "" else "s"}") },
-            text = { Text("Esta acción no se puede deshacer. ¿Confirmas la eliminación?") },
+            title = {
+                Text(
+                    if (selectedIds.size == 1)
+                        stringResource(R.string.home_delete_confirm_title, selectedIds.size)
+                    else
+                        stringResource(R.string.home_delete_confirm_title_plural, selectedIds.size)
+                )
+            },
+            text = { Text(stringResource(R.string.home_delete_confirm_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -550,11 +569,11 @@ fun HomeScreen(
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
-                ) { Text("Eliminar") }
+                ) { Text(stringResource(R.string.home_delete_confirm_button)) }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmDialog = false }) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.home_cancel))
                 }
             }
         )
@@ -739,7 +758,7 @@ fun ShipmentCard(
                     ) {
                         // ── Compartir ──────────────────────────────────────────
                         DropdownMenuItem(
-                            text = { Text("Compartir") },
+                            text = { Text(stringResource(R.string.home_share)) },
                             leadingIcon = {
                                 Icon(Icons.Default.Share, null,
                                     tint = MaterialTheme.colorScheme.primary)
@@ -762,7 +781,7 @@ fun ShipmentCard(
                                     putExtra(Intent.EXTRA_TEXT, shareText)
                                 }
                                 context.startActivity(
-                                    Intent.createChooser(shareIntent, "Compartir envío")
+                                    Intent.createChooser(shareIntent, context.getString(R.string.home_share_chooser))
                                 )
                             }
                         )
@@ -951,6 +970,6 @@ private fun relativeTime(timestampMs: Long): String {
         minutes < 60  -> "hace $minutes min"
         hours   < 24  -> "hace $hours h"
         days    < 30  -> "hace $days d"
-        else          -> "hace ${days / 30} mes"
+        else          -> { val m = days / 30; "hace $m ${if (m == 1L) "mes" else "meses"}" }
     }
 }

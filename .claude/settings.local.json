@@ -88,7 +88,11 @@
       "Bash(./gradlew.bat clean)",
       "Bash(./gradlew.bat assembleRelease:*)",
       "Bash(./gradlew.bat:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(Get-Content \"C:\\\\Users\\\\waar1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-waar1-AndroidStudioProjects-Tracker\\\\tasks\\\\a877acb.output\" -Raw)",
+      "Bash(Select-String -Pattern \".\")",
+      "Bash(Select-Object -First 200)",
+      "Bash(test:*)"
     ]
   }
 }

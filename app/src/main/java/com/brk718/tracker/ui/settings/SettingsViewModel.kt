@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -171,6 +172,7 @@ class SettingsViewModel @Inject constructor(
         // OneTime work para sincronización inmediata (visible en syncWorkInfoFlow)
         val oneTimeRequest = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5L, TimeUnit.MINUTES)
             .build()
         workManager.enqueueUniqueWork(
             "TrackerSyncNow",
@@ -272,10 +274,12 @@ class SettingsViewModel @Inject constructor(
         val request = if (effectiveInterval == -1) {
             PeriodicWorkRequestBuilder<SyncWorker>(30L, TimeUnit.MINUTES)
                 .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5L, TimeUnit.MINUTES)
                 .build()
         } else {
             PeriodicWorkRequestBuilder<SyncWorker>(effectiveInterval.toLong(), TimeUnit.HOURS)
                 .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10L, TimeUnit.MINUTES)
                 .build()
         }
         workManager.enqueueUniquePeriodicWork(

@@ -7,6 +7,9 @@ import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -79,15 +82,38 @@ class HomeViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private val _refreshError = MutableStateFlow<String?>(null)
+    val refreshError: StateFlow<String?> = _refreshError.asStateFlow()
+
+    fun clearRefreshError() { _refreshError.value = null }
+
     fun refreshAll() {
         viewModelScope.launch {
             _isRefreshing.value = true
+            _refreshError.value = null
             try {
-                // first() garantiza que esperamos la primera emisión del Flow antes de iterar,
-                // evitando la race condition de stateIn().value que puede ser lista vacía.
-                repository.activeShipments.first().forEach { shipmentWithEvents ->
-                    repository.refreshShipment(shipmentWithEvents.shipment.id)
+                val shipments = repository.activeShipments.first()
+                // Refrescar todos en paralelo — cada async devuelve true si falló
+                val failCount = coroutineScope {
+                    shipments.map { shipmentWithEvents ->
+                        async {
+                            try {
+                                repository.refreshShipment(shipmentWithEvents.shipment.id)
+                                false // sin fallo
+                            } catch (e: Exception) {
+                                true  // fallo
+                            }
+                        }
+                    }.awaitAll().count { it }
                 }
+                if (failCount > 0) {
+                    _refreshError.value = if (failCount == 1)
+                        "No se pudo actualizar 1 envío"
+                    else
+                        "No se pudieron actualizar $failCount envíos"
+                }
+            } catch (e: Exception) {
+                _refreshError.value = "Error al actualizar: sin conexión"
             } finally {
                 _isRefreshing.value = false
             }

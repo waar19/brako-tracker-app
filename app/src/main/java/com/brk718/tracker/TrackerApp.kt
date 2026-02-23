@@ -31,11 +31,14 @@ class TrackerApp : Application(), Configuration.Provider {
         val notificationManager =
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // Canal principal: cambios de estado de envíos
+        // Borrar canal antiguo (IMPORTANCE_DEFAULT no mostraba banners heads-up)
+        notificationManager.deleteNotificationChannel(CHANNEL_SHIPMENT_UPDATES_OLD)
+
+        // Canal v2: IMPORTANCE_HIGH garantiza banners emergentes (heads-up) en Android 8+
         val shipmentChannel = NotificationChannel(
             CHANNEL_SHIPMENT_UPDATES,
             "Actualizaciones de envíos",
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "Notificaciones cuando cambia el estado de tus envíos"
             enableVibration(true)
@@ -45,6 +48,7 @@ class TrackerApp : Application(), Configuration.Provider {
     }
 
     companion object {
-        const val CHANNEL_SHIPMENT_UPDATES = "shipment_updates"
+        const val CHANNEL_SHIPMENT_UPDATES = "shipment_updates_v2"
+        private const val CHANNEL_SHIPMENT_UPDATES_OLD = "shipment_updates"
     }
 }
