@@ -28,6 +28,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.brk718.tracker.BuildConfig
 import com.brk718.tracker.R
 import com.brk718.tracker.data.billing.BillingState
@@ -350,6 +353,36 @@ fun SettingsScreen(
                             if (syncFailed) {
                                 TextButton(onClick = { viewModel.syncNow() }) {
                                     Text(stringResource(R.string.settings_sync_retry))
+                                }
+                            }
+                        }
+                    )
+                    SettingsItemDivider()
+                    // Tile "Segundo plano": re-evalúa al volver de la pantalla del sistema (ON_RESUME)
+                    val lifecycleOwner = LocalLifecycleOwner.current
+                    var batteryOk by remember { mutableStateOf(viewModel.isBatteryOptimizationIgnored()) }
+                    DisposableEffect(lifecycleOwner) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            if (event == Lifecycle.Event.ON_RESUME) {
+                                batteryOk = viewModel.isBatteryOptimizationIgnored()
+                            }
+                        }
+                        lifecycleOwner.lifecycle.addObserver(observer)
+                        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                    }
+                    SettingsCustomTrailingItem(
+                        title = "Segundo plano",
+                        subtitle = if (batteryOk)
+                            "Notificaciones sin restricciones ✓"
+                        else
+                            "Optimización activa — puede perder notificaciones",
+                        icon = Icons.Default.BatteryAlert,
+                        trailingContent = {
+                            if (!batteryOk) {
+                                TextButton(
+                                    onClick = { viewModel.requestBatteryOptimizationExemption() }
+                                ) {
+                                    Text("Corregir")
                                 }
                             }
                         }

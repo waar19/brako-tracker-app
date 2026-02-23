@@ -81,6 +81,7 @@ class SettingsViewModel @Inject constructor(
                 scheduleSyncWorker(
                     intervalHours = prefs.syncIntervalHours,
                     onlyWifi      = prefs.syncOnlyOnWifi,
+                    isPremium     = prefs.isPremium,
                     policy        = ExistingPeriodicWorkPolicy.KEEP
                 )
             }
@@ -95,7 +96,7 @@ class SettingsViewModel @Inject constructor(
                 .collect { isPremium ->
                     if (!isPremium) {
                         val prefs = prefsRepo.preferences.first()
-                        if (prefs.autoSync) scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi)
+                        if (prefs.autoSync) scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi, prefs.isPremium)
                     }
                 }
         }
@@ -232,7 +233,7 @@ class SettingsViewModel @Inject constructor(
         // Re-encolar el trabajo periódico con UPDATE para resetear su estado FAILED
         val prefs = uiState.value.preferences
         if (prefs.autoSync) {
-            scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi)
+            scheduleSyncWorker(prefs.syncIntervalHours, prefs.syncOnlyOnWifi, prefs.isPremium)
         }
     }
 
@@ -240,7 +241,8 @@ class SettingsViewModel @Inject constructor(
     fun setAutoSync(value: Boolean) = viewModelScope.launch {
         prefsRepo.setAutoSync(value)
         if (value) {
-            scheduleSyncWorker(uiState.value.preferences.syncIntervalHours, uiState.value.preferences.syncOnlyOnWifi)
+            val p = uiState.value.preferences
+            scheduleSyncWorker(p.syncIntervalHours, p.syncOnlyOnWifi, p.isPremium)
         } else {
             workManager.cancelUniqueWork("TrackerSync")
         }
@@ -249,14 +251,16 @@ class SettingsViewModel @Inject constructor(
     fun setSyncIntervalHours(hours: Int) = viewModelScope.launch {
         prefsRepo.setSyncIntervalHours(hours)
         if (uiState.value.preferences.autoSync) {
-            scheduleSyncWorker(hours, uiState.value.preferences.syncOnlyOnWifi)
+            val p = uiState.value.preferences
+            scheduleSyncWorker(hours, p.syncOnlyOnWifi, p.isPremium)
         }
     }
 
     fun setSyncOnlyOnWifi(value: Boolean) = viewModelScope.launch {
         prefsRepo.setSyncOnlyOnWifi(value)
         if (uiState.value.preferences.autoSync) {
-            scheduleSyncWorker(uiState.value.preferences.syncIntervalHours, value)
+            val p = uiState.value.preferences
+            scheduleSyncWorker(p.syncIntervalHours, value, p.isPremium)
         }
     }
 
@@ -306,6 +310,39 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { outlookService.disconnect() }
     }
 
+    // === Segundo plano ===
+
+    /** Devuelve true si la app está eximida de la optimización de batería del sistema. */
+    fun isBatteryOptimizationIgnored(): Boolean {
+        val pm = context.getSystemService(android.content.Context.POWER_SERVICE)
+                as android.os.PowerManager
+        return pm.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    /**
+     * Abre el diálogo del sistema para solicitar la exención de optimización de batería.
+     * En la mayoría de OEMs esto desbloquea WorkManager para ejecutarse en segundo plano.
+     * Fallback: si el intent directo falla (raro en algunos OEMs), abre la pantalla general
+     * de optimización de batería.
+     */
+    fun requestBatteryOptimizationExemption() {
+        try {
+            val intent = android.content.Intent(
+                android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+            ).apply {
+                data = android.net.Uri.parse("package:${context.packageName}")
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback: abre la pantalla general de optimización de batería
+            val fallback = android.content.Intent(
+                android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
+            ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+            context.startActivity(fallback)
+        }
+    }
+
     // === Suscripción Premium ===
     fun purchaseSubscription(activity: android.app.Activity) {
         billingRepository.purchaseSubscription(activity)
@@ -351,10 +388,10 @@ class SettingsViewModel @Inject constructor(
     private fun scheduleSyncWorker(
         intervalHours: Int,
         onlyWifi: Boolean,
+        isPremium: Boolean,                                                      // pasado explícitamente para no leer uiState desde init
         policy: ExistingPeriodicWorkPolicy = ExistingPeriodicWorkPolicy.UPDATE
     ) {
         // Guard defensivo: si el usuario no es premium, nunca encolar worker de 30 min
-        val isPremium = uiState.value.preferences.isPremium
         val effectiveInterval = if (intervalHours == -1 && !isPremium) 2 else intervalHours
         if (effectiveInterval == 0) return  // manual — no programar
         val networkType = if (onlyWifi) NetworkType.UNMETERED else NetworkType.CONNECTED
