@@ -8,6 +8,4 @@
     <exclude domain="sharedpref" path="osmdroid" />
     <!-- Excluir archivo de debug de Amazon (solo existe en debug builds) -->
     <exclude domain="file" path="amazon_debug.html" />
-    <!-- Excluir caché HTTP de OkHttp -->
-    <exclude domain="cache" path="." />
 </full-backup-content>
