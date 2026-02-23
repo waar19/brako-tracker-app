@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brk718.tracker.data.local.UserPreferencesRepository
 import com.brk718.tracker.data.remote.GmailService
+import com.brk718.tracker.data.remote.OutlookService
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.domain.ParsedShipment
 import com.brk718.tracker.ui.add.FREE_SHIPMENT_LIMIT
@@ -25,14 +26,19 @@ data class GmailUiState(
     val hasScanned: Boolean = false,
     val foundShipments: List<ParsedShipment> = emptyList(),
     val importedIds: Set<String> = emptySet(),
-    val importingIds: Set<String> = emptySet(), // trackingNumbers que están siendo importados ahora
+    val importingIds: Set<String> = emptySet(),
     val error: String? = null,
-    val limitReachedIds: Set<String> = emptySet() // trackingNumbers rechazados por límite free
+    val limitReachedIds: Set<String> = emptySet(),
+    /** Señal para que GmailScreen lance el ActivityResultLauncher */
+    val shouldLaunchOAuth: Boolean = false,
+    /** Gate premium: true cuando Outlook ya está conectado y el usuario no es Premium */
+    val showMultiEmailPremiumGate: Boolean = false
 )
 
 @HiltViewModel
 class GmailViewModel @Inject constructor(
     private val gmailService: GmailService,
+    private val outlookService: OutlookService,   // para verificar si Outlook está conectado
     private val repository: ShipmentRepository,
     private val prefsRepository: UserPreferencesRepository
 ) : ViewModel() {
@@ -53,6 +59,30 @@ class GmailViewModel @Inject constructor(
     }
 
     fun getSignInIntent(): Intent = gmailService.signInIntent
+
+    /**
+     * Llamado cuando el usuario toca "Conectar Gmail".
+     * Verifica el gate premium antes de lanzar el OAuth.
+     * La Screen observa [GmailUiState.shouldLaunchOAuth] y lanza el launcher cuando sea true.
+     */
+    fun onConnectClicked() {
+        viewModelScope.launch {
+            val prefs = prefsRepository.userPreferencesFlow.first()
+            if (!prefs.isPremium && outlookService.isConnected()) {
+                // Outlook ya conectado + usuario free → gate premium
+                _uiState.update { it.copy(showMultiEmailPremiumGate = true) }
+                return@launch
+            }
+            // Sin restricción → señalar a la Screen que lance el OAuth
+            _uiState.update { it.copy(shouldLaunchOAuth = true) }
+        }
+    }
+
+    /** Llamado desde GmailScreen justo después de lanzar el launcher, para resetear la señal */
+    fun onOAuthLaunched() = _uiState.update { it.copy(shouldLaunchOAuth = false) }
+
+    /** Cierra el dialog de gate premium */
+    fun dismissPremiumGate() = _uiState.update { it.copy(showMultiEmailPremiumGate = false) }
 
     fun handleSignInResult(data: Intent?) {
         viewModelScope.launch {

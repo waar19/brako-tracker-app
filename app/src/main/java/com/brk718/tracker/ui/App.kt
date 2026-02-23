@@ -171,10 +171,16 @@ fun App(
                 PaywallScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.GMAIL) {
-                GmailScreen(onBack = { navController.popBackStack() })
+                GmailScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToPaywall = { navController.navigate(Routes.PAYWALL) }
+                )
             }
             composable(Routes.OUTLOOK) {
-                OutlookScreen(onBack = { navController.popBackStack() })
+                OutlookScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToPaywall = { navController.navigate(Routes.PAYWALL) }
+                )
             }
             composable(Routes.AMAZON_AUTH) {
                 AmazonAuthScreen(

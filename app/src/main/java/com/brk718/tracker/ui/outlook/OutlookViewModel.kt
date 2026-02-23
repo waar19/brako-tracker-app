@@ -4,6 +4,7 @@ import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brk718.tracker.data.local.UserPreferencesRepository
+import com.brk718.tracker.data.remote.EmailService
 import com.brk718.tracker.data.remote.OutlookService
 import com.brk718.tracker.data.repository.ShipmentRepository
 import com.brk718.tracker.domain.ParsedShipment
@@ -20,19 +21,22 @@ import javax.inject.Inject
 data class OutlookUiState(
     val isConnected: Boolean = false,
     val accountEmail: String? = null,
-    val isConnecting: Boolean = false,   // true mientras dura el flujo OAuth del browser
+    val isConnecting: Boolean = false,
     val isScanning: Boolean = false,
     val hasScanned: Boolean = false,
     val foundShipments: List<ParsedShipment> = emptyList(),
     val importedIds: Set<String> = emptySet(),
     val importingIds: Set<String> = emptySet(),
     val error: String? = null,
-    val limitReachedIds: Set<String> = emptySet()
+    val limitReachedIds: Set<String> = emptySet(),
+    /** Gate premium: true cuando Gmail ya está conectado y el usuario no es Premium */
+    val showMultiEmailPremiumGate: Boolean = false
 )
 
 @HiltViewModel
 class OutlookViewModel @Inject constructor(
     private val outlookService: OutlookService,
+    private val emailService: EmailService,       // GmailService vía DI, para verificar conexión
     private val repository: ShipmentRepository,
     private val prefsRepository: UserPreferencesRepository
 ) : ViewModel() {
@@ -58,8 +62,18 @@ class OutlookViewModel @Inject constructor(
      * Lanza el flujo OAuth interactivo de Microsoft.
      * Requiere la Activity activa (obtenida con LocalContext.current en el Composable).
      */
+    /** Cierra el dialog de gate premium */
+    fun dismissPremiumGate() = _uiState.update { it.copy(showMultiEmailPremiumGate = false) }
+
     fun signIn(activity: Activity) {
         viewModelScope.launch {
+            // Gate premium: Gmail ya conectado + usuario free → bloquear
+            val prefs = prefsRepository.userPreferencesFlow.first()
+            if (!prefs.isPremium && emailService.isConnected()) {
+                _uiState.update { it.copy(showMultiEmailPremiumGate = true) }
+                return@launch
+            }
+
             _uiState.update { it.copy(isConnecting = true, error = null) }
             try {
                 val ok = outlookService.signIn(activity)

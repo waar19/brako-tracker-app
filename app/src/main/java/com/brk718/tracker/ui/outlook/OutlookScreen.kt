@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,10 +30,42 @@ private val OutlookBlue = Color(0xFF0078D4)
 @Composable
 fun OutlookScreen(
     onBack: () -> Unit,
+    onNavigateToPaywall: () -> Unit = {},
     viewModel: OutlookViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+
+    // Dialog gate premium: Gmail ya conectado + usuario free
+    if (uiState.showMultiEmailPremiumGate) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissPremiumGate() },
+            icon = {
+                Icon(
+                    Icons.Default.WorkspacePremium,
+                    contentDescription = null,
+                    tint = Color(0xFFFFC107)
+                )
+            },
+            title = { Text("Función Premium") },
+            text = {
+                Text("Conectar Gmail y Outlook a la vez está disponible solo para usuarios Premium.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.dismissPremiumGate()
+                    onNavigateToPaywall()
+                }) {
+                    Text("Ver Premium")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissPremiumGate() }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
