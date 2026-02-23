@@ -20,6 +20,6 @@ data class CarrierScraperEvent(
  * Interfaz común para todos los scrapers de carriers colombianos.
  * Cada implementación es @Singleton y se inyecta vía [CarrierScraperFactory].
  */
-interface ColombianCarrierScraper {
+interface CarrierScraper {
     suspend fun getTracking(trackingNumber: String): CarrierScraperResult
 }

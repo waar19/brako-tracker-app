@@ -60,6 +60,14 @@ object CarrierDetector {
             t.matches(Regex("9\\d{9,10}")) -> "Servientrega"     // 10-11 dígitos, empieza con 9
             t.matches(Regex("22\\d{8}")) -> "Servientrega"       // 10 dígitos, empieza con 22 (formato alternativo)
 
+            // ── México — prefijos únicos (sin conflicto con Colombia) ────────
+            // J&T Express México: siempre empieza con "JMX" (único, no solapa)
+            t.matches(Regex("JMX\\d{9,12}", RegexOption.IGNORE_CASE)) -> "J&T Express MX"
+            // Estafeta waybill largo (22 dígitos); el de 10/13 dígitos es ambiguo con Colombia
+            t.matches(Regex("\\d{22}")) -> "Estafeta"
+            // Paquetexpress: alfanumérico con 3 letras iniciales (ej. MZR98HZ84420)
+            t.matches(Regex("[A-Z]{3}\\d{4,6}[A-Z0-9]{3,6}", RegexOption.IGNORE_CASE)) -> "Paquetexpress"
+
             // ── MercadoLibre (prefijo ME + 8-18 alfanuméricos) ───────────────
             // NO se mapea a slug fijo → AfterShip detectCouriers() elige el slug
             // correcto por país (mercadolibre-mx, mercadolibre-cl, etc.)

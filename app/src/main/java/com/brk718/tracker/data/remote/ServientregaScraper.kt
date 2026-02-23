@@ -31,7 +31,7 @@ import javax.inject.Singleton
  *   }
  */
 @Singleton
-class ServientregaScraper @Inject constructor() : ColombianCarrierScraper {
+class ServientregaScraper @Inject constructor() : CarrierScraper {
 
     companion object {
         private const val TAG = "ServientregaScraper"

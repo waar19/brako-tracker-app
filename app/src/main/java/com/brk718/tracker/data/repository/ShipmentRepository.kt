@@ -8,7 +8,7 @@ import com.brk718.tracker.data.local.ShipmentWithEvents
 import com.brk718.tracker.data.local.TrackingEventEntity
 import com.brk718.tracker.data.remote.AmazonTrackingService
 import com.brk718.tracker.data.remote.CarrierScraperFactory
-import com.brk718.tracker.data.remote.ColombianCarrierScraper
+import com.brk718.tracker.data.remote.CarrierScraper
 import com.brk718.tracker.data.remote.GeocodingService
 import com.brk718.tracker.data.remote.InterrapidisimoScraper
 import com.brk718.tracker.data.remote.CreateTrackingBody
@@ -76,7 +76,8 @@ class ShipmentRepository @Inject constructor(
         private val SCRAPER_ONLY_SLUGS = setOf(
             "servientrega",
             "coordinadora",  // AfterShip siempre devuelve 404 para coordinadora
-            "envia-co"       // API directa: queries.envia.com/shipments/generaltrack
+            "envia-co",      // API directa: queries.envia.com/shipments/generaltrack
+            "redpack",       // scraper directo WordPress AJAX (sin AfterShip)
         )
 
         // Mapeo conocido: nombre del carrier → slug de AfterShip
@@ -582,13 +583,13 @@ class ShipmentRepository @Inject constructor(
      * Fallback: obtiene datos de rastreo directamente del sitio del carrier cuando
      * AfterShip no retorna datos o falla.
      *
-     * Solo se activa para carriers que tienen un [ColombianCarrierScraper] registrado
+     * Solo se activa para carriers que tienen un [CarrierScraper] registrado
      * en [CarrierScraperFactory] (Servientrega, Coordinadora, TCC, Deprisa).
      */
     private suspend fun refreshShipmentWithScraper(
         id: String,
         shipment: ShipmentEntity,
-        scraper: ColombianCarrierScraper
+        scraper: CarrierScraper
     ) = withContext(Dispatchers.IO) {
         try {
             val result = scraper.getTracking(shipment.trackingNumber)
@@ -623,7 +624,9 @@ class ShipmentRepository @Inject constructor(
                             val cached = geocodeCache[cacheKey]!!
                             lat = cached.first; lon = cached.second
                         } else {
-                            val coords = geocodingService.getCoordinates(normalizeLocationQuery(event.location))
+                            val slug = resolveSlug(shipment.carrier) ?: shipment.carrier.lowercase()
+                            val country = countryForSlug(slug)
+                            val coords = geocodingService.getCoordinates(normalizeLocationQuery(event.location, country))
                             lat = coords?.lat; lon = coords?.lon
                             geocodeCache[cacheKey] = Pair(lat, lon)
                         }
@@ -662,20 +665,32 @@ class ShipmentRepository @Inject constructor(
     }
 
     /**
+     * Resuelve el país a usar en geocodificación según el slug del carrier.
+     * Necesario para que Nominatim devuelva coordenadas correctas:
+     * carriers mexicanos → "Mexico", resto → "Colombia" (default).
+     */
+    private fun countryForSlug(slug: String): String = when (slug) {
+        "estafeta", "redpack", "paquetexpress", "99minutos",
+        "jet-express", "ivoy", "correos-de-mexico" -> "Mexico"
+        else -> "Colombia"
+    }
+
+    /**
      * Normaliza el string de ciudad devuelto por el carrier para mejorar
      * el hit rate de Nominatim.
      *  "Medellin (Antioquia)"  → "Medellin, Colombia"
      *  "BOGOTA - CENTRO"       → "Bogota, Colombia"
-     *  "CALI"                  → "Cali, Colombia"
+     *  "MONTERREY - NORTE"     → "Monterrey, Mexico"
+     *  "CDMX"                  → "Cdmx, Mexico"
      */
-    private fun normalizeLocationQuery(raw: String): String {
+    private fun normalizeLocationQuery(raw: String, country: String = "Colombia"): String {
         var s = raw.trim()
         s = s.replace(Regex("\\s*\\(.*?\\)"), "").trim()  // strip "(Antioquia)"
         s = s.replace(Regex("\\s*-.*$"), "").trim()        // strip "- CENTRO"
         if (s.isNotBlank() && s.filter { it.isLetter() }.all { it.isUpperCase() }) {
             s = s.lowercase().replaceFirstChar { it.uppercaseChar() }  // BOGOTA → Bogota
         }
-        return "$s, Colombia"
+        return "$s, $country"
     }
 
     private suspend fun refreshShipmentAmazon(id: String) = withContext(Dispatchers.IO) {

@@ -34,7 +34,7 @@ import javax.inject.Singleton
 @Singleton
 class CoordinadoraScraper @Inject constructor(
     @ApplicationContext private val context: Context
-) : ColombianCarrierScraper {
+) : CarrierScraper {
 
     companion object {
         private const val TAG = "CoordinadoraScraper"
