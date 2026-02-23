@@ -101,7 +101,14 @@
       "WebFetch(domain:builtwith.com)",
       "WebFetch(domain:mobile.servientrega.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:www.aftership.com)"
+      "WebFetch(domain:www.aftership.com)",
+      "WebFetch(domain:docs.aftership.com)",
+      "WebFetch(domain:sismilenio.servientrega.com)",
+      "WebFetch(domain:wssismilenio.servientrega.com)",
+      "WebFetch(domain:tracking.servientrega.us)",
+      "Bash(curl:*)",
+      "Bash(powershell -File:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File:*)"
     ]
   }
 }

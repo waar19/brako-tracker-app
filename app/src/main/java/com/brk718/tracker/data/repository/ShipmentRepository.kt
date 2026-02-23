@@ -9,6 +9,7 @@ import com.brk718.tracker.data.local.TrackingEventEntity
 import com.brk718.tracker.data.remote.AmazonTrackingService
 import com.brk718.tracker.data.remote.CarrierScraperFactory
 import com.brk718.tracker.data.remote.ColombianCarrierScraper
+import com.brk718.tracker.data.remote.GeocodingService
 import com.brk718.tracker.data.remote.InterrapidisimoScraper
 import com.brk718.tracker.data.remote.CreateTrackingBody
 import com.brk718.tracker.data.remote.CreateTrackingRequest
@@ -40,7 +41,8 @@ class ShipmentRepository @Inject constructor(
     private val api: TrackingApi,
     private val amazonService: AmazonTrackingService,
     private val interrapidisimoScraper: InterrapidisimoScraper,
-    private val scraperFactory: CarrierScraperFactory
+    private val scraperFactory: CarrierScraperFactory,
+    private val geocodingService: GeocodingService
 ) {
     companion object {
         // ── SimpleDateFormat cacheados (ThreadLocal = thread-safe con Dispatchers.IO) ───────────
@@ -64,6 +66,16 @@ class ShipmentRepository @Inject constructor(
             Pair("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
             Pair("yyyy-MM-dd HH:mm:ss", Locale.US),
             Pair("yyyy-MM-dd",          Locale.US)
+        )
+
+        /**
+         * Carriers que van DIRECTO al scraper, sin pasar por AfterShip.
+         * AfterShip no los soporta (devuelve 404 o no responde), por lo que
+         * intentarlo solo causa freezes por timeout.
+         */
+        private val SCRAPER_ONLY_SLUGS = setOf(
+            "servientrega",
+            "coordinadora"   // AfterShip siempre devuelve 404 para coordinadora
         )
 
         // Mapeo conocido: nombre del carrier → slug de AfterShip
@@ -314,6 +326,19 @@ class ShipmentRepository @Inject constructor(
                 return@withContext
             }
 
+            // Paso 2b: Carriers con scraper directo (AfterShip no los soporta → freeze/timeout)
+            if (slug != null && slug in SCRAPER_ONLY_SLUGS) {
+                val directScraper = scraperFactory.getFor(slug)
+                if (directScraper != null) {
+                    android.util.Log.d("Tracking",
+                        "Usando scraper directo para $slug/$trackingNumber (no pasa por AfterShip)")
+                    dao.insertShipment(shipment.copy(carrier = slug, status = "Registrando..."))
+                    refreshShipmentWithScraper(id, shipment.copy(carrier = slug), directScraper)
+                    notifyWidget()
+                    return@withContext
+                }
+            }
+
             // Paso 2: Si tenemos slug, crear tracking en AfterShip
             var afterShipOk = false
             if (slug != null && slug != "amazon") {
@@ -428,6 +453,16 @@ class ShipmentRepository @Inject constructor(
         // Resolver el slug correcto: el carrier guardado puede ser el nombre (ej. "interrapidisimo")
         // o ya el slug (ej. "inter-rapidisimo"). Intentar resolución siempre.
         val effectiveSlug = resolveSlug(shipment.carrier) ?: shipment.carrier
+
+        // Si es un carrier que usa scraper directo, saltar AfterShip completamente
+        if (effectiveSlug in SCRAPER_ONLY_SLUGS) {
+            scraperFactory.getFor(effectiveSlug)?.let { scraper ->
+                android.util.Log.d("ShipmentRepository",
+                    "Scraper directo para $effectiveSlug/${shipment.trackingNumber} (sin AfterShip)")
+                refreshShipmentWithScraper(id, shipment, scraper)
+            }
+            return@withLock
+        }
         // Si el slug efectivo difiere del carrier guardado, corregirlo en la BD
         if (effectiveSlug != shipment.carrier) {
             dao.insertShipment(shipment.copy(carrier = effectiveSlug))
@@ -560,6 +595,14 @@ class ShipmentRepository @Inject constructor(
             if (result.error != null || result.status == null) {
                 android.util.Log.w("ShipmentRepository",
                     "Scraper sin datos para ${shipment.trackingNumber}: ${result.error}")
+                // Si el envío está en "Registrando..." (recién agregado), cambiarlo a un estado
+                // terminal para evitar que quede congelado para siempre.
+                if (shipment.status == "Registrando...") {
+                    dao.insertShipment(shipment.copy(
+                        status = "Seguimiento manual",
+                        lastUpdate = System.currentTimeMillis()
+                    ))
+                }
                 return@withContext
             }
 
@@ -569,14 +612,31 @@ class ShipmentRepository @Inject constructor(
             ))
 
             if (result.events.isNotEmpty()) {
+                val geocodeCache = mutableMapOf<String, Pair<Double?, Double?>>()
                 val events = result.events.mapIndexed { index, event ->
+                    var lat: Double? = null
+                    var lon: Double? = null
+                    if (event.location.isNotBlank()) {
+                        val cacheKey = event.location.trim().lowercase()
+                        if (geocodeCache.containsKey(cacheKey)) {
+                            val cached = geocodeCache[cacheKey]!!
+                            lat = cached.first; lon = cached.second
+                        } else {
+                            val coords = geocodingService.getCoordinates("${event.location}, Colombia")
+                            lat = coords?.lat; lon = coords?.lon
+                            geocodeCache[cacheKey] = Pair(lat, lon)
+                        }
+                    }
                     TrackingEventEntity(
                         id = 0L,
                         shipmentId = id,
-                        timestamp = System.currentTimeMillis() - (index * 3_600_000L),
+                        timestamp = parseInterrapidisimoDate(event.timestamp)
+                            ?: (System.currentTimeMillis() - (index * 3_600_000L)),
                         description = event.description,
                         location = event.location,
-                        status = ""
+                        status = "",
+                        latitude = lat,
+                        longitude = lon
                     )
                 }
                 dao.clearEventsForShipment(id)
@@ -589,6 +649,14 @@ class ShipmentRepository @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("ShipmentRepository",
                 "Scraper falló para ${shipment.trackingNumber}: ${e.message}", e)
+            // Si el envío sigue en "Registrando...", sacarlo de ese estado para evitar
+            // que quede congelado cuando OkHttp lanza SocketTimeoutException u otra excepción.
+            if (shipment.status == "Registrando...") {
+                dao.insertShipment(shipment.copy(
+                    status = "Seguimiento manual",
+                    lastUpdate = System.currentTimeMillis()
+                ))
+            }
         }
     }
 
